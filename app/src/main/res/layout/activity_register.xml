@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#E3F2FD"
+    android:background="#1C1C1C"
     android:padding="24dp">
 
     <LinearLayout
@@ -10,21 +11,26 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
+        <!-- Título Principal -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="NutriTrack"
-            android:textColor="#000000"
+            android:text="IronProgress"
+            android:textColor="#FFFFFF"
             android:textSize="32sp"
             android:textStyle="bold"
             android:layout_gravity="center"
             android:layout_marginTop="48dp"
             android:layout_marginBottom="64dp" />
 
+        <!-- Campo de Nombre -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="16dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:hintTextColor="@color/hintColor"
+            app:boxBackgroundColor="#2F2F2F">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/firstNameEditText"
@@ -32,14 +38,18 @@
                 android:layout_height="wrap_content"
                 android:hint="Nombre"
                 android:inputType="textPersonName"
-                android:padding="16dp"
-                android:background="#FFFFFF" />
+                android:textColor="#FFFFFF"
+                android:padding="16dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Campo de Apellido -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="16dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:hintTextColor="@color/hintColor"
+            app:boxBackgroundColor="#2F2F2F">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/lastNameEditText"
@@ -47,14 +57,18 @@
                 android:layout_height="wrap_content"
                 android:hint="Apellido"
                 android:inputType="textPersonName"
-                android:padding="16dp"
-                android:background="#FFFFFF" />
+                android:textColor="#FFFFFF"
+                android:padding="16dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Campo de Correo Electrónico -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="16dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:hintTextColor="@color/hintColor"
+            app:boxBackgroundColor="#2F2F2F">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/emailEditText"
@@ -62,14 +76,18 @@
                 android:layout_height="wrap_content"
                 android:hint="Correo electrónico"
                 android:inputType="textEmailAddress"
-                android:padding="16dp"
-                android:background="#FFFFFF" />
+                android:textColor="#FFFFFF"
+                android:padding="16dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- Campo de Contraseña -->
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="32dp">
+            android:layout_marginBottom="32dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:hintTextColor="@color/hintColor"
+            app:boxBackgroundColor="#2F2F2F">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/passwordEditText"
@@ -77,33 +95,11 @@
                 android:layout_height="wrap_content"
                 android:hint="Contraseña"
                 android:inputType="textPassword"
-                android:padding="16dp"
-                android:background="#FFFFFF" />
+                android:textColor="#FFFFFF"
+                android:padding="16dp" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="16dp">
-
-            <Button
-                android:id="@+id/getLocationButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Obtener ubicación" />
-
-            <TextView
-                android:id="@+id/locationTextView"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Ubicación no disponible"
-                android:textSize="14sp"
-                android:gravity="center_vertical" />
-        </LinearLayout>
-
+        <!-- Sección de Foto de Perfil -->
         <ImageView
             android:id="@+id/profileImageView"
             android:layout_width="100dp"
@@ -111,24 +107,29 @@
             android:layout_gravity="center"
             android:layout_marginBottom="16dp"
             android:scaleType="centerCrop"
-            android:background="@drawable/placeholder"
+            android:background="#2F2F2F"
             android:contentDescription="Vista previa de la foto" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/takePhotoButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Tomar Foto"
+            android:textSize="18sp"
+            android:padding="16dp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E63946"
             android:layout_marginBottom="32dp" />
 
-        <Button
+        <!-- Botón Registrar -->
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/registerButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Registrar"
             android:textSize="18sp"
             android:padding="16dp"
-            android:backgroundTint="#2196F3" />
-
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E63946" />
     </LinearLayout>
 </ScrollView>

@@ -2,25 +2,31 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
-    android:background="#E3F2FD"
+    android:background="#1C1C1C"
     android:padding="24dp">
 
+    <!-- Título Principal -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="NutriTrack"
-        android:textColor="#000000"
+        android:text="IronProgress"
+        android:textColor="#FFFFFF"
         android:textSize="32sp"
         android:textStyle="bold"
         android:layout_gravity="center"
         android:layout_marginTop="48dp"
         android:layout_marginBottom="64dp" />
 
+    <!-- Campo de Correo Electrónico -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="16dp"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        app:hintTextColor="@color/hintColor"
+        app:boxBackgroundColor="#2F2F2F">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/emailEditText"
@@ -28,14 +34,18 @@
             android:layout_height="wrap_content"
             android:hint="Correo electrónico"
             android:inputType="textEmailAddress"
-            android:padding="16dp"
-            android:background="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:padding="16dp" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- Campo de Contraseña -->
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="32dp">
+        android:layout_marginBottom="32dp"
+        style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+        app:hintTextColor="@color/hintColor"
+        app:boxBackgroundColor="#2F2F2F">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/passwordEditText"
@@ -43,27 +53,32 @@
             android:layout_height="wrap_content"
             android:hint="Contraseña"
             android:inputType="textPassword"
-            android:padding="16dp"
-            android:background="#FFFFFF" />
+            android:textColor="#FFFFFF"
+            android:padding="16dp" />
     </com.google.android.material.textfield.TextInputLayout>
 
-    <Button
+
+    <!-- Botón de Iniciar Sesión -->
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/loginButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Iniciar sesión"
         android:textSize="18sp"
+        android:textColor="#FFFFFF"
         android:padding="16dp"
-        android:backgroundTint="#2196F3"
+        android:backgroundTint="#E63946"
         android:layout_marginBottom="16dp" />
 
-    <Button
+    <!-- Botón de Registro -->
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/registerButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Registrar"
         android:textSize="18sp"
+        android:textColor="#FFFFFF"
         android:padding="16dp"
-        android:backgroundTint="#2196F3" />
+        android:backgroundTint="#E63946" />
 
 </LinearLayout>
