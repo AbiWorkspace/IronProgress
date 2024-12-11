@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">NutriTrack</string>
+    <string name="app_name">Iron Progress</string>
     <string name="prompt_gender">Seleccione el género</string>
     <string name="prompt_age">Seleccione la edad</string>
     <string name="prompt_height">Seleccione la altura (cm)</string>
