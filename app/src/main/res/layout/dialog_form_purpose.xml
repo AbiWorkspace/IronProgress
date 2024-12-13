@@ -1,0 +1,35 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@drawable/dialog_background"
+    android:gravity="center">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Propósito del Formulario"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Este formulario te permite proporcionar información básica como peso, altura, edad, género y nivel de actividad. Esta información será utilizada para sugerir objetivos personalizados para alcanzar tus metas de salud y condición física."
+        android:textColor="#B0BEC5"
+        android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/closePurposeButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Entendido"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#E63946"
+        android:textStyle="bold" />
+</LinearLayout>

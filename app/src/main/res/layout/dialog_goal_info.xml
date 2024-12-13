@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@drawable/dialog_background"
+    android:gravity="center">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Información de Meta"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="• Ganar músculo: Plan diseñado para aumentar masa muscular mediante ejercicios de fuerza y una dieta adecuada.\n\n• Perder peso: Objetivo centrado en reducir grasa corporal a través de un déficit calórico.\n\n• Mantenerse: Estrategia para conservar el peso actual y la composición corporal."
+        android:textColor="#B0BEC5"
+        android:textSize="16sp" />
+
+    <Button
+        android:id="@+id/closeGoalButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="Entendido"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#E63946"
+        android:textStyle="bold" />
+</LinearLayout>

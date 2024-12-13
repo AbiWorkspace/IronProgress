@@ -38,7 +38,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Peso"
+            android:text="Peso (kg)"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
@@ -63,7 +63,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Altura"
+            android:text="Altura (cm)"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
@@ -88,7 +88,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Edad"
+            android:text="Edad (años)"
             android:textSize="18sp"
             android:textStyle="bold"
             android:textColor="#FFFFFF"
@@ -168,15 +168,13 @@
 
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/helpButton"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:src="@drawable/ic_help"
-                app:tint="#FFFFFF"
-                app:backgroundTint="#E63946"
-                android:layout_marginStart="8dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="center"
-                app:fabSize="mini" />
-
+                android:scaleType="center"
+                android:src="@drawable/ic_help"
+                app:backgroundTint="#E63946"
+                app:tint="#FFFFFF" />
 
 
         </LinearLayout>
@@ -196,14 +194,34 @@
                 android:textColor="#FFFFFF"
                 android:layout_marginBottom="8dp" />
 
-            <Spinner
-                android:id="@+id/goalSpinner"
+            <!-- Contenedor horizontal para el Spinner y el botón -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="#2F2F2F"
-                android:padding="16dp"
-                android:textColor="#FFFFFF"/>
+                android:orientation="horizontal">
+
+                <Spinner
+                    android:id="@+id/goalSpinner"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:background="#2F2F2F"
+                    android:padding="16dp"
+                    android:textColor="#FFFFFF" />
+
+                <com.google.android.material.floatingactionbutton.FloatingActionButton
+                    android:id="@+id/goalHelpButton"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_gravity="center"
+                    android:layout_marginStart="8dp"
+                    android:scaleType="center"
+                    android:src="@drawable/ic_help"
+                    app:backgroundTint="#E63946"
+                    app:tint="#FFFFFF" />
+            </LinearLayout>
         </com.google.android.material.textfield.TextInputLayout>
+
 
         <!-- Botón Enviar -->
         <com.google.android.material.button.MaterialButton

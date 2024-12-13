@@ -39,14 +39,12 @@ import java.util.Map;
 public class RegisterActivity extends AppCompatActivity {
 
     private EditText firstNameEditText, lastNameEditText, emailEditText, passwordEditText;
-    private Button registerButton, getLocationButton, takePhotoButton;
-    private TextView locationTextView;
+    private Button registerButton,  takePhotoButton;
     private ImageView profileImageView;
 
     private FirebaseAuth mAuth;
     private DatabaseReference mDatabase;
-    private LocationManager locationManager;
-    private LocationListener locationListener;
+
 
     private Bitmap photoBitmap; // Bitmap para almacenar la foto tomada
     private double currentLatitude = 0.0, currentLongitude = 0.0;
@@ -57,7 +55,7 @@ public class RegisterActivity extends AppCompatActivity {
         setContentView(R.layout.activity_register);
 
         initializeUI();
-        setupLocation();
+
         setupPhotoCapture();
 
         mAuth = FirebaseAuth.getInstance();
@@ -81,28 +79,13 @@ public class RegisterActivity extends AppCompatActivity {
         emailEditText = findViewById(R.id.emailEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         registerButton = findViewById(R.id.registerButton);
-        getLocationButton = findViewById(R.id.getLocationButton);
+
         takePhotoButton = findViewById(R.id.takePhotoButton);
-        locationTextView = findViewById(R.id.locationTextView);
+
         profileImageView = findViewById(R.id.profileImageView);
     }
 
-    private void setupLocation() {
-        locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-        locationListener = location -> {
-            currentLatitude = location.getLatitude();
-            currentLongitude = location.getLongitude();
-            locationTextView.setText("Lat: " + currentLatitude + ", Lng: " + currentLongitude);
-        };
 
-        getLocationButton.setOnClickListener(v -> {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-            } else {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
-            }
-        });
-    }
 
     private void setupPhotoCapture() {
         takePhotoButton.setOnClickListener(v -> {
@@ -175,8 +158,6 @@ public class RegisterActivity extends AppCompatActivity {
         userUpdates.put("lastName", lastName);
         userUpdates.put("email", email);
         userUpdates.put("profilePhoto", encodedImage); // Guardar la imagen como texto
-        userUpdates.put("latitude", currentLatitude);
-        userUpdates.put("longitude", currentLongitude);
         userUpdates.put("isFirstTime", true);
 
         // Guardar en Realtime Database
@@ -184,10 +165,33 @@ public class RegisterActivity extends AppCompatActivity {
             if (task.isSuccessful()) {
                 Toast.makeText(this, "Usuario registrado exitosamente", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Error al guardar el usuario", Toast.LENGTH_SHORT).show();
+                // Obtener información detallada del error
+                String errorMessage = task.getException() != null ? task.getException().getMessage() : "Error desconocido";
+                Log.e("RegisterActivity", "Error al guardar el usuario: " + errorMessage);
+
+                // Revisar posibles errores específicos
+                if (task.getException() != null) {
+                    if (errorMessage.contains("EMAIL")) {
+                        Toast.makeText(this, "Error: Correo ya registrado o inválido.", Toast.LENGTH_LONG).show();
+                    } else if (errorMessage.contains("PERMISSION_DENIED")) {
+                        Toast.makeText(this, "Error: No tienes permisos para esta operación.", Toast.LENGTH_LONG).show();
+                    } else if (errorMessage.contains("NETWORK_ERROR")) {
+                        Toast.makeText(this, "Error: Problema de red. Verifica tu conexión.", Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(this, "Error desconocido al guardar el usuario. Verifica los datos.", Toast.LENGTH_LONG).show();
+                    }
+                } else {
+                    Toast.makeText(this, "Error al guardar el usuario. Sin mensaje adicional.", Toast.LENGTH_SHORT).show();
+                }
             }
+        }).addOnFailureListener(e -> {
+            // Captura adicional para errores de la base de datos
+            String failureMessage = e.getMessage() != null ? e.getMessage() : "Error desconocido en la base de datos.";
+            Log.e("RegisterActivity", "Error de actualización de datos: " + failureMessage);
+            Toast.makeText(this, "Error crítico al guardar los datos: " + failureMessage, Toast.LENGTH_LONG).show();
         });
     }
+
 
     private String encodeBitmapToBase64(Bitmap bitmap) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
