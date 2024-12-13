@@ -5,19 +5,14 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
 import android.util.Patterns;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -26,7 +21,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.example.diets.R;
-import com.example.diets.model.User;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
@@ -38,16 +32,15 @@ import java.util.Map;
 
 public class RegisterActivity extends AppCompatActivity {
 
+    private static final String TAG = "RegisterActivity";
     private EditText firstNameEditText, lastNameEditText, emailEditText, passwordEditText;
-    private Button registerButton,  takePhotoButton;
+    private Button registerButton, takePhotoButton;
     private ImageView profileImageView;
 
     private FirebaseAuth mAuth;
     private DatabaseReference mDatabase;
 
-
     private Bitmap photoBitmap; // Bitmap para almacenar la foto tomada
-    private double currentLatitude = 0.0, currentLongitude = 0.0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,7 +48,6 @@ public class RegisterActivity extends AppCompatActivity {
         setContentView(R.layout.activity_register);
 
         initializeUI();
-
         setupPhotoCapture();
 
         mAuth = FirebaseAuth.getInstance();
@@ -79,13 +71,9 @@ public class RegisterActivity extends AppCompatActivity {
         emailEditText = findViewById(R.id.emailEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         registerButton = findViewById(R.id.registerButton);
-
         takePhotoButton = findViewById(R.id.takePhotoButton);
-
         profileImageView = findViewById(R.id.profileImageView);
     }
-
-
 
     private void setupPhotoCapture() {
         takePhotoButton.setOnClickListener(v -> {
@@ -103,27 +91,27 @@ public class RegisterActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 101 && resultCode == RESULT_OK && data != null) {
             photoBitmap = (Bitmap) data.getExtras().get("data");
-            profileImageView.setImageBitmap(photoBitmap);
+            if (photoBitmap != null) {
+                profileImageView.setImageBitmap(photoBitmap);
+            } else {
+                Log.e(TAG, "Bitmap is null after capturing the photo.");
+            }
         }
     }
 
     private boolean validateInputs(String firstName, String lastName, String email, String password) {
-        // Validación del nombre
         if (firstName.isEmpty() || !firstName.matches("[a-zA-Z]+")) {
             firstNameEditText.setError("Nombre requerido y no puede contener caracteres especiales ni números");
             return false;
         }
-        // Validación del apellido
         if (lastName.isEmpty() || !lastName.matches("[a-zA-Z]+")) {
             lastNameEditText.setError("Apellido requerido y no puede contener caracteres especiales ni números");
             return false;
         }
-        // Validación del correo electrónico
         if (email.isEmpty() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             emailEditText.setError("Correo electrónico inválido");
             return false;
         }
-        // Validación de la contraseña
         if (password.isEmpty() || password.length() < 6) {
             passwordEditText.setError("La contraseña debe tener al menos 6 caracteres");
             return false;
@@ -141,7 +129,9 @@ public class RegisterActivity extends AppCompatActivity {
                             writeNewUser(userId, firstName, lastName, email, photoBitmap);
                         }
                     } else {
-                        Toast.makeText(RegisterActivity.this, "Error en el registro", Toast.LENGTH_SHORT).show();
+                        String errorMessage = task.getException() != null ? task.getException().getMessage() : "Error desconocido";
+                        Log.e(TAG, "Error en el registro: " + errorMessage);
+                        Toast.makeText(RegisterActivity.this, "Error en el registro: " + errorMessage, Toast.LENGTH_LONG).show();
                     }
                 });
     }
@@ -149,59 +139,39 @@ public class RegisterActivity extends AppCompatActivity {
     private void writeNewUser(String userId, String firstName, String lastName, String email, Bitmap photoBitmap) {
         DatabaseReference userRef = mDatabase.child("users").child(userId);
 
-        // Convertir la imagen a Base64
         String encodedImage = (photoBitmap != null) ? encodeBitmapToBase64(photoBitmap) : "default";
+        Log.d(TAG, "Encoded image: " + encodedImage);
 
-        // Consolidar datos del usuario
         Map<String, Object> userUpdates = new HashMap<>();
         userUpdates.put("firstName", firstName);
         userUpdates.put("lastName", lastName);
         userUpdates.put("email", email);
-        userUpdates.put("profilePhoto", encodedImage); // Guardar la imagen como texto
+        userUpdates.put("profilePhoto", encodedImage);
         userUpdates.put("isFirstTime", true);
 
-        // Guardar en Realtime Database
-        userRef.updateChildren(userUpdates).addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                Toast.makeText(this, "Usuario registrado exitosamente", Toast.LENGTH_SHORT).show();
-            } else {
-                // Obtener información detallada del error
-                String errorMessage = task.getException() != null ? task.getException().getMessage() : "Error desconocido";
-                Log.e("RegisterActivity", "Error al guardar el usuario: " + errorMessage);
-
-                // Revisar posibles errores específicos
-                if (task.getException() != null) {
-                    if (errorMessage.contains("EMAIL")) {
-                        Toast.makeText(this, "Error: Correo ya registrado o inválido.", Toast.LENGTH_LONG).show();
-                    } else if (errorMessage.contains("PERMISSION_DENIED")) {
-                        Toast.makeText(this, "Error: No tienes permisos para esta operación.", Toast.LENGTH_LONG).show();
-                    } else if (errorMessage.contains("NETWORK_ERROR")) {
-                        Toast.makeText(this, "Error: Problema de red. Verifica tu conexión.", Toast.LENGTH_LONG).show();
+        userRef.updateChildren(userUpdates)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        Toast.makeText(this, "Usuario registrado exitosamente", Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(this, "Error desconocido al guardar el usuario. Verifica los datos.", Toast.LENGTH_LONG).show();
+                        Log.e(TAG, "Error al guardar el usuario: " + task.getException());
+                        Toast.makeText(this, "Error al guardar el usuario", Toast.LENGTH_SHORT).show();
                     }
-                } else {
-                    Toast.makeText(this, "Error al guardar el usuario. Sin mensaje adicional.", Toast.LENGTH_SHORT).show();
-                }
-            }
-        }).addOnFailureListener(e -> {
-            // Captura adicional para errores de la base de datos
-            String failureMessage = e.getMessage() != null ? e.getMessage() : "Error desconocido en la base de datos.";
-            Log.e("RegisterActivity", "Error de actualización de datos: " + failureMessage);
-            Toast.makeText(this, "Error crítico al guardar los datos: " + failureMessage, Toast.LENGTH_LONG).show();
-        });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error crítico al guardar los datos: " + e.getMessage());
+                    Toast.makeText(this, "Error crítico al guardar los datos", Toast.LENGTH_LONG).show();
+                });
     }
-
 
     private String encodeBitmapToBase64(Bitmap bitmap) {
+        if (bitmap == null) {
+            Log.e(TAG, "Bitmap is null, cannot encode.");
+            return null;
+        }
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, baos);
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
         byte[] imageBytes = baos.toByteArray();
         return Base64.encodeToString(imageBytes, Base64.DEFAULT);
-    }
-
-    private Bitmap decodeBase64ToBitmap(String encodedImage) {
-        byte[] decodedBytes = Base64.decode(encodedImage, Base64.DEFAULT);
-        return BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
     }
 }

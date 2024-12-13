@@ -97,12 +97,23 @@ public class MainActivity extends AppCompatActivity {
                             checkFirstTimeLogin(user.getUid());
                         }
                     } else {
-                        String errorMessage = task.getException() != null ? task.getException().getMessage() : "Error en el inicio de sesión";
+                        String errorMessage = task.getException() != null ? task.getException().getMessage() : "Error desconocido";
                         Log.d(TAG, "Error en el inicio de sesión: " + errorMessage);
-                        Toast.makeText(MainActivity.this, errorMessage, Toast.LENGTH_SHORT).show();
+                        handleAuthError(errorMessage);
                     }
                 });
     }
+
+    private void handleAuthError(String errorMessage) {
+        if (errorMessage.contains("blocked all requests")) {
+            Toast.makeText(this, "Demasiados intentos fallidos. Intenta más tarde.", Toast.LENGTH_LONG).show();
+        } else if (errorMessage.contains("The supplied auth credential is incorrect")) {
+            Toast.makeText(this, "Correo o contraseña incorrectos.", Toast.LENGTH_LONG).show();
+        } else {
+            Toast.makeText(this, "Error en el inicio de sesión: " + errorMessage, Toast.LENGTH_LONG).show();
+        }
+    }
+
 
     private void checkFirstTimeLogin(String userId) {
         Log.d(TAG, "Verificando primer inicio de sesión para el usuario: " + userId);
