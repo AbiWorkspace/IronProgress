@@ -2,14 +2,14 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/navigation_home"
-        android:icon="@drawable/ic_home"
-        android:title="Home" />
+        android:icon="@drawable/ic_dashboard"
+        android:title="Inicio" />
     <item
         android:id="@+id/navigation_dashboard"
         android:icon="@drawable/ic_dashboard"
         android:title="Peso" />
     <item
         android:id="@+id/navigation_video"
-        android:icon="@drawable/ic_video"
-        android:title="Video" />
+        android:icon="@drawable/strength_svgrepo_com"
+        android:title="Entreenamiento" />
 </menu>
