@@ -138,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
                                 startActivity(new Intent(MainActivity.this, UserFormActivity.class));
                             } else {
                                 Log.d(TAG, "Redirigiendo al dashboard");
-                                startActivity(new Intent(MainActivity.this, DashboardActivity.class));
+                                startActivity(new Intent(MainActivity.this, ViewPagerActivity.class));
                             }
                         }
                         finish();

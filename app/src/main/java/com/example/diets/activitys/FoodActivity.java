@@ -5,28 +5,24 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.*;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.appcompat.widget.Toolbar;
+import androidx.viewpager2.widget.ViewPager2;
+
 import com.example.diets.R;
-import com.example.diets.api.FoodService;
+import com.example.diets.adapters.ViewPagerAdapter;
 import com.example.diets.model.User;
-import com.example.diets.record.RecipeResponse;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonObject;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public class DashboardActivity extends AppCompatActivity {
+public class FoodActivity extends AppCompatActivity {
     private static final String TAG = "DashboardActivity";
 
     // UI Elements
@@ -34,23 +30,22 @@ public class DashboardActivity extends AppCompatActivity {
     private TextView breakfastDetails, lunchDetails, dinnerDetails, snacksDetails;
     private EditText foodTextField;
     private User user;
-    private FoodService foodService;
     private DatabaseReference mDatabase;
     private FirebaseAuth mAuth;
     private DrawerLayout drawerLayout;
     private NavigationView navigationView;
-    private final Map<String, JsonArray> mealNutritionMap = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_dashboard);
+        setContentView(R.layout.activity_food);
+
+
 
         // Inicializa FirebaseAuth y UI
         mAuth = FirebaseAuth.getInstance();
         initializeUI();
 
-        foodService = new FoodService();
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
         // Carga los datos del usuario desde Firebase
@@ -100,7 +95,7 @@ public class DashboardActivity extends AppCompatActivity {
         BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
         bottomNavigationView.setOnNavigationItemSelectedListener(item -> {
             if (item.getItemId() == R.id.navigation_home) {
-                startActivity(new Intent(this, DashboardActivity.class));
+                startActivity(new Intent(this, FoodActivity.class));
                 return true;
             } else if (item.getItemId() == R.id.navigation_dashboard) {
                 startActivity(new Intent(this, WeightActivity.class));
@@ -111,7 +106,6 @@ public class DashboardActivity extends AppCompatActivity {
             } else {
                 return false;
             }
-
         });
 
         drawerLayout = findViewById(R.id.drawer_layout);
@@ -133,7 +127,7 @@ public class DashboardActivity extends AppCompatActivity {
         Toast.makeText(this, "Sesión cerrada exitosamente", Toast.LENGTH_SHORT).show();
 
         // Redirige a la pantalla de inicio de sesión
-        Intent intent = new Intent(DashboardActivity.this, MainActivity.class);
+        Intent intent = new Intent(FoodActivity.this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
 
@@ -141,102 +135,6 @@ public class DashboardActivity extends AppCompatActivity {
         if (drawerLayout.isDrawerOpen(navigationView)) {
             drawerLayout.closeDrawer(navigationView);
         }
-    }
-
-    private void modifyMeal(String mealType) {
-        String newFood = foodTextField.getText().toString().trim();
-        if (newFood.isEmpty()) {
-            Toast.makeText(this, "Por favor, ingresa un alimento para modificar.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        JsonArray currentNutrients = mealNutritionMap.get(mealType);
-        if (currentNutrients != null) {
-            adjustUserNutrition(currentNutrients, false);
-            mealNutritionMap.remove(mealType);
-        }
-        fetchAndAddRecipe(mealType);
-    }
-
-    private void fetchAndAddRecipe(String mealType) {
-        String newFood = foodTextField.getText().toString().trim();
-        if (newFood.isEmpty()) {
-            Toast.makeText(this, "Por favor, ingresa un alimento.", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        new Thread(() -> {
-            try {
-                List<RecipeResponse.Result> recipes = foodService.getFoodRecipes(newFood);
-                if (recipes != null && !recipes.isEmpty()) {
-                    runOnUiThread(() -> showRecipeSelectionDialog(recipes, mealType));
-                } else {
-                    runOnUiThread(() -> Toast.makeText(this, "No se encontraron recetas.", Toast.LENGTH_SHORT).show());
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error al obtener recetas: " + e.getMessage(), e);
-            }
-        }).start();
-    }
-
-    private void showRecipeSelectionDialog(List<RecipeResponse.Result> recipes, String mealType) {
-        String[] recipeTitles = recipes.stream().map(RecipeResponse.Result::title).toArray(String[]::new);
-        new AlertDialog.Builder(this)
-                .setTitle("Selecciona una receta para " + mealType)
-                .setItems(recipeTitles, (dialog, which) -> {
-                    RecipeResponse.Result selectedRecipe = recipes.get(which);
-                    fetchAndAddNutritionData(selectedRecipe, mealType);
-                })
-                .setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss())
-                .create()
-                .show();
-    }
-
-    private void fetchAndAddNutritionData(RecipeResponse.Result selectedRecipe, String mealType) {
-        new Thread(() -> {
-            try {
-                JsonObject nutrition = foodService.getRecipeNutrition(selectedRecipe.id());
-                if (nutrition != null) {
-                    JsonArray nutrients = nutrition.getAsJsonArray("nutrients");
-                    mealNutritionMap.put(mealType, nutrients);
-                    adjustUserNutrition(nutrients, true);
-                    updateMealDetails(mealType, selectedRecipe.title());
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error al obtener la nutrición: " + e.getMessage(), e);
-            }
-        }).start();
-    }
-
-    private void adjustUserNutrition(JsonArray nutrients, boolean isAdding) {
-        double caloriesChange = 0.0, proteinChange = 0.0, fatChange = 0.0, carbChange = 0.0;
-
-        for (int i = 0; i < nutrients.size(); i++) {
-            JsonObject nutrient = nutrients.get(i).getAsJsonObject();
-            String name = nutrient.get("name").getAsString();
-            double amount = nutrient.get("amount").getAsDouble();
-
-            switch (name.toLowerCase(Locale.ROOT)) {
-                case "calories": caloriesChange = amount; break;
-                case "protein": proteinChange = amount; break;
-                case "fat": fatChange = amount; break;
-                case "carbohydrates": carbChange = amount; break;
-            }
-        }
-
-        if (isAdding) {
-            user.addCaloriesToday(caloriesChange);
-            user.addProteinToday(proteinChange);
-            user.addFatToday(fatChange);
-            user.addCarbToday(carbChange);
-        } else {
-            user.subtractCaloriesToday(caloriesChange);
-            user.subtractProteinToday(proteinChange);
-            user.subtractFatToday(fatChange);
-            user.subtractCarbToday(carbChange);
-        }
-
-        runOnUiThread(() -> updateNutritionalValues(user));
     }
 
     private void updateNutritionalValues(User user) {

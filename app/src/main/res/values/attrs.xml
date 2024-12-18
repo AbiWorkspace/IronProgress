@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Atributos personalizados para los títulos y detalles de las tarjetas -->
+    <declare-styleable name="CardViewMeal">
+        <attr name="titleText" format="string" />
+        <attr name="detailsText" format="string" />
+    </declare-styleable>
+</resources>

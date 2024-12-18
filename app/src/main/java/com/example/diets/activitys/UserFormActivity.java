@@ -6,12 +6,10 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -183,7 +181,7 @@ public class UserFormActivity extends AppCompatActivity {
         successMessage.setText(message);
         closeButton.setOnClickListener(v -> {
             dialog.dismiss();
-            startActivity(new Intent(UserFormActivity.this, DashboardActivity.class));
+            startActivity(new Intent(UserFormActivity.this, ViewPagerActivity.class));
             finish();
         });
         dialog.show();
