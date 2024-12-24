@@ -2,57 +2,75 @@ package com.example.diets.activitys;
 
 import android.os.Bundle;
 import android.util.Log;
+
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager2.widget.ViewPager2;
 import com.example.diets.R;
 import com.example.diets.adapters.ViewPagerAdapter;
+import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
-public class ViewPagerActivity extends AppCompatActivity {
-    private static final String TAG = "ViewPagerActivity";
+
+public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener {
+
+    private DrawerLayout drawerLayout;
+    private ViewPager2 viewPager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_viewpager);
 
-        // Encuentra el ViewPager y el TabLayout por su ID
-        ViewPager2 viewPager = findViewById(R.id.viewPager);
+        // Inicializar vistas
+        viewPager = findViewById(R.id.viewPager);
         TabLayout tabLayout = findViewById(R.id.tabLayout);
+        drawerLayout = findViewById(R.id.drawer_layout);
+        NavigationView navigationView = findViewById(R.id.nav_view);
 
-        // Verifica si los elementos fueron encontrados
-        if (viewPager == null) {
-            Log.d(TAG, "ViewPager no encontrado");
-        } else {
-            Log.d(TAG, "ViewPager encontrado");
-        }
-
-        if (tabLayout == null) {
-            Log.d(TAG, "TabLayout no encontrado");
-        } else {
-            Log.d(TAG, "TabLayout encontrado");
-        }
-
-        // Configura el adaptador para el ViewPager
+        // Configurar ViewPager
         ViewPagerAdapter adapter = new ViewPagerAdapter(this);
         viewPager.setAdapter(adapter);
-        Log.d(TAG, "Adapter configurado");
 
-        // Configura el TabLayoutMediator para enlazar el TabLayout con el ViewPager
+        // Configurar TabLayout
         new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
-            Log.d(TAG, "Configurando tab en posición: " + position);
             if (position == 0) {
                 tab.setText("Entrenamiento");
-                Log.d(TAG, "Tab 'Entrenamiento' configurado");
             } else if (position == 1) {
                 tab.setText("Alimentación");
-                Log.d(TAG, "Tab 'Alimentación' configurado");
-            } else {
-                tab.setText("Tab " + (position + 1));
-                Log.d(TAG, "Tab " + (position + 1) + " configurado");
             }
         }).attach();
-        Log.d(TAG, "TabLayoutMediator adjuntado");
+
+        // Manejar cambios de página
+        viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
+            @Override
+            public void onPageSelected(int position) {
+                super.onPageSelected(position);
+                Log.d("ViewPagerActivity", "Página seleccionada: " + position);
+                // Habilitar/deshabilitar drawer según el fragment
+                if (position == 1) { // DashboardFragment
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
+                    Log.d("ViewPagerActivity", "Drawer desbloqueado para DashboardFragment");
+                } else {
+                    drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
+                    Log.d("ViewPagerActivity", "Drawer bloqueado para EntrenamientoFragment");
+                }
+            }
+        });
+
+        // Configurar NavigationView
+        navigationView.setNavigationItemSelectedListener(item -> {
+            Log.d("ViewPagerActivity", "Elemento del NavigationView seleccionado: " + item.getTitle());
+            // Manejar clicks en el menú
+            return true;
+        });
+
+        Log.d("ViewPagerActivity", "onCreate completado");
+    }
+
+    @Override
+    public void onNavigationItemSelected(int position) {
+        viewPager.setCurrentItem(position);
     }
 }

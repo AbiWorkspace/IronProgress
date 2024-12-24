@@ -3,19 +3,23 @@ package com.example.diets.activitys;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.fragment.app.Fragment;
 import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.diets.R;
-import com.example.diets.adapters.ViewPagerAdapter;
+
+import com.example.diets.activitys.MainActivity;
+
+import com.example.diets.activitys.WeightActivity;
 import com.example.diets.model.User;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
-import com.google.android.material.tabs.TabLayout;
-import com.google.android.material.tabs.TabLayoutMediator;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
 
@@ -23,7 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 
 public class FoodActivity extends AppCompatActivity {
-    private static final String TAG = "DashboardActivity";
+    private static final String TAG = "FoodActivity";
 
     // UI Elements
     private TextView caloriesNeededTextView, caloriesTodayTextView, proteinTextView, fatTextView, carbTextView;
@@ -39,8 +43,6 @@ public class FoodActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_food);
-
-
 
         // Inicializa FirebaseAuth y UI
         mAuth = FirebaseAuth.getInstance();
@@ -93,20 +95,25 @@ public class FoodActivity extends AppCompatActivity {
 
         // Configura el menú inferior
         BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
-        bottomNavigationView.setOnNavigationItemSelectedListener(item -> {
-            if (item.getItemId() == R.id.navigation_home) {
-                startActivity(new Intent(this, FoodActivity.class));
-                return true;
-            } else if (item.getItemId() == R.id.navigation_dashboard) {
-                startActivity(new Intent(this, WeightActivity.class));
-                return true;
-            } else if (item.getItemId() == R.id.navigation_video) {
-                startActivity(new Intent(this, VideoActivity.class));
-                return true;
-            } else {
+        if (bottomNavigationView != null) {
+            Log.d("BottomNav", "BottomNavigationView encontrado");
+            bottomNavigationView.setOnNavigationItemSelectedListener(item -> {
+                Log.d("BottomNav", "Item seleccionado: " + item.getItemId());
+                int itemId = item.getItemId();
+                if (itemId == R.id.navigation_home) {
+                    Log.d("BottomNav", "Navegando a FoodActivity");
+                    startActivity(new Intent(FoodActivity.this, FoodActivity.class));
+                    return true;
+                } else if (itemId == R.id.navigation_dashboard) {
+                    Log.d("BottomNav", "Navegando a WeightActivity");
+                    startActivity(new Intent(FoodActivity.this, WeightActivity.class));
+                    return true;
+                }
                 return false;
-            }
-        });
+            });
+        } else {
+            Log.e("BottomNav", "BottomNavigationView no encontrado");
+        }
 
         drawerLayout = findViewById(R.id.drawer_layout);
         navigationView = findViewById(R.id.navigation_view);
@@ -124,17 +131,12 @@ public class FoodActivity extends AppCompatActivity {
 
     private void handleLogout() {
         mAuth.signOut();
-        Toast.makeText(this, "Sesión cerrada exitosamente", Toast.LENGTH_SHORT).show();
+        Toast.makeText(FoodActivity.this, "Sesión cerrada exitosamente", Toast.LENGTH_SHORT).show();
 
         // Redirige a la pantalla de inicio de sesión
         Intent intent = new Intent(FoodActivity.this, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
-
-        // Cierra el DrawerLayout si está abierto
-        if (drawerLayout.isDrawerOpen(navigationView)) {
-            drawerLayout.closeDrawer(navigationView);
-        }
     }
 
     private void updateNutritionalValues(User user) {

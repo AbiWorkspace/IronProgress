@@ -36,9 +36,7 @@
         <activity
             android:name=".activitys.UserFormActivity"
             android:exported="true" />
-        <activity
-            android:name=".activitys.FoodActivity"
-            android:exported="true" />
+
 
         <!-- Nueva actividad para el administrador -->
         <activity
@@ -48,10 +46,15 @@
         <activity
             android:name=".activitys.ViewPagerActivity"
             android:exported="true" />
+
+        <activity
+            android:name=".activitys.FoodActivity"
+            android:exported="true" />
         <activity
             android:name=".fragments.EntrenamientoFragment"
             android:exported="true"
             tools:ignore="Instantiatable" />
+        <activity android:name=".activities.DashboardActivity" />
 
         <activity android:name=".activitys.UserListActivity" />
         <activity android:name=".activitys.UserDetailsActivity" android:exported="true" />
