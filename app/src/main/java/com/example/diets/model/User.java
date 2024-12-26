@@ -28,6 +28,7 @@ public class User {
     private double longitude; // Coordenada de longitud
     private String profilePhotoUrl; // URL de la foto de perfil
     private String profilePhoto;
+
     // Constructor sin argumentos requerido por Firebase
     public User() {
         this.firstTime = true;
@@ -343,11 +344,25 @@ public class User {
         };
     }
 
+    public double calculateProtein() {
+        // Ejemplo: 1.6 gramos de proteína por kilogramo de peso corporal
+        return weight * 1.6;
+    }
+
+    public double calculateFat() {
+        // Ejemplo: 0.8 gramos de grasa por kilogramo de peso corporal
+        return weight * 0.8;
+    }
+
+    public double calculateCarbs() {
+        // Ejemplo: 4 gramos de carbohidratos por kilogramo de peso corporal
+        return weight * 4;
+    }
+
     public double[] calculateMacros(double weight, String goal, double calories) {
         double proteinGrams = 1.8 * weight;
         double fatGrams = calories * 0.25 / 9;
         double carbGrams = (calories - (proteinGrams * 4) - (fatGrams * 9)) / 4;
         return new double[]{proteinGrams, fatGrams, carbGrams};
     }
-
 }

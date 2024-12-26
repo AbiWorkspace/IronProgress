@@ -34,12 +34,11 @@
                     android:textColor="#FFFFFF"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Información de nutrientes -->
                 <TextView
                     android:id="@+id/proteinTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Proteínas: 0g"
+                    android:text="Proteínas necesarias: 0g"
                     android:textSize="16sp"
                     android:textColor="#FFFFFF"
                     android:layout_gravity="start"
@@ -49,7 +48,7 @@
                     android:id="@+id/fatTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Grasas: 0g"
+                    android:text="Grasas necesarias: 0g"
                     android:textSize="16sp"
                     android:textColor="#FFFFFF"
                     android:layout_gravity="start"
@@ -59,7 +58,7 @@
                     android:id="@+id/carbTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Carbohidratos: 0g"
+                    android:text="Carbohidratos necesarios: 0g"
                     android:textSize="16sp"
                     android:textColor="#FFFFFF"
                     android:layout_gravity="start"
@@ -87,7 +86,6 @@
                     android:layout_gravity="start"
                     android:layout_marginStart="8dp" />
 
-                <!-- Campo de texto -->
                 <EditText
                     android:id="@+id/foodTextField"
                     android:layout_width="299dp"
@@ -99,9 +97,11 @@
                     android:layout_marginTop="16dp"
                     android:background="#2F2F2F"
                     android:textColor="#FFFFFF"
-                    android:textColorHint="#BBBBBB" />
+                    android:textColorHint="#BBBBBB"
+                    android:drawableStart="@drawable/ic_search"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp" />
 
-                <!-- Contenedor dinámico para los bloques de alimentos -->
                 <LinearLayout
                     android:id="@+id/foodContainer"
                     android:layout_width="match_parent"

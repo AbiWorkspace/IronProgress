@@ -19,7 +19,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="end">
+            android:gravity="center_vertical">
+
+            <EditText
+                android:id="@+id/foodTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Nombre de la comida"
+                android:maxLines="1"
+                android:inputType="text"
+                android:maxLength="20"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:background="@null" />
 
             <ImageButton
                 android:id="@+id/menuButton"
@@ -29,19 +43,6 @@
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/menu" />
         </LinearLayout>
-
-        <EditText
-            android:id="@+id/foodTitle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Nombre de la comida"
-            android:maxLines="1"
-            android:inputType="text"
-            android:maxLength="20"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:background="@null" />
 
         <TextView
             android:id="@+id/foodCalories"
@@ -86,12 +87,21 @@
                 android:textColor="#FFFFFF" />
         </LinearLayout>
 
+        <!-- Contenedor para los alimentos -->
+        <LinearLayout
+            android:id="@+id/foodItemsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="8dp" />
+
         <ImageButton
-            android:id="@+id/addFoodButton"
+            android:id="@+id/addFoodItemButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:src="@drawable/ic_add"
             android:backgroundTint="#E63946"
-            android:padding="8dp" />
+            android:padding="8dp"
+            android:contentDescription="@string/add_food_item" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

@@ -170,13 +170,17 @@ public class DashboardFragment extends Fragment {
                 user.getGoal()
         );
 
+        double proteinNeeded = user.calculateProtein();
+        double fatNeeded = user.calculateFat();
+        double carbNeeded = user.calculateCarbs();
+
         if (getActivity() != null) {
             getActivity().runOnUiThread(() -> {
-                caloriesTodayTextView.setText(String.format(Locale.getDefault(), "Calorías de hoy: %.2f kcal", user.getCaloriesToday()));
+                caloriesTodayTextView.setText(String.format(Locale.getDefault(), "Calorías consumidas: %.2f kcal", user.getCaloriesToday()));
                 caloriesNeededTextView.setText(String.format(Locale.getDefault(), "Calorías necesarias: %.2f kcal", caloriesNeeded));
-                proteinTextView.setText(String.format(Locale.getDefault(), "Proteínas: %.2f g", user.getProteinToday()));
-                fatTextView.setText(String.format(Locale.getDefault(), "Grasas: %.2f g", user.getFatToday()));
-                carbTextView.setText(String.format(Locale.getDefault(), "Carbohidratos: %.2f g", user.getCarbToday()));
+                proteinTextView.setText(String.format(Locale.getDefault(), "Proteínas necesarias: %.2f g", proteinNeeded));
+                fatTextView.setText(String.format(Locale.getDefault(), "Grasas necesarias: %.2f g", fatNeeded));
+                carbTextView.setText(String.format(Locale.getDefault(), "Carbohidratos necesarios: %.2f g", carbNeeded));
             });
         }
     }
@@ -203,20 +207,29 @@ public class DashboardFragment extends Fragment {
                     saveFoodNames();
                 }
             });
+
+            // Configurar el menú desplegable
+            ImageButton menuButton = foodBlock.findViewById(R.id.menuButton);
+            menuButton.setOnClickListener(v -> {
+                PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
+                popupMenu.getMenuInflater().inflate(R.menu.food_block_menu, popupMenu.getMenu());
+                popupMenu.setOnMenuItemClickListener(item -> {
+                    if (item.getItemId() == R.id.action_delete) {
+                        foodContainer.removeView(foodBlock);
+                        saveFoodNames();
+                        return true;
+                    }
+                    return false;
+                });
+                popupMenu.show();
+            });
+
+            // Añadir lógica para añadir alimentos
+            LinearLayout foodItemsContainer = foodBlock.findViewById(R.id.foodItemsContainer);
+            ImageButton addFoodItemButton = foodBlock.findViewById(R.id.addFoodItemButton);
+            addFoodItemButton.setOnClickListener(v -> addFoodItem(foodItemsContainer));
         } else {
             Toast.makeText(getActivity(), "No puedes añadir más de 10 comidas", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void loadSavedOrDefaultFoodBlocks() {
-        SharedPreferences prefs = getActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        for (int i = 0; i < MAX_FOOD_BLOCKS; i++) {
-            String foodName = prefs.getString("foodName" + i, null);
-            if (foodName != null) {
-                addFoodBlockWithName(foodName);
-            } else if (i < DEFAULT_FOOD_NAMES.length) {
-                addFoodBlockWithName(DEFAULT_FOOD_NAMES[i]);
-            }
         }
     }
     private void addFoodBlockWithName(String name) {
@@ -257,6 +270,25 @@ public class DashboardFragment extends Fragment {
             });
             popupMenu.show();
         });
+
+        // Añadir lógica para añadir alimentos
+        LinearLayout foodItemsContainer = foodBlock.findViewById(R.id.foodItemsContainer);
+        ImageButton addFoodItemButton = foodBlock.findViewById(R.id.addFoodItemButton);
+        addFoodItemButton.setOnClickListener(v -> addFoodItem(foodItemsContainer));
+    }
+
+    private void addFoodItem(LinearLayout foodItemsContainer) {
+        View foodItem = getLayoutInflater().inflate(R.layout.food_item, null);
+
+        // Añadir margen inferior para separación
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(0, 0, 0, 8); // Margen inferior de 8dp
+        foodItem.setLayoutParams(params);
+
+        foodItemsContainer.addView(foodItem);
     }
 
     private void saveFoodNames() {
@@ -271,5 +303,15 @@ public class DashboardFragment extends Fragment {
         editor.apply();
     }
 
-
+    private void loadSavedOrDefaultFoodBlocks() {
+        SharedPreferences prefs = getActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        for (int i = 0; i < MAX_FOOD_BLOCKS; i++) {
+            String foodName = prefs.getString("foodName" + i, null);
+            if (foodName != null) {
+                addFoodBlockWithName(foodName);
+            } else if (i < DEFAULT_FOOD_NAMES.length) {
+                addFoodBlockWithName(DEFAULT_FOOD_NAMES[i]);
+            }
+        }
+    }
 }
