@@ -1,5 +1,4 @@
 package com.example.diets.activitys;
-
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -18,8 +17,9 @@ import com.google.android.material.navigation.NavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.*;
 import java.util.Locale;
-import java.util.Map;
-
+import android.text.InputFilter;
+import android.content.SharedPreferences;
+import android.widget.ImageButton;
 public class DashboardFragment extends Fragment {
 
     private static final String TAG = "DashboardFragment";
@@ -27,12 +27,15 @@ public class DashboardFragment extends Fragment {
 
     // UI Elements
     private TextView caloriesNeededTextView, caloriesTodayTextView, proteinTextView, fatTextView, carbTextView;
-    private TextView breakfastDetails, lunchDetails, dinnerDetails, snacksDetails;
     private EditText foodTextField;
     private User user;
     private DatabaseReference mDatabase;
     private FirebaseAuth mAuth;
     private NavigationView navigationView;
+    private LinearLayout foodContainer;
+    private static final int MAX_FOOD_BLOCKS = 10;
+    private static final String PREFS_NAME = "FoodPrefs";
+    private static final String[] DEFAULT_FOOD_NAMES = {"Desayuno", "Almuerzo", "Comida", "Snack", "Cena"};
 
     public interface OnNavigationItemSelectedListener {
         void onNavigationItemSelected(int position);
@@ -71,6 +74,9 @@ public class DashboardFragment extends Fragment {
 
         // Configura el NavigationView (menú lateral)
         setupNavigationView(view);
+
+        // Cargar comidas guardadas o predeterminadas
+        loadSavedOrDefaultFoodBlocks();
     }
 
     private void loadUserData(String userId) {
@@ -104,10 +110,10 @@ public class DashboardFragment extends Fragment {
         fatTextView = view.findViewById(R.id.fatTextView);
         carbTextView = view.findViewById(R.id.carbTextView);
 
-        breakfastDetails = view.findViewById(R.id.breakfastDetails);
-        lunchDetails = view.findViewById(R.id.lunchDetails);
-        dinnerDetails = view.findViewById(R.id.dinnerDetails);
-        snacksDetails = view.findViewById(R.id.snacksDetails);
+        foodContainer = view.findViewById(R.id.foodContainer);
+        Button addFoodButton = view.findViewById(R.id.addFoodButton);
+
+        addFoodButton.setOnClickListener(v -> addFoodBlock());
 
         BottomNavigationView bottomNavigationView = view.findViewById(R.id.bottom_navigation);
         if (bottomNavigationView != null) {
@@ -175,17 +181,95 @@ public class DashboardFragment extends Fragment {
         }
     }
 
-    private void updateMealDetails(String mealType, String recipeTitle) {
-        Map<String, TextView> mealDetailsMap = Map.of(
-                "Desayuno", breakfastDetails,
-                "Almuerzo", lunchDetails,
-                "Cena", dinnerDetails,
-                "Snacks", snacksDetails
-        );
+    private void addFoodBlock() {
+        if (foodContainer.getChildCount() < MAX_FOOD_BLOCKS) {
+            View foodBlock = getLayoutInflater().inflate(R.layout.food_block, null);
+            EditText foodTitle = foodBlock.findViewById(R.id.foodTitle);
+            foodTitle.setFilters(new InputFilter[] { new InputFilter.LengthFilter(20) });
 
-        TextView mealDetailView = mealDetailsMap.get(mealType);
-        if (mealDetailView != null && getActivity() != null) {
-            getActivity().runOnUiThread(() -> mealDetailView.setText(recipeTitle));
+            // Añadir margen inferior para separación
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 0, 0, 16); // Margen inferior de 16dp
+            foodBlock.setLayoutParams(params);
+
+            foodContainer.addView(foodBlock);
+
+            // Guardar el nombre de la comida cuando se modifique
+            foodTitle.setOnFocusChangeListener((v, hasFocus) -> {
+                if (!hasFocus) {
+                    saveFoodNames();
+                }
+            });
+        } else {
+            Toast.makeText(getActivity(), "No puedes añadir más de 10 comidas", Toast.LENGTH_SHORT).show();
         }
     }
+
+    private void loadSavedOrDefaultFoodBlocks() {
+        SharedPreferences prefs = getActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        for (int i = 0; i < MAX_FOOD_BLOCKS; i++) {
+            String foodName = prefs.getString("foodName" + i, null);
+            if (foodName != null) {
+                addFoodBlockWithName(foodName);
+            } else if (i < DEFAULT_FOOD_NAMES.length) {
+                addFoodBlockWithName(DEFAULT_FOOD_NAMES[i]);
+            }
+        }
+    }
+    private void addFoodBlockWithName(String name) {
+        View foodBlock = getLayoutInflater().inflate(R.layout.food_block, null);
+        EditText foodTitle = foodBlock.findViewById(R.id.foodTitle);
+        foodTitle.setText(name);
+        foodTitle.setFilters(new InputFilter[] { new InputFilter.LengthFilter(20) });
+
+        // Añadir margen inferior para separación
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.setMargins(0, 0, 0, 16); // Margen inferior de 16dp
+        foodBlock.setLayoutParams(params);
+
+        foodContainer.addView(foodBlock);
+
+        // Guardar el nombre de la comida cuando se modifique
+        foodTitle.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                saveFoodNames();
+            }
+        });
+
+        // Configurar el menú desplegable
+        ImageButton menuButton = foodBlock.findViewById(R.id.menuButton);
+        menuButton.setOnClickListener(v -> {
+            PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
+            popupMenu.getMenuInflater().inflate(R.menu.food_block_menu, popupMenu.getMenu());
+            popupMenu.setOnMenuItemClickListener(item -> {
+                if (item.getItemId() == R.id.action_delete) {
+                    foodContainer.removeView(foodBlock);
+                    saveFoodNames();
+                    return true;
+                }
+                return false;
+            });
+            popupMenu.show();
+        });
+    }
+
+    private void saveFoodNames() {
+        SharedPreferences prefs = getActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        for (int i = 0; i < foodContainer.getChildCount(); i++) {
+            View foodBlock = foodContainer.getChildAt(i);
+            EditText foodTitle = foodBlock.findViewById(R.id.foodTitle);
+            String foodName = foodTitle.getText().toString();
+            editor.putString("foodName" + i, foodName);
+        }
+        editor.apply();
+    }
+
+
 }

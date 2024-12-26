@@ -88,10 +88,7 @@ public class FoodActivity extends AppCompatActivity {
         fatTextView = findViewById(R.id.fatTextView);
         carbTextView = findViewById(R.id.carbTextView);
 
-        breakfastDetails = findViewById(R.id.breakfastDetails);
-        lunchDetails = findViewById(R.id.lunchDetails);
-        dinnerDetails = findViewById(R.id.dinnerDetails);
-        snacksDetails = findViewById(R.id.snacksDetails);
+
 
         // Configura el menú inferior
         BottomNavigationView bottomNavigationView = findViewById(R.id.bottom_navigation);
