@@ -33,4 +33,8 @@
         <item name="tabIndicatorColor">@android:color/white</item>
         <item name="tabIndicatorHeight">0dp</item> <!-- Oculta el indicador de pestaña -->
     </style>
+    <style name="RedButton" parent="Widget.AppCompat.Button">
+        <item name="android:background">#E63946</item>
+        <item name="android:textColor">#FFFFFF</item>
+    </style>
 </resources>
