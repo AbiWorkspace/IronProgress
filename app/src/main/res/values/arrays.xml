@@ -260,5 +260,20 @@
         <item>Trabajo con desgaste físico</item>
         <item>Trabajo sin desgaste físico</item>
     </string-array>
+    <string-array name="goal_options2">
+        <item>Aumentar masa muscular</item>
+        <item>Mejorar fuerza</item>
+        <item>Ambos</item>
+    </string-array>
 
-</resources>
+    <string-array name="experience_options">
+        <item>Principiante</item>
+        <item>Intermedio</item>
+        <item>Avanzado</item>
+    </string-array>
+
+    <string-array name="time_availability_options">
+        <item>Menos de 1 hora al día</item>
+        <item>1-2 horas al día</item>
+        <item>Más de 2 horas al día</item>
+    </string-array></resources>

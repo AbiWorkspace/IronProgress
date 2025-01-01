@@ -3,14 +3,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.diets">
 
-
+    <!-- Permisos -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-
 
     <application
         android:name=".activitys.DietsApp"
@@ -21,7 +19,7 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-
+        <!-- Actividades -->
         <activity
             android:name=".activitys.MainActivity"
             android:exported="true">
@@ -36,9 +34,6 @@
         <activity
             android:name=".activitys.UserFormActivity"
             android:exported="true" />
-
-
-        <!-- Nueva actividad para el administrador -->
         <activity
             android:name=".activitys.AdminActivity"
             android:exported="true" />
@@ -46,7 +41,6 @@
         <activity
             android:name=".activitys.ViewPagerActivity"
             android:exported="true" />
-
         <activity
             android:name=".activitys.FoodActivity"
             android:exported="true" />
@@ -54,17 +48,24 @@
             android:name=".fragments.EntrenamientoFragment"
             android:exported="true"
             tools:ignore="Instantiatable" />
-        <activity android:name=".activities.DashboardActivity" />
-
-        <activity android:name=".activitys.UserListActivity" />
-        <activity android:name=".activitys.UserDetailsActivity" android:exported="true" />
-        <activity android:name=".activitys.RegisterUserByAdminActivity" android:exported="true" />
+        <activity
+            android:name=".activitys.UserListActivity"
+            android:exported="true" />
+        <activity
+            android:name=".activitys.UserDetailsActivity"
+            android:exported="true" />
+        <activity
+            android:name=".activitys.RegisterUserByAdminActivity"
+            android:exported="true" />
         <activity
             android:name=".activitys.EditUserActivity"
             android:exported="true"
             android:label="Editar Usuario" />
-        <activity android:name=".activitys.WeightActivity" />
-        <activity android:name=".activitys.VideoActivity" />
+        <activity
+            android:name=".activitys.WeightActivity"
+            android:exported="true" />
+
+
 
     </application>
 

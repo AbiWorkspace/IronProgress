@@ -2,6 +2,7 @@ package com.example.diets.fragments;
 
 import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
@@ -52,11 +53,17 @@ public class EntrenamientoFragment extends Fragment {
         TextView welcomeText = view.findViewById(R.id.welcomeText);
         Spinner daysSpinner = view.findViewById(R.id.daysSpinner);
         Spinner jobTypeSpinner = view.findViewById(R.id.jobTypeSpinner);
+        Spinner goalSpinner2 = view.findViewById(R.id.goalSpinner);
+        Spinner experienceSpinner = view.findViewById(R.id.experienceSpinner);
+        Spinner timeSpinner = view.findViewById(R.id.timeSpinner);
         Button submitButton = view.findViewById(R.id.submitButton);
 
         welcomeText.setVisibility(View.VISIBLE);
         daysSpinner.setVisibility(View.VISIBLE);
         jobTypeSpinner.setVisibility(View.VISIBLE);
+        goalSpinner2.setVisibility(View.VISIBLE);
+        experienceSpinner.setVisibility(View.VISIBLE);
+        timeSpinner.setVisibility(View.VISIBLE);
         submitButton.setVisibility(View.VISIBLE);
 
         Log.d(TAG, "showWelcomeForm: Configurando ArrayAdapter para los Spinners");
@@ -67,6 +74,18 @@ public class EntrenamientoFragment extends Fragment {
         ArrayAdapter<CharSequence> jobTypeAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.job_type_array, android.R.layout.simple_spinner_item);
         jobTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        ArrayAdapter<CharSequence> goalAdapter = ArrayAdapter.createFromResource(getContext(),
+                R.array.goal_options2, android.R.layout.simple_spinner_item);
+        goalAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        ArrayAdapter<CharSequence> experienceAdapter = ArrayAdapter.createFromResource(getContext(),
+                R.array.experience_options, android.R.layout.simple_spinner_item);
+        experienceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        ArrayAdapter<CharSequence> timeAdapter = ArrayAdapter.createFromResource(getContext(),
+                R.array.time_availability_options, android.R.layout.simple_spinner_item);
+        timeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         // Verificar si los adaptadores tienen contenido antes de asignarlos a los Spinners
         if (daysAdapter.getCount() > 0) {
@@ -85,6 +104,30 @@ public class EntrenamientoFragment extends Fragment {
             Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de tipo de trabajo");
         }
 
+        if (goalAdapter.getCount() > 0) {
+            goalSpinner2.setAdapter(goalAdapter);
+            Log.d(TAG, "showWelcomeForm: Spinner de objetivos lleno con opciones");
+        } else {
+            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de objetivos", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de objetivos");
+        }
+
+        if (experienceAdapter.getCount() > 0) {
+            experienceSpinner.setAdapter(experienceAdapter);
+            Log.d(TAG, "showWelcomeForm: Spinner de experiencia lleno con opciones");
+        } else {
+            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de experiencia", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de experiencia");
+        }
+
+        if (timeAdapter.getCount() > 0) {
+            timeSpinner.setAdapter(timeAdapter);
+            Log.d(TAG, "showWelcomeForm: Spinner de disponibilidad de tiempo lleno con opciones");
+        } else {
+            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de disponibilidad de tiempo", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de disponibilidad de tiempo");
+        }
+
         submitButton.setOnClickListener(v -> {
             Log.d(TAG, "submitButton: Botón de enviar clicado");
 
@@ -95,12 +138,21 @@ public class EntrenamientoFragment extends Fragment {
             editor.apply();
             Log.d(TAG, "submitButton: Preferencias actualizadas, firstTime establecido a false");
 
-            // Ocultar formulario y mostrar contenido normal
-            welcomeText.setVisibility(View.GONE);
-            daysSpinner.setVisibility(View.GONE);
-            jobTypeSpinner.setVisibility(View.GONE);
-            submitButton.setVisibility(View.GONE);
-            Log.d(TAG, "submitButton: Formulario de bienvenida oculto, mostrando contenido normal");
+            // Obtener los datos del formulario
+            String goal = ((Spinner) view.findViewById(R.id.goalSpinner)).getSelectedItem().toString();
+            String daysText = ((Spinner) view.findViewById(R.id.daysSpinner)).getSelectedItem().toString();
+            String timeText = ((Spinner) view.findViewById(R.id.timeSpinner)).getSelectedItem().toString();
+
+            // Extraer el número de días y tiempo del texto
+            int days = Integer.parseInt(daysText.replaceAll("\\D+", ""));
+            int time = Integer.parseInt(timeText.replaceAll("\\D+", ""));
+
+            // Iniciar la nueva actividad para la distribución de ejercicios
+            Intent intent = new Intent(getActivity(), ExerciseDistributionFragment.class);
+            intent.putExtra("goal", goal);
+            intent.putExtra("days", days);
+            intent.putExtra("time", time);
+            startActivity(intent);
         });
     }
 }
