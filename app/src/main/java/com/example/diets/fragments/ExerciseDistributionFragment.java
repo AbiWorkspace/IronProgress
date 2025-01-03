@@ -1,6 +1,7 @@
 package com.example.diets.fragments;
 
 import android.os.Bundle;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.widget.TextView;
 
@@ -32,6 +33,8 @@ public class ExerciseDistributionFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         Bundle args = getArguments();
+        TextView distributionTextView = view.findViewById(R.id.distributionTextView);
+
         if (args != null) {
             String goal = args.getString("goal");
             String jobType = args.getString("jobType");
@@ -47,20 +50,28 @@ public class ExerciseDistributionFragment extends Fragment {
 
             List<String> distributions = generateTrainingDistributions(goal, days, time, jobType, experience);
 
-            TextView distributionTextView = view.findViewById(R.id.distributionTextView);
-            StringBuilder allDistributions = new StringBuilder();
-            for (String distribution : distributions) {
-                allDistributions.append(distribution).append("\n\n");
-            }
-
             if (distributionTextView != null) {
+                StringBuilder allDistributions = new StringBuilder();
+                for (String distribution : distributions) {
+                    allDistributions.append(distribution).append("\n\n");
+                }
+
                 distributionTextView.setText(allDistributions.toString());
+                distributionTextView.setMovementMethod(new ScrollingMovementMethod());
                 Log.d(TAG, "Distributions set to TextView");
+                Log.d(TAG, "Distributions: " + allDistributions.toString());
             } else {
                 Log.e(TAG, "distributionTextView is null");
             }
-
-            Log.d(TAG, "Distributions: " + allDistributions.toString());
+        } else {
+            Log.e(TAG, "No se pasaron argumentos al fragmento.");
+            if (distributionTextView != null) {
+                distributionTextView.setText("Texto de prueba");
+                distributionTextView.setMovementMethod(new ScrollingMovementMethod());
+                Log.d(TAG, "Texto de prueba establecido en TextView");
+            } else {
+                Log.e(TAG, "distributionTextView is null incluso sin argumentos");
+            }
         }
     }
 
@@ -68,14 +79,16 @@ public class ExerciseDistributionFragment extends Fragment {
         List<String> distributions = new ArrayList<>();
         Random random = new Random();
 
-        if ("fuerza".equalsIgnoreCase(goal)) {
+        if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal)) {
             distributions.add(generateDynamicPowerliftingDistribution(days, time, "Push-Pull", jobType, experience, random));
             distributions.add(generateDynamicPowerliftingDistribution(days, time, "Push-Pull-Legs", jobType, experience, random));
             distributions.add(generateDynamicPowerliftingDistribution(days, time, "Full Body", jobType, experience, random));
-        } else if ("hipertrofia".equalsIgnoreCase(goal)) {
+        } else if ("hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
             distributions.add(generateDynamicHypertrophyDistribution(days, time, "Push-Pull", jobType, experience, random));
             distributions.add(generateDynamicHypertrophyDistribution(days, time, "Push-Pull-Legs", jobType, experience, random));
             distributions.add(generateDynamicHypertrophyDistribution(days, time, "Full Body", jobType, experience, random));
+        } else {
+            Log.e(TAG, "Goal no reconocido: " + goal);
         }
 
         return distributions;
@@ -118,6 +131,8 @@ public class ExerciseDistributionFragment extends Fragment {
                 addRandomExercises(distribution, pushExercises, random);
                 addRandomExercises(distribution, pullExercises, random);
                 addRandomExercises(distribution, legExercises, random);
+            } else {
+                Log.e(TAG, "Tipo de distribución no reconocido: " + type);
             }
 
             distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
@@ -163,6 +178,8 @@ public class ExerciseDistributionFragment extends Fragment {
                 addRandomExercises(distribution, pushExercises, random);
                 addRandomExercises(distribution, pullExercises, random);
                 addRandomExercises(distribution, legExercises, random);
+            } else {
+                Log.e(TAG, "Tipo de distribución no reconocido: " + type);
             }
 
             distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
@@ -170,13 +187,14 @@ public class ExerciseDistributionFragment extends Fragment {
 
         return distribution.toString();
     }
-
     private void addRandomExercises(StringBuilder distribution, List<String> exercises, Random random) {
         int numExercises = random.nextInt(2) + 2; // 2-3 ejercicios aleatorios
         for (int i = 0; i < numExercises; i++) {
             String exercise = exercises.get(random.nextInt(exercises.size()));
             if (!distribution.toString().contains(exercise)) {
                 distribution.append("- ").append(exercise).append("\n");
+            } else {
+                Log.e(TAG, "Ejercicio duplicado: " + exercise);
             }
         }
     }
