@@ -1,4 +1,5 @@
 package com.example.diets.fragments;
+
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.TextView;
@@ -7,6 +8,7 @@ import com.example.diets.R;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,21 +31,22 @@ public class ExerciseDistributionFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Recibir los datos del formulario
         Bundle args = getArguments();
         if (args != null) {
             String goal = args.getString("goal");
+            String jobType = args.getString("jobType");
+            String experience = args.getString("experience");
             int days = args.getInt("days", 0);
             int time = args.getInt("time", 0);
 
             Log.d(TAG, "Goal: " + goal);
+            Log.d(TAG, "Job Type: " + jobType);
+            Log.d(TAG, "Experience: " + experience);
             Log.d(TAG, "Days: " + days);
             Log.d(TAG, "Time: " + time);
 
-            // Generar distribuciones de entrenamiento
-            List<String> distributions = generateTrainingDistributions(goal, days, time);
+            List<String> distributions = generateTrainingDistributions(goal, days, time, jobType, experience);
 
-            // Mostrar las distribuciones generadas
             TextView distributionTextView = view.findViewById(R.id.distributionTextView);
             StringBuilder allDistributions = new StringBuilder();
             for (String distribution : distributions) {
@@ -61,129 +64,120 @@ public class ExerciseDistributionFragment extends Fragment {
         }
     }
 
-    private List<String> generateTrainingDistributions(String goal, int days, int time) {
+    private List<String> generateTrainingDistributions(String goal, int days, int time, String jobType, String experience) {
         List<String> distributions = new ArrayList<>();
+        Random random = new Random();
 
         if ("fuerza".equalsIgnoreCase(goal)) {
-            distributions.add(generatePowerliftingDistribution(days, time, "Push-Pull"));
-            distributions.add(generatePowerliftingDistribution(days, time, "Push-Pull-Legs"));
-            distributions.add(generatePowerliftingDistribution(days, time, "Full Body"));
+            distributions.add(generateDynamicPowerliftingDistribution(days, time, "Push-Pull", jobType, experience, random));
+            distributions.add(generateDynamicPowerliftingDistribution(days, time, "Push-Pull-Legs", jobType, experience, random));
+            distributions.add(generateDynamicPowerliftingDistribution(days, time, "Full Body", jobType, experience, random));
         } else if ("hipertrofia".equalsIgnoreCase(goal)) {
-            distributions.add(generateHypertrophyDistribution(days, time, "Push-Pull"));
-            distributions.add(generateHypertrophyDistribution(days, time, "Push-Pull-Legs"));
-            distributions.add(generateHypertrophyDistribution(days, time, "Full Body"));
+            distributions.add(generateDynamicHypertrophyDistribution(days, time, "Push-Pull", jobType, experience, random));
+            distributions.add(generateDynamicHypertrophyDistribution(days, time, "Push-Pull-Legs", jobType, experience, random));
+            distributions.add(generateDynamicHypertrophyDistribution(days, time, "Full Body", jobType, experience, random));
         }
 
         return distributions;
     }
 
-    private String generatePowerliftingDistribution(int days, int time, String type) {
+    private String generateDynamicPowerliftingDistribution(int days, int time, String type, String jobType, String experience, Random random) {
         StringBuilder distribution = new StringBuilder();
-        List<String> pushExercises = List.of("Press de banca", "Press militar", "Fondos");
-        List<String> pullExercises = List.of("Remo con barra", "Dominadas", "Curls de bíceps");
-        List<String> legExercises = List.of("Sentadillas", "Peso muerto", "Prensa de piernas");
+        List<String> pushExercises = List.of("Press de banca", "Press militar", "Fondos", "Press inclinado");
+        List<String> pullExercises = List.of("Remo con barra", "Dominadas", "Curls de bíceps", "Face pulls");
+        List<String> legExercises = List.of("Sentadillas", "Peso muerto", "Prensa de piernas", "Zancadas");
 
         int timePerDay = time / days;
 
         distribution.append("Distribución para Fuerza (Powerlifting) - ").append(type).append(":\n");
 
-        switch (type) {
-            case "Push-Pull":
-                for (int i = 1; i <= days; i++) {
-                    distribution.append("Día ").append(i).append(":\n");
-                    if (i % 2 == 1) {
-                        distribution.append("Push:\n");
-                        pushExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    } else {
-                        distribution.append("Pull:\n");
-                        pullExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    }
-                    distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
+        for (int i = 1; i <= days; i++) {
+            distribution.append("Día ").append(i).append(":\n");
+
+            if ("Push-Pull".equals(type)) {
+                if (i % 2 == 1) {
+                    distribution.append("Push:\n");
+                    addRandomExercises(distribution, pushExercises, random);
+                } else {
+                    distribution.append("Pull:\n");
+                    addRandomExercises(distribution, pullExercises, random);
                 }
-                break;
-            case "Push-Pull-Legs":
-                for (int i = 1; i <= days; i++) {
-                    distribution.append("Día ").append(i).append(":\n");
-                    if (i % 3 == 1) {
-                        distribution.append("Push:\n");
-                        pushExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    } else if (i % 3 == 2) {
-                        distribution.append("Pull:\n");
-                        pullExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    } else {
-                        distribution.append("Legs:\n");
-                        legExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    }
-                    distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
+            } else if ("Push-Pull-Legs".equals(type)) {
+                if (i % 3 == 1) {
+                    distribution.append("Push:\n");
+                    addRandomExercises(distribution, pushExercises, random);
+                } else if (i % 3 == 2) {
+                    distribution.append("Pull:\n");
+                    addRandomExercises(distribution, pullExercises, random);
+                } else {
+                    distribution.append("Legs:\n");
+                    addRandomExercises(distribution, legExercises, random);
                 }
-                break;
-            case "Full Body":
-                for (int i = 1; i <= days; i++) {
-                    distribution.append("Día ").append(i).append(":\n");
-                    distribution.append("Full Body:\n");
-                    pushExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    pullExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    legExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
-                }
-                break;
+            } else if ("Full Body".equals(type)) {
+                distribution.append("Full Body:\n");
+                addRandomExercises(distribution, pushExercises, random);
+                addRandomExercises(distribution, pullExercises, random);
+                addRandomExercises(distribution, legExercises, random);
+            }
+
+            distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
         }
 
         return distribution.toString();
     }
 
-    private String generateHypertrophyDistribution(int days, int time, String type) {
+    private String generateDynamicHypertrophyDistribution(int days, int time, String type, String jobType, String experience, Random random) {
         StringBuilder distribution = new StringBuilder();
-        List<String> pushExercises = List.of("Press de pecho", "Press de hombros", "Extensiones de tríceps");
-        List<String> pullExercises = List.of("Remo con mancuerna", "Dominadas", "Curls de bíceps");
-        List<String> legExercises = List.of("Sentadillas", "Peso muerto", "Prensa de piernas");
+        List<String> pushExercises = List.of("Press de pecho", "Press de hombros", "Extensiones de tríceps", "Aperturas con mancuernas");
+        List<String> pullExercises = List.of("Remo con mancuerna", "Dominadas", "Curls de bíceps", "Encogimientos de trapecio");
+        List<String> legExercises = List.of("Sentadillas", "Peso muerto", "Prensa de piernas", "Elevaciones de talones");
 
         int timePerDay = time / days;
 
         distribution.append("Distribución para Hipertrofia - ").append(type).append(":\n");
 
-        switch (type) {
-            case "Push-Pull":
-                for (int i = 1; i <= days; i++) {
-                    distribution.append("Día ").append(i).append(":\n");
-                    if (i % 2 == 1) {
-                        distribution.append("Push:\n");
-                        pushExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    } else {
-                        distribution.append("Pull:\n");
-                        pullExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    }
-                    distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
+        for (int i = 1; i <= days; i++) {
+            distribution.append("Día ").append(i).append(":\n");
+
+            if ("Push-Pull".equals(type)) {
+                if (i % 2 == 1) {
+                    distribution.append("Push:\n");
+                    addRandomExercises(distribution, pushExercises, random);
+                } else {
+                    distribution.append("Pull:\n");
+                    addRandomExercises(distribution, pullExercises, random);
                 }
-                break;
-            case "Push-Pull-Legs":
-                for (int i = 1; i <= days; i++) {
-                    distribution.append("Día ").append(i).append(":\n");
-                    if (i % 3 == 1) {
-                        distribution.append("Push:\n");
-                        pushExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    } else if (i % 3 == 2) {
-                        distribution.append("Pull:\n");
-                        pullExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    } else {
-                        distribution.append("Legs:\n");
-                        legExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    }
-                    distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
+            } else if ("Push-Pull-Legs".equals(type)) {
+                if (i % 3 == 1) {
+                    distribution.append("Push:\n");
+                    addRandomExercises(distribution, pushExercises, random);
+                } else if (i % 3 == 2) {
+                    distribution.append("Pull:\n");
+                    addRandomExercises(distribution, pullExercises, random);
+                } else {
+                    distribution.append("Legs:\n");
+                    addRandomExercises(distribution, legExercises, random);
                 }
-                break;
-            case "Full Body":
-                for (int i = 1; i <= days; i++) {
-                    distribution.append("Día ").append(i).append(":\n");
-                    distribution.append("Full Body:\n");
-                    pushExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    pullExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    legExercises.forEach(exercise -> distribution.append("- ").append(exercise).append("\n"));
-                    distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
-                }
-                break;
+            } else if ("Full Body".equals(type)) {
+                distribution.append("Full Body:\n");
+                addRandomExercises(distribution, pushExercises, random);
+                addRandomExercises(distribution, pullExercises, random);
+                addRandomExercises(distribution, legExercises, random);
+            }
+
+            distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
         }
 
         return distribution.toString();
+    }
+
+    private void addRandomExercises(StringBuilder distribution, List<String> exercises, Random random) {
+        int numExercises = random.nextInt(2) + 2; // 2-3 ejercicios aleatorios
+        for (int i = 0; i < numExercises; i++) {
+            String exercise = exercises.get(random.nextInt(exercises.size()));
+            if (!distribution.toString().contains(exercise)) {
+                distribution.append("- ").append(exercise).append("\n");
+            }
+        }
     }
 }

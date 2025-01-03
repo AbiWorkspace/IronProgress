@@ -1,5 +1,4 @@
 package com.example.diets.adapters;
-
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
@@ -8,24 +7,55 @@ import androidx.viewpager2.adapter.FragmentStateAdapter;
 import com.example.diets.activitys.DashboardFragment;
 import com.example.diets.fragments.EntrenamientoFragment;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class ViewPagerAdapter extends FragmentStateAdapter {
+
+    private final List<Fragment> fragmentList = new ArrayList<>();
 
     public ViewPagerAdapter(@NonNull FragmentActivity fragmentActivity) {
         super(fragmentActivity);
+        // Agregar los fragments iniciales
+        fragmentList.add(new EntrenamientoFragment());
+        fragmentList.add(new DashboardFragment());
+    }
+
+    /**
+     * Reemplaza un fragmento en una posición específica.
+     * Nota: Para que los cambios surtan efecto, asegúrate de recrear el adaptador o
+     * configurar nuevamente el ViewPager2 con el adaptador modificado.
+     */
+    public void replaceFragment(int position, Fragment fragment) {
+        if (position >= 0 && position < fragmentList.size()) {
+            fragmentList.set(position, fragment);
+        }
+    }
+
+    /**
+     * Agrega un nuevo fragmento al adaptador.
+     */
+    public void addFragment(Fragment fragment) {
+        fragmentList.add(fragment);
+    }
+
+    /**
+     * Elimina un fragmento en una posición específica.
+     */
+    public void removeFragment(int position) {
+        if (position >= 0 && position < fragmentList.size()) {
+            fragmentList.remove(position);
+        }
     }
 
     @NonNull
     @Override
     public Fragment createFragment(int position) {
-        if (position == 0) {
-            return new EntrenamientoFragment();
-        } else {
-            return new DashboardFragment();
-        }
+        return fragmentList.get(position);
     }
 
     @Override
     public int getItemCount() {
-        return 2;
+        return fragmentList.size();
     }
 }

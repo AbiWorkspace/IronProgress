@@ -8,15 +8,16 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager2.widget.ViewPager2;
 import com.example.diets.R;
 import com.example.diets.adapters.ViewPagerAdapter;
+import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
-
 
 public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener {
 
     private DrawerLayout drawerLayout;
     private ViewPager2 viewPager;
+    private ViewPagerAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,7 +31,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         NavigationView navigationView = findViewById(R.id.nav_view);
 
         // Configurar ViewPager
-        ViewPagerAdapter adapter = new ViewPagerAdapter(this);
+        adapter = new ViewPagerAdapter(this);
         viewPager.setAdapter(adapter);
 
         // Configurar TabLayout
@@ -47,30 +48,34 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
             @Override
             public void onPageSelected(int position) {
                 super.onPageSelected(position);
-                Log.d("ViewPagerActivity", "Página seleccionada: " + position);
                 // Habilitar/deshabilitar drawer según el fragment
                 if (position == 1) { // DashboardFragment
                     drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED);
-                    Log.d("ViewPagerActivity", "Drawer desbloqueado para DashboardFragment");
                 } else {
                     drawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
-                    Log.d("ViewPagerActivity", "Drawer bloqueado para EntrenamientoFragment");
                 }
             }
         });
 
         // Configurar NavigationView
         navigationView.setNavigationItemSelectedListener(item -> {
-            Log.d("ViewPagerActivity", "Elemento del NavigationView seleccionado: " + item.getTitle());
-            // Manejar clicks en el menú
+            // Manejar clics en el menú
             return true;
         });
-
-        Log.d("ViewPagerActivity", "onCreate completado");
     }
 
     @Override
     public void onNavigationItemSelected(int position) {
         viewPager.setCurrentItem(position);
+    }
+
+    public void switchToExerciseDistributionFragment(Bundle data) {
+        // Crea el nuevo fragmento y actualiza el adaptador
+        ExerciseDistributionFragment fragment = new ExerciseDistributionFragment();
+        fragment.setArguments(data);
+
+        // Reemplazar el fragmento en la lista del adaptador
+        adapter.replaceFragment(0, fragment);
+        viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
 }

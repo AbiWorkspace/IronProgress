@@ -2,7 +2,6 @@ package com.example.diets.fragments;
 
 import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
 
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
@@ -18,6 +17,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.example.diets.R;
+import com.example.diets.activitys.ViewPagerActivity;
 
 public class EntrenamientoFragment extends Fragment {
 
@@ -131,28 +131,31 @@ public class EntrenamientoFragment extends Fragment {
         submitButton.setOnClickListener(v -> {
             Log.d(TAG, "submitButton: Botón de enviar clicado");
 
-            // Guardar datos del formulario y actualizar preferencias
-            SharedPreferences settings = getActivity().getSharedPreferences(PREFS_NAME, 0);
-            SharedPreferences.Editor editor = settings.edit();
-            editor.putBoolean(FIRST_TIME_KEY, false);
-            editor.apply();
-            Log.d(TAG, "submitButton: Preferencias actualizadas, firstTime establecido a false");
+            // Recopilar datos seleccionados en los Spinners
+            String goal = goalSpinner2.getSelectedItem().toString();
+            String daysText = daysSpinner.getSelectedItem().toString();
+            String jobType = jobTypeSpinner.getSelectedItem().toString();
+            String experience = experienceSpinner.getSelectedItem().toString();
+            String timeText = timeSpinner.getSelectedItem().toString();
 
-            // Obtener los datos del formulario
-            String goal = ((Spinner) view.findViewById(R.id.goalSpinner)).getSelectedItem().toString();
-            String daysText = ((Spinner) view.findViewById(R.id.daysSpinner)).getSelectedItem().toString();
-            String timeText = ((Spinner) view.findViewById(R.id.timeSpinner)).getSelectedItem().toString();
-
-            // Extraer el número de días y tiempo del texto
+            // Procesar valores numéricos
             int days = Integer.parseInt(daysText.replaceAll("\\D+", ""));
             int time = Integer.parseInt(timeText.replaceAll("\\D+", ""));
 
-            // Iniciar la nueva actividad para la distribución de ejercicios
-            Intent intent = new Intent(getActivity(), ExerciseDistributionFragment.class);
-            intent.putExtra("goal", goal);
-            intent.putExtra("days", days);
-            intent.putExtra("time", time);
-            startActivity(intent);
+            // Crear un Bundle con los datos
+            Bundle data = new Bundle();
+            data.putString("goal", goal);
+            data.putString("jobType", jobType);
+            data.putString("experience", experience);
+            data.putInt("days", days);
+            data.putInt("time", time);
+
+            // Llamar al método para cambiar al nuevo fragmento
+            if (getActivity() instanceof ViewPagerActivity) {
+                ((ViewPagerActivity) getActivity()).switchToExerciseDistributionFragment(data);
+            }
         });
+
+
     }
 }
