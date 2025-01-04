@@ -43,7 +43,16 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp"
-            android:background="#2F2F2F" />
+            android:background="@drawable/rounded_background"
+            android:elevation="4dp"
+            android:layout_margin="8dp"
+            android:gravity="center"
+            android:clipToPadding="false"
+            android:clipChildren="false">
+
+
+
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/saveButton"

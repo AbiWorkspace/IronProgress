@@ -140,36 +140,74 @@ public class ExerciseDistributionFragment extends Fragment {
             Log.e(TAG, "No se pasaron argumentos al fragmento.");
         }
     }
-
     private List<String> generateTrainingDistributions(String goal, int days, int time, String jobType, String experience) {
         List<String> distributions = new ArrayList<>();
 
         if (days >= 6) {
-            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
-                distributions.add("Push-Pull-Legs (Empuje-Tirón-Piernas):\nLunes: Empuje (pecho, hombros, tríceps).\nMartes: Tirón (espalda, bíceps).\nMiércoles: Piernas (cuádriceps, isquiotibiales, glúteos).\nJueves: Descanso.\nViernes: Empuje (pecho, hombros, tríceps).\nSábado: Tirón (espalda, bíceps).\nDomingo: Piernas (cuádriceps, isquiotibiales, glúteos).");
-                distributions.add("PHAT (Power Hypertrophy Adaptive Training):\nLunes: Fuerza parte superior.\nMartes: Fuerza parte inferior.\nMiércoles: Descanso.\nJueves: Hipertrofia parte superior (pecho, espalda).\nViernes: Hipertrofia parte inferior (piernas, glúteos).\nSábado: Hipertrofia parte superior (hombros, brazos).\nDomingo: Descanso.");
-                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMartes: Press de banca.\nMiércoles: Descanso.\nJueves: Peso muerto.\nViernes: Accesorios (hombros, brazos).\nSábado: Sentadilla.\nDomingo: Descanso.");
-            }
+            addSixDayDistributions(goal, time, distributions);
         } else if (days >= 5) {
-            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
-                distributions.add("Fuerza-Hipertrofia (Strength-Hypertrophy Split):\nLunes: Fuerza (sentadillas, press de banca, peso muerto).\nMartes: Hipertrofia (pecho, espalda, hombros).\nMiércoles: Descanso.\nJueves: Fuerza (sentadillas, press de banca, peso muerto).\nViernes: Hipertrofia (piernas, brazos).\nSábado y Domingo: Descanso.");
-                distributions.add("Entrenamiento de Volumen Alemán (GVT):\nLunes: Pecho y espalda.\nMartes: Piernas y abdominales.\nMiércoles: Descanso.\nJueves: Brazos y hombros.\nViernes: Piernas y abdominales.\nSábado y Domingo: Descanso.");
-                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMartes: Press de banca.\nMiércoles: Descanso.\nJueves: Peso muerto.\nViernes: Accesorios (hombros, brazos).\nSábado: Sentadilla.\nDomingo: Descanso.");
-            }
+            addFiveDayDistributions(goal, time, distributions);
         } else if (days >= 4) {
-            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
-                distributions.add("Upper-Lower (Superior-Inferior):\nLunes: Parte superior (pecho, espalda, hombros, brazos).\nMartes: Parte inferior (piernas, glúteos).\nMiércoles: Descanso.\nJueves: Parte superior (pecho, espalda, hombros, brazos).\nViernes: Parte inferior (piernas, glúteos).\nSábado y Domingo: Descanso.");
-                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMartes: Press de banca.\nMiércoles: Descanso.\nJueves: Peso muerto.\nViernes: Accesorios (hombros, brazos).\nSábado: Sentadilla.\nDomingo: Descanso.");
-            }
+            addFourDayDistributions(goal, time, distributions);
         } else if (days >= 3) {
-            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
-                distributions.add("Full Body:\nLunes: Full Body.\nMiércoles: Full Body.\nViernes: Full Body.");
-                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMiércoles: Press de banca.\nViernes: Peso muerto.");
-            }
+            addThreeDayDistributions(goal, time, distributions);
         } else {
             Log.e(TAG, "No hay suficientes días para una distribución adecuada");
         }
 
         return distributions;
+    }
+
+    private void addSixDayDistributions(String goal, int time, List<String> distributions) {
+        if (isStrengthOrHypertrophy(goal)) {
+            if (time < 60) {
+                distributions.add("Push-Pull-Legs (Empuje-Tirón-Piernas) - Menos de 1 hora:\nLunes: Empuje (pecho, hombros, tríceps).\nMartes: Tirón (espalda, bíceps).\nMiércoles: Piernas (cuádriceps, isquiotibiales, glúteos).\nJueves: Descanso (no cuenta).\nViernes: Empuje (pecho, hombros, tríceps).\nSábado: Tirón (espalda, bíceps).\nDomingo: Piernas (cuádriceps, isquiotibiales, glúteos).");
+            } else {
+                distributions.add("Push-Pull-Legs (Empuje-Tirón-Piernas):\nLunes: Empuje (pecho, hombros, tríceps).\nMartes: Tirón (espalda, bíceps).\nMiércoles: Piernas (cuádriceps, isquiotibiales, glúteos).\nJueves: Descanso (no cuenta).\nViernes: Empuje (pecho, hombros, tríceps).\nSábado: Tirón (espalda, bíceps).\nDomingo: Piernas (cuádriceps, isquiotibiales, glúteos).");
+            }
+            distributions.add("PHAT (Power Hypertrophy Adaptive Training):\nLunes: Fuerza parte superior.\nMartes: Fuerza parte inferior.\nMiércoles: Descanso (no cuenta).\nJueves: Hipertrofia parte superior (pecho, espalda).\nViernes: Hipertrofia parte inferior (piernas, glúteos).\nSábado: Hipertrofia parte superior (hombros, brazos).\nDomingo: Descanso (no cuenta).");
+            distributions.add("5/3/1 de Jim Wendler:\nLunes: Press de banca.\nMartes: Sentadilla.\nMiércoles: Descanso (no cuenta).\nJueves: Press militar.\nViernes: Peso muerto.\nSábado y Domingo: Descanso (no cuenta).");
+        }
+    }
+
+    private void addFiveDayDistributions(String goal, int time, List<String> distributions) {
+        if (isStrengthOrHypertrophy(goal)) {
+            if (time < 60) {
+                distributions.add("Fuerza-Hipertrofia (Strength-Hypertrophy Split) - Menos de 1 hora:\nLunes: Fuerza (sentadillas, press de banca, peso muerto).\nMartes: Hipertrofia (pecho, espalda, hombros).\nMiércoles: Descanso (no cuenta).\nJueves: Fuerza (sentadillas, press de banca, peso muerto).\nViernes: Hipertrofia (piernas, brazos).\nSábado y Domingo: Descanso (no cuenta).");
+            } else {
+                distributions.add("Fuerza-Hipertrofia (Strength-Hypertrophy Split):\nLunes: Fuerza (sentadillas, press de banca, peso muerto).\nMartes: Hipertrofia (pecho, espalda, hombros).\nMiércoles: Descanso (no cuenta).\nJueves: Fuerza (sentadillas, press de banca, peso muerto).\nViernes: Hipertrofia (piernas, brazos).\nSábado y Domingo: Descanso (no cuenta).");
+            }
+            distributions.add("Entrenamiento de Volumen Alemán (GVT):\nLunes: Pecho y espalda.\nMartes: Piernas y abdominales.\nMiércoles: Descanso (no cuenta).\nJueves: Brazos y hombros.\nViernes: Piernas y abdominales.\nSábado y Domingo: Descanso (no cuenta).");
+            distributions.add("Westside Barbell:\nLunes: Fuerza máxima (press de banca).\nMiércoles: Fuerza máxima (sentadilla/peso muerto).\nViernes: Fuerza dinámica (press de banca).\nSábado: Fuerza dinámica (sentadilla/peso muerto).\nMartes y Jueves: Accesorios (hombros, brazos).\nDomingo: Descanso (no cuenta).");
+            distributions.add("Push-Pull-Legs (Empuje-Tirón-Piernas):\nLunes: Empuje (pecho, hombros, tríceps).\nMartes: Tirón (espalda, bíceps).\nMiércoles: Piernas (cuádriceps, isquiotibiales, glúteos).\nJueves: Empuje (pecho, hombros, tríceps).\nViernes: Tirón (espalda, bíceps).\nSábado: Piernas (cuádriceps, isquiotibiales, glúteos).\nDomingo: Descanso (no cuenta).");
+        }
+    }
+
+    private void addFourDayDistributions(String goal, int time, List<String> distributions) {
+        if (isStrengthOrHypertrophy(goal)) {
+            if (time < 60) {
+                distributions.add("Upper-Lower (Superior-Inferior) - Menos de 1 hora:\nLunes: Parte superior (pecho, espalda, hombros, brazos).\nMartes: Parte inferior (piernas, glúteos).\nMiércoles: Descanso (no cuenta).\nJueves: Parte superior (pecho, espalda, hombros, brazos).\nViernes: Parte inferior (piernas, glúteos).\nSábado y Domingo: Descanso (no cuenta).");
+            } else {
+                distributions.add("Upper-Lower (Superior-Inferior):\nLunes: Parte superior (pecho, espalda, hombros, brazos).\nMartes: Parte inferior (piernas, glúteos).\nMiércoles: Descanso (no cuenta).\nJueves: Parte superior (pecho, espalda, hombros, brazos).\nViernes: Parte inferior (piernas, glúteos).\nSábado y Domingo: Descanso (no cuenta).");
+            }
+            distributions.add("PHUL (Power Hypertrophy Upper Lower):\nLunes: Fuerza parte superior.\nMartes: Fuerza parte inferior.\nJueves: Hipertrofia parte superior.\nViernes: Hipertrofia parte inferior.\nMiércoles, Sábado y Domingo: Descanso (no cuenta).");
+            distributions.add("Full Body (Cuerpo Completo):\nLunes: Full Body (fuerza).\nMiércoles: Full Body (hipertrofia).\nViernes: Full Body (fuerza).\nDomingo: Full Body (hipertrofia).");
+            distributions.add("Push-Pull-Legs (Empuje-Tirón-Piernas):\nLunes: Empuje (pecho, hombros, tríceps).\nMartes: Tirón (espalda, bíceps).\nJueves: Piernas (cuádriceps, isquiotibiales, glúteos).\nViernes: Empuje (pecho, hombros, tríceps).\nSábado: Tirón (espalda, bíceps).\nDomingo: Piernas (cuádriceps, isquiotibiales, glúteos).");
+        }
+    }
+
+    private void addThreeDayDistributions(String goal, int time, List<String> distributions) {
+        if (isStrengthOrHypertrophy(goal)) {
+            if (time < 60) {
+                distributions.add("Full Body - Menos de 1 hora:\nLunes: Full Body.\nMiércoles: Full Body.\nViernes: Full Body.");
+            } else {
+                distributions.add("Full Body:\nLunes: Full Body.\nMiércoles: Full Body.\nViernes: Full Body.");
+            }
+            distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMiércoles: Press de banca.\nViernes: Peso muerto.");
+            distributions.add("Push-Pull-Legs (Empuje-Tirón-Piernas):\nLunes: Empuje (pecho, hombros, tríceps).\nMiércoles: Tirón (espalda, bíceps).\nViernes: Piernas (cuádriceps, isquiotibiales, glúteos).");
+        }
+    }
+    private boolean isStrengthOrHypertrophy(String goal) {
+        return "fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal);
     }
 }
