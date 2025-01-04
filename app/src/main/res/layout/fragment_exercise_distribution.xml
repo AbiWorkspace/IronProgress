@@ -37,15 +37,25 @@
             android:background="#444444"
             android:layout_marginBottom="16dp" />
 
-        <TextView
-            android:id="@+id/distributionTextView"
+        <LinearLayout
+            android:id="@+id/distributionContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="18sp"
-            android:textColor="#FFFFFF"
+            android:orientation="vertical"
             android:padding="16dp"
-            android:background="#2F2F2F"
-            android:scrollbars="vertical"
-            android:layout_gravity="center_horizontal" />
+            android:background="#2F2F2F" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/saveButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Guardar Distribución"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E63946"
+            android:layout_gravity="center"
+            android:padding="16dp"
+            android:textSize="18sp"
+            android:layout_marginTop="16dp"
+            android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 </ScrollView>

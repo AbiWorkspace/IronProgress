@@ -1,19 +1,25 @@
 package com.example.diets.fragments;
 
+
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
 import android.os.Bundle;
-import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
-import android.widget.TextView;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.LinearLayout;
 
 import com.example.diets.R;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -21,6 +27,7 @@ import androidx.fragment.app.Fragment;
 
 public class ExerciseDistributionFragment extends Fragment {
     private static final String TAG = "ExerciseDistributionFragment";
+    private String selectedDistribution = null;
 
     @Nullable
     @Override
@@ -33,7 +40,16 @@ public class ExerciseDistributionFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         Bundle args = getArguments();
-        TextView distributionTextView = view.findViewById(R.id.distributionTextView);
+        LinearLayout distributionContainer = view.findViewById(R.id.distributionContainer);
+        Button saveButton = view.findViewById(R.id.saveButton);
+        saveButton.setOnClickListener(v -> {
+            if (selectedDistribution != null) {
+                Log.d(TAG, "Distribución seleccionada: " + selectedDistribution);
+                // Aquí puedes agregar la lógica para guardar la distribución seleccionada
+            } else {
+                Log.d(TAG, "No se ha seleccionado ninguna distribución");
+            }
+        });
 
         if (args != null) {
             String goal = args.getString("goal");
@@ -50,152 +66,110 @@ public class ExerciseDistributionFragment extends Fragment {
 
             List<String> distributions = generateTrainingDistributions(goal, days, time, jobType, experience);
 
-            if (distributionTextView != null) {
-                StringBuilder allDistributions = new StringBuilder();
+            if (distributionContainer != null) {
+                Log.e(TAG, "distributionContainer is not null");
+                RadioGroup radioGroup = new RadioGroup(getContext());
+                radioGroup.setOrientation(RadioGroup.VERTICAL);
+                Log.e(TAG, "RadioGroup created");
+
                 for (String distribution : distributions) {
-                    allDistributions.append(distribution).append("\n\n");
+                    Log.e(TAG, "Processing distribution: " + distribution);
+                    LinearLayout distributionLayout = new LinearLayout(getContext());
+                    distributionLayout.setOrientation(LinearLayout.HORIZONTAL);
+                    distributionLayout.setPadding(16, 16, 16, 16);
+                    distributionLayout.setBackground(getResources().getDrawable(R.drawable.distribution_background));
+                    Log.e(TAG, "LinearLayout for distribution created");
+
+                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    );
+                    params.setMargins(0, 0, 0, 16);
+                    distributionLayout.setLayoutParams(params);
+                    Log.e(TAG, "LayoutParams set for LinearLayout");
+
+                    RadioButton radioButton = new RadioButton(getContext());
+                    radioButton.setText("");
+                    radioButton.setPadding(8, 8, 8, 8);
+                    radioButton.setButtonTintList(ColorStateList.valueOf(getResources().getColor(R.color.red)));
+                    radioButton.setLayoutParams(new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                    ));
+                    Log.e(TAG, "RadioButton created and styled");
+
+                    TextView distributionText = new TextView(getContext());
+                    distributionText.setText(distribution);
+                    distributionText.setTextColor(getResources().getColor(R.color.white));
+                    distributionText.setPadding(8, 8, 8, 8);
+                    distributionText.setTextSize(16);
+                    distributionText.setTypeface(null, Typeface.BOLD);
+                    Log.e(TAG, "TextView created and styled");
+
+                    distributionLayout.addView(radioButton);
+                    Log.e(TAG, "RadioButton added to LinearLayout");
+                    distributionLayout.addView(distributionText);
+                    Log.e(TAG, "TextView added to LinearLayout");
+
+                    radioGroup.addView(distributionLayout);
+                    Log.e(TAG, "LinearLayout added to RadioGroup");
+
+                    // Log the state of the RadioButton
+                    radioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                        Log.e(TAG, "RadioButton " + distribution + " isChecked: " + isChecked);
+                        if (isChecked) {
+                            selectedDistribution = distribution;
+                            for (int i = 0; i < radioGroup.getChildCount(); i++) {
+                                LinearLayout layout = (LinearLayout) radioGroup.getChildAt(i);
+                                RadioButton rb = (RadioButton) layout.getChildAt(0);
+                                if (rb != buttonView) {
+                                    rb.setChecked(false);
+                                }
+                            }
+                        }
+                    });
                 }
 
-                distributionTextView.setText(allDistributions.toString());
-                distributionTextView.setMovementMethod(new ScrollingMovementMethod());
-                Log.d(TAG, "Distributions set to TextView");
-                Log.d(TAG, "Distributions: " + allDistributions.toString());
+                distributionContainer.addView(radioGroup);
+                Log.e(TAG, "RadioGroup added to distributionContainer");
+                Log.d(TAG, "Distributions set to individual containers with RadioButtons");
             } else {
-                Log.e(TAG, "distributionTextView is null");
+                Log.e(TAG, "distributionContainer is null");
             }
         } else {
             Log.e(TAG, "No se pasaron argumentos al fragmento.");
-            if (distributionTextView != null) {
-                distributionTextView.setText("Texto de prueba");
-                distributionTextView.setMovementMethod(new ScrollingMovementMethod());
-                Log.d(TAG, "Texto de prueba establecido en TextView");
-            } else {
-                Log.e(TAG, "distributionTextView is null incluso sin argumentos");
-            }
         }
     }
 
     private List<String> generateTrainingDistributions(String goal, int days, int time, String jobType, String experience) {
         List<String> distributions = new ArrayList<>();
-        Random random = new Random();
 
-        if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal)) {
-            distributions.add(generateDynamicPowerliftingDistribution(days, time, "Push-Pull", jobType, experience, random));
-            distributions.add(generateDynamicPowerliftingDistribution(days, time, "Push-Pull-Legs", jobType, experience, random));
-            distributions.add(generateDynamicPowerliftingDistribution(days, time, "Full Body", jobType, experience, random));
-        } else if ("hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
-            distributions.add(generateDynamicHypertrophyDistribution(days, time, "Push-Pull", jobType, experience, random));
-            distributions.add(generateDynamicHypertrophyDistribution(days, time, "Push-Pull-Legs", jobType, experience, random));
-            distributions.add(generateDynamicHypertrophyDistribution(days, time, "Full Body", jobType, experience, random));
+        if (days >= 6) {
+            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
+                distributions.add("Push-Pull-Legs (Empuje-Tirón-Piernas):\nLunes: Empuje (pecho, hombros, tríceps).\nMartes: Tirón (espalda, bíceps).\nMiércoles: Piernas (cuádriceps, isquiotibiales, glúteos).\nJueves: Descanso.\nViernes: Empuje (pecho, hombros, tríceps).\nSábado: Tirón (espalda, bíceps).\nDomingo: Piernas (cuádriceps, isquiotibiales, glúteos).");
+                distributions.add("PHAT (Power Hypertrophy Adaptive Training):\nLunes: Fuerza parte superior.\nMartes: Fuerza parte inferior.\nMiércoles: Descanso.\nJueves: Hipertrofia parte superior (pecho, espalda).\nViernes: Hipertrofia parte inferior (piernas, glúteos).\nSábado: Hipertrofia parte superior (hombros, brazos).\nDomingo: Descanso.");
+                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMartes: Press de banca.\nMiércoles: Descanso.\nJueves: Peso muerto.\nViernes: Accesorios (hombros, brazos).\nSábado: Sentadilla.\nDomingo: Descanso.");
+            }
+        } else if (days >= 5) {
+            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
+                distributions.add("Fuerza-Hipertrofia (Strength-Hypertrophy Split):\nLunes: Fuerza (sentadillas, press de banca, peso muerto).\nMartes: Hipertrofia (pecho, espalda, hombros).\nMiércoles: Descanso.\nJueves: Fuerza (sentadillas, press de banca, peso muerto).\nViernes: Hipertrofia (piernas, brazos).\nSábado y Domingo: Descanso.");
+                distributions.add("Entrenamiento de Volumen Alemán (GVT):\nLunes: Pecho y espalda.\nMartes: Piernas y abdominales.\nMiércoles: Descanso.\nJueves: Brazos y hombros.\nViernes: Piernas y abdominales.\nSábado y Domingo: Descanso.");
+                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMartes: Press de banca.\nMiércoles: Descanso.\nJueves: Peso muerto.\nViernes: Accesorios (hombros, brazos).\nSábado: Sentadilla.\nDomingo: Descanso.");
+            }
+        } else if (days >= 4) {
+            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
+                distributions.add("Upper-Lower (Superior-Inferior):\nLunes: Parte superior (pecho, espalda, hombros, brazos).\nMartes: Parte inferior (piernas, glúteos).\nMiércoles: Descanso.\nJueves: Parte superior (pecho, espalda, hombros, brazos).\nViernes: Parte inferior (piernas, glúteos).\nSábado y Domingo: Descanso.");
+                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMartes: Press de banca.\nMiércoles: Descanso.\nJueves: Peso muerto.\nViernes: Accesorios (hombros, brazos).\nSábado: Sentadilla.\nDomingo: Descanso.");
+            }
+        } else if (days >= 3) {
+            if ("fuerza".equalsIgnoreCase(goal) || "Aumentar fuerza".equalsIgnoreCase(goal) || "hipertrofia".equalsIgnoreCase(goal) || "Aumentar masa muscular".equalsIgnoreCase(goal)) {
+                distributions.add("Full Body:\nLunes: Full Body.\nMiércoles: Full Body.\nViernes: Full Body.");
+                distributions.add("Powerlifting Split:\nLunes: Sentadilla.\nMiércoles: Press de banca.\nViernes: Peso muerto.");
+            }
         } else {
-            Log.e(TAG, "Goal no reconocido: " + goal);
+            Log.e(TAG, "No hay suficientes días para una distribución adecuada");
         }
 
         return distributions;
-    }
-
-    private String generateDynamicPowerliftingDistribution(int days, int time, String type, String jobType, String experience, Random random) {
-        StringBuilder distribution = new StringBuilder();
-        List<String> pushExercises = List.of("Press de banca", "Press militar", "Fondos", "Press inclinado");
-        List<String> pullExercises = List.of("Remo con barra", "Dominadas", "Curls de bíceps", "Face pulls");
-        List<String> legExercises = List.of("Sentadillas", "Peso muerto", "Prensa de piernas", "Zancadas");
-
-        int timePerDay = time / days;
-
-        distribution.append("Distribución para Fuerza (Powerlifting) - ").append(type).append(":\n");
-
-        for (int i = 1; i <= days; i++) {
-            distribution.append("Día ").append(i).append(":\n");
-
-            if ("Push-Pull".equals(type)) {
-                if (i % 2 == 1) {
-                    distribution.append("Push:\n");
-                    addRandomExercises(distribution, pushExercises, random);
-                } else {
-                    distribution.append("Pull:\n");
-                    addRandomExercises(distribution, pullExercises, random);
-                }
-            } else if ("Push-Pull-Legs".equals(type)) {
-                if (i % 3 == 1) {
-                    distribution.append("Push:\n");
-                    addRandomExercises(distribution, pushExercises, random);
-                } else if (i % 3 == 2) {
-                    distribution.append("Pull:\n");
-                    addRandomExercises(distribution, pullExercises, random);
-                } else {
-                    distribution.append("Legs:\n");
-                    addRandomExercises(distribution, legExercises, random);
-                }
-            } else if ("Full Body".equals(type)) {
-                distribution.append("Full Body:\n");
-                addRandomExercises(distribution, pushExercises, random);
-                addRandomExercises(distribution, pullExercises, random);
-                addRandomExercises(distribution, legExercises, random);
-            } else {
-                Log.e(TAG, "Tipo de distribución no reconocido: " + type);
-            }
-
-            distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
-        }
-
-        return distribution.toString();
-    }
-
-    private String generateDynamicHypertrophyDistribution(int days, int time, String type, String jobType, String experience, Random random) {
-        StringBuilder distribution = new StringBuilder();
-        List<String> pushExercises = List.of("Press de pecho", "Press de hombros", "Extensiones de tríceps", "Aperturas con mancuernas");
-        List<String> pullExercises = List.of("Remo con mancuerna", "Dominadas", "Curls de bíceps", "Encogimientos de trapecio");
-        List<String> legExercises = List.of("Sentadillas", "Peso muerto", "Prensa de piernas", "Elevaciones de talones");
-
-        int timePerDay = time / days;
-
-        distribution.append("Distribución para Hipertrofia - ").append(type).append(":\n");
-
-        for (int i = 1; i <= days; i++) {
-            distribution.append("Día ").append(i).append(":\n");
-
-            if ("Push-Pull".equals(type)) {
-                if (i % 2 == 1) {
-                    distribution.append("Push:\n");
-                    addRandomExercises(distribution, pushExercises, random);
-                } else {
-                    distribution.append("Pull:\n");
-                    addRandomExercises(distribution, pullExercises, random);
-                }
-            } else if ("Push-Pull-Legs".equals(type)) {
-                if (i % 3 == 1) {
-                    distribution.append("Push:\n");
-                    addRandomExercises(distribution, pushExercises, random);
-                } else if (i % 3 == 2) {
-                    distribution.append("Pull:\n");
-                    addRandomExercises(distribution, pullExercises, random);
-                } else {
-                    distribution.append("Legs:\n");
-                    addRandomExercises(distribution, legExercises, random);
-                }
-            } else if ("Full Body".equals(type)) {
-                distribution.append("Full Body:\n");
-                addRandomExercises(distribution, pushExercises, random);
-                addRandomExercises(distribution, pullExercises, random);
-                addRandomExercises(distribution, legExercises, random);
-            } else {
-                Log.e(TAG, "Tipo de distribución no reconocido: " + type);
-            }
-
-            distribution.append("Tiempo estimado: ").append(timePerDay).append(" minutos\n\n");
-        }
-
-        return distribution.toString();
-    }
-    private void addRandomExercises(StringBuilder distribution, List<String> exercises, Random random) {
-        int numExercises = random.nextInt(2) + 2; // 2-3 ejercicios aleatorios
-        for (int i = 0; i < numExercises; i++) {
-            String exercise = exercises.get(random.nextInt(exercises.size()));
-            if (!distribution.toString().contains(exercise)) {
-                distribution.append("- ").append(exercise).append("\n");
-            } else {
-                Log.e(TAG, "Ejercicio duplicado: " + exercise);
-            }
-        }
     }
 }
