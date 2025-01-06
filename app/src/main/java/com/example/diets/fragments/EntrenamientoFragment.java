@@ -155,7 +155,5 @@ public class EntrenamientoFragment extends Fragment {
                 ((ViewPagerActivity) getActivity()).switchToExerciseDistributionFragment(data);
             }
         });
-
-
     }
 }
