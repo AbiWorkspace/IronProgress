@@ -45,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
         mAuth = FirebaseAuth.getInstance();
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
+
         // Verifica si el usuario ya está autenticado
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
