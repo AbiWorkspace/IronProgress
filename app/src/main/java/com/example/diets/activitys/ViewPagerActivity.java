@@ -12,6 +12,7 @@ import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
+import com.example.diets.fragments.SelectExercisesFragment;
 
 public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener {
 
@@ -72,6 +73,15 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
     public void switchToExerciseDistributionFragment(Bundle data) {
         // Crea el nuevo fragmento y actualiza el adaptador
         ExerciseDistributionFragment fragment = new ExerciseDistributionFragment();
+        fragment.setArguments(data);
+
+        // Reemplazar el fragmento en la lista del adaptador
+        adapter.replaceFragment(0, fragment);
+        viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
+    }
+    public void switchToSelectExercisesFragment(Bundle data) {
+        // Crea el nuevo fragmento y actualiza el adaptador
+        SelectExercisesFragment fragment = new SelectExercisesFragment();
         fragment.setArguments(data);
 
         // Reemplazar el fragmento en la lista del adaptador

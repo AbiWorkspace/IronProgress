@@ -8,6 +8,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 
 import com.example.diets.R;
+import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.model.ExerciseDistribution;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -33,6 +34,7 @@ public class ExerciseDistributionFragment extends Fragment {
     private String selectedDistribution = null;
     private DatabaseReference mDatabase;
     private int selectedDays;
+    private List<RadioButton> radioButtons = new ArrayList<>();
 
     @Nullable
     @Override
@@ -52,7 +54,12 @@ public class ExerciseDistributionFragment extends Fragment {
         saveButton.setOnClickListener(v -> {
             if (selectedDistribution != null) {
                 Log.d(TAG, "Distribución seleccionada: " + selectedDistribution);
-                // Aquí puedes agregar la lógica para guardar la distribución seleccionada
+                // Guardar la distribución seleccionada en un Bundle
+                Bundle data = new Bundle();
+                data.putString("selectedDistribution", selectedDistribution);
+
+                // Cambiar al siguiente fragmento
+                ((ViewPagerActivity) getActivity()).switchToSelectExercisesFragment(data);
             } else {
                 Log.d(TAG, "No se ha seleccionado ninguna distribución");
             }
@@ -180,13 +187,12 @@ public class ExerciseDistributionFragment extends Fragment {
         ));
 
         distributionLayout.addView(radioButton);
+        radioButtons.add(radioButton); // Añadir el RadioButton a la lista
 
         radioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
                 selectedDistribution = exerciseDistribution.getTitle();
-                for (int i = 0; i < container.getChildCount(); i++) {
-                    LinearLayout layout = (LinearLayout) container.getChildAt(i);
-                    RadioButton rb = (RadioButton) layout.getChildAt(layout.getChildCount() - 1);
+                for (RadioButton rb : radioButtons) {
                     if (rb != buttonView) {
                         rb.setChecked(false);
                     }

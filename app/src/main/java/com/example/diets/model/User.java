@@ -339,7 +339,7 @@ public class User {
         double get = bmr * activityFactor;
         return switch (goal != null ? goal.toLowerCase() : "maintain weight") {
             case "lose weight" -> get * 0.75;
-            case "gain muscle" -> get * 1.15;
+            case "gain muscle.class" -> get * 1.15;
             default -> get;
         };
     }
