@@ -1,4 +1,5 @@
 package com.example.diets.model;
+
 public class Exercise {
     private int id;
     private String name;
@@ -8,9 +9,10 @@ public class Exercise {
     private String loadIntensity;
     private String image;
     private String description;
+    private String movementType; // Nuevo campo para empuje o tracción
 
     // Constructor
-    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description) {
+    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description, String movementType) {
         this.id = id;
         this.name = name;
         this.equipmentType = equipmentType;
@@ -19,6 +21,7 @@ public class Exercise {
         this.loadIntensity = loadIntensity;
         this.image = image;
         this.description = description;
+        this.movementType = movementType; // Inicialización del nuevo campo
     }
 
     // Getters and Setters
@@ -85,7 +88,15 @@ public class Exercise {
     public void setDescription(String description) {
         this.description = description;
     }
-//agregar el tipo empuje o traccion
+
+    public String getMovementType() {
+        return movementType;
+    }
+
+    public void setMovementType(String movementType) {
+        this.movementType = movementType;
+    }
+
     @Override
     public String toString() {
         return "Exercise{" +
@@ -97,6 +108,7 @@ public class Exercise {
                 ", loadIntensity='" + loadIntensity + '\'' +
                 ", image='" + image + '\'' +
                 ", description='" + description + '\'' +
+                ", movementType='" + movementType + '\'' +
                 '}';
     }
 }

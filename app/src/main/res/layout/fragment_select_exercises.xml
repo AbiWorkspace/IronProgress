@@ -1,38 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:background="#1C1C1C">
+    android:background="#1C1C1C"
+    android:padding="16dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Selecciona tus ejercicios"
-        android:textColor="#FFFFFF"
-        android:textSize="24sp"
-        android:layout_gravity="center"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="16dp" />
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="#2F2F2F" />
-
-    <Button
-        android:id="@+id/saveButton"
-        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Guardar Ejercicios"
-        android:textColor="#FFFFFF"
-        android:backgroundTint="#E63946"
-        android:layout_gravity="center"
-        android:padding="16dp"
-        android:textSize="18sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginTop="16dp" />
-</LinearLayout>
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Selecciona tus ejercicios"
+            android:textColor="#FFFFFF"
+            android:textSize="24sp"
+            android:layout_gravity="center"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="16dp" />
+
+        <LinearLayout
+            android:id="@+id/containerLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#2F2F2F" />
+
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Guardar Ejercicios"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E63946"
+            android:layout_gravity="center"
+            android:padding="16dp"
+            android:textSize="18sp"
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginTop="16dp" />
+    </LinearLayout>
+</ScrollView>

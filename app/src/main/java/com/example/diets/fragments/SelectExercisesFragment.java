@@ -1,5 +1,7 @@
 package com.example.diets.fragments;
 
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -7,6 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -16,16 +19,22 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
+import com.example.diets.model.Exercise;
+import com.example.diets.model.ExerciseDistribution;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-
 public class SelectExercisesFragment extends Fragment {
     private static final String TAG = "SelectExercisesFragment";
     private List<String> selectedExercises = new ArrayList<>();
-    private RecyclerView recyclerView;
-    private ExercisesAdapter adapter;
+    private LinearLayout containerLayout;
+    private DatabaseReference mDatabase;
+    private List<ExerciseDistribution.TrainingDay> trainingDays;
 
     @Nullable
     @Override
@@ -37,13 +46,16 @@ public class SelectExercisesFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        recyclerView = view.findViewById(R.id.recyclerView);
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        containerLayout = view.findViewById(R.id.containerLayout);
+        mDatabase = FirebaseDatabase.getInstance().getReference();
 
-        // Simulación de datos de ejercicios
-        List<String> exercises = Arrays.asList("Push-up", "Squat", "Lunge", "Plank", "Burpee");
-        adapter = new ExercisesAdapter(exercises, selectedExercises);
-        recyclerView.setAdapter(adapter);
+        // Obtener los datos del Bundle
+        Bundle data = getArguments();
+        if (data != null) {
+            String selectedDistribution = data.getString("selectedDistribution");
+            trainingDays = (List<ExerciseDistribution.TrainingDay>) data.getSerializable("trainingDays");
+            createExerciseContainers(trainingDays);
+        }
 
         Button saveButton = view.findViewById(R.id.saveButton);
         saveButton.setOnClickListener(v -> {
@@ -52,11 +64,76 @@ public class SelectExercisesFragment extends Fragment {
         });
     }
 
+    private void createExerciseContainers(List<ExerciseDistribution.TrainingDay> trainingDays) {
+        for (ExerciseDistribution.TrainingDay trainingDay : trainingDays) {
+            LinearLayout dayContainer = new LinearLayout(getContext());
+            dayContainer.setOrientation(LinearLayout.VERTICAL);
+            dayContainer.setPadding(16, 16, 16, 16);
+            dayContainer.setBackgroundColor(Color.parseColor("#2F2F2F"));
+
+            // Agregar margen inferior y borde para separar los contenedores
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            params.setMargins(0, 0, 0, 16);
+            dayContainer.setLayoutParams(params);
+            dayContainer.setBackgroundResource(R.drawable.container_background);
+
+            TextView dayTitle = new TextView(getContext());
+            dayTitle.setText(trainingDay.getDayName());
+            dayTitle.setTextColor(Color.WHITE);
+            dayTitle.setTextSize(20);
+            dayTitle.setTypeface(null, Typeface.BOLD);
+            dayContainer.addView(dayTitle);
+
+            RecyclerView recyclerView = new RecyclerView(getContext());
+            recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+            loadExercises(recyclerView, trainingDay.getMovementPatterns());
+            dayContainer.addView(recyclerView);
+
+            Button addButton = new Button(getContext());
+            addButton.setText("Agregar Ejercicios");
+            addButton.setTextColor(Color.WHITE);
+            addButton.setBackgroundColor(Color.parseColor("#E63946"));
+            addButton.setOnClickListener(v -> {
+                // Lógica para agregar ejercicios
+                Log.d(TAG, "Agregar ejercicios para " + trainingDay.getDayName());
+            });
+            dayContainer.addView(addButton);
+
+            containerLayout.addView(dayContainer);
+        }
+    }
+
+    private void loadExercises(RecyclerView recyclerView, List<String> movementPatterns) {
+        DatabaseReference exercisesRef = mDatabase.child("exercises");
+        exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                List<Exercise> exercises = new ArrayList<>();
+                for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
+                    Exercise exercise = exerciseSnapshot.getValue(Exercise.class);
+                    if (exercise != null && movementPatterns.contains(exercise.getMovementType())) {
+                        exercises.add(exercise);
+                    }
+                }
+                ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExercises);
+                recyclerView.setAdapter(adapter);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.d(TAG, "Error de base de datos: " + error.getMessage());
+            }
+        });
+    }
+
     private static class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
-        private final List<String> exercises;
+        private final List<Exercise> exercises;
         private final List<String> selectedExercises;
 
-        ExercisesAdapter(List<String> exercises, List<String> selectedExercises) {
+        ExercisesAdapter(List<Exercise> exercises, List<String> selectedExercises) {
             this.exercises = exercises;
             this.selectedExercises = selectedExercises;
         }
@@ -70,15 +147,15 @@ public class SelectExercisesFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            String exercise = exercises.get(position);
-            holder.exerciseName.setText(exercise);
+            Exercise exercise = exercises.get(position);
+            holder.exerciseName.setText(exercise.getName());
             holder.checkBox.setOnCheckedChangeListener(null);
-            holder.checkBox.setChecked(selectedExercises.contains(exercise));
+            holder.checkBox.setChecked(selectedExercises.contains(exercise.getName()));
             holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 if (isChecked) {
-                    selectedExercises.add(exercise);
+                    selectedExercises.add(exercise.getName());
                 } else {
-                    selectedExercises.remove(exercise);
+                    selectedExercises.remove(exercise.getName());
                 }
             });
         }

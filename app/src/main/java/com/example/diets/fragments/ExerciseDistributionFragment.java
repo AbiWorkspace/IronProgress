@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.LinearLayout;
-
 import com.example.diets.R;
 import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.model.ExerciseDistribution;
@@ -15,19 +14,17 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
 import java.util.ArrayList;
 import java.util.List;
-
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.RadioButton;
 import android.widget.TextView;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import java.io.Serializable;
 
 public class ExerciseDistributionFragment extends Fragment {
     private static final String TAG = "ExerciseDistributionFragment";
@@ -35,6 +32,7 @@ public class ExerciseDistributionFragment extends Fragment {
     private DatabaseReference mDatabase;
     private int selectedDays;
     private List<RadioButton> radioButtons = new ArrayList<>();
+    private List<ExerciseDistribution.TrainingDay> trainingDays;
 
     @Nullable
     @Override
@@ -57,6 +55,7 @@ public class ExerciseDistributionFragment extends Fragment {
                 // Guardar la distribución seleccionada en un Bundle
                 Bundle data = new Bundle();
                 data.putString("selectedDistribution", selectedDistribution);
+                data.putSerializable("trainingDays", (Serializable) trainingDays);
 
                 // Cambiar al siguiente fragmento
                 ((ViewPagerActivity) getActivity()).switchToSelectExercisesFragment(data);
@@ -192,6 +191,7 @@ public class ExerciseDistributionFragment extends Fragment {
         radioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
                 selectedDistribution = exerciseDistribution.getTitle();
+                trainingDays = exerciseDistribution.getTrainingDays();
                 for (RadioButton rb : radioButtons) {
                     if (rb != buttonView) {
                         rb.setChecked(false);

@@ -1,6 +1,7 @@
 package com.example.diets.model;
 
 import java.util.List;
+import com.example.diets.model.Muscle;
 
 public class MovementPattern {
     private int id;

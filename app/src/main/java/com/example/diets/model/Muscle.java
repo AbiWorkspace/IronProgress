@@ -1,6 +1,7 @@
 package com.example.diets.model;
 
- class Muscle {
+
+public class Muscle {
     private int id;
     private String name;
 
