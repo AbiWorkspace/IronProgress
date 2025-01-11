@@ -21,11 +21,14 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.ExerciseDistribution;
+import com.example.diets.model.MovementPattern;
+import com.example.diets.model.TrainingDay;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.example.diets.model.TrainingDay;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +37,7 @@ public class SelectExercisesFragment extends Fragment {
     private List<String> selectedExercises = new ArrayList<>();
     private LinearLayout containerLayout;
     private DatabaseReference mDatabase;
-    private List<ExerciseDistribution.TrainingDay> trainingDays;
+    private List<TrainingDay> trainingDays;
 
     @Nullable
     @Override
@@ -53,7 +56,7 @@ public class SelectExercisesFragment extends Fragment {
         Bundle data = getArguments();
         if (data != null) {
             String selectedDistribution = data.getString("selectedDistribution");
-            trainingDays = (List<ExerciseDistribution.TrainingDay>) data.getSerializable("trainingDays");
+            trainingDays = (List<TrainingDay>) data.getSerializable("trainingDays");
             createExerciseContainers(trainingDays);
         }
 
@@ -64,8 +67,8 @@ public class SelectExercisesFragment extends Fragment {
         });
     }
 
-    private void createExerciseContainers(List<ExerciseDistribution.TrainingDay> trainingDays) {
-        for (ExerciseDistribution.TrainingDay trainingDay : trainingDays) {
+    private void createExerciseContainers(List<TrainingDay> trainingDays) {
+        for (TrainingDay trainingDay : trainingDays) {
             LinearLayout dayContainer = new LinearLayout(getContext());
             dayContainer.setOrientation(LinearLayout.VERTICAL);
             dayContainer.setPadding(16, 16, 16, 16);
@@ -98,12 +101,20 @@ public class SelectExercisesFragment extends Fragment {
             addButton.setBackgroundColor(Color.parseColor("#E63946"));
             addButton.setOnClickListener(v -> {
                 // Lógica para agregar ejercicios
-                Log.d(TAG, "Agregar ejercicios para " + trainingDay.getDayName());
+                showExerciseSelectionDialog(trainingDay);
             });
             dayContainer.addView(addButton);
 
             containerLayout.addView(dayContainer);
         }
+    }
+
+    private void showExerciseSelectionDialog(TrainingDay trainingDay) {
+        ExerciseSelectionDialogFragment dialogFragment = new ExerciseSelectionDialogFragment();
+        Bundle args = new Bundle();
+        args.putSerializable("trainingDay", trainingDay);
+        dialogFragment.setArguments(args);
+        dialogFragment.show(getFragmentManager(), "ExerciseSelectionDialog");
     }
 
     private void loadExercises(RecyclerView recyclerView, List<String> movementPatterns) {
@@ -115,7 +126,13 @@ public class SelectExercisesFragment extends Fragment {
                 for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
                     Exercise exercise = exerciseSnapshot.getValue(Exercise.class);
                     if (exercise != null && movementPatterns.contains(exercise.getMovementType())) {
-                        exercises.add(exercise);
+                        for (String pattern : movementPatterns) {
+                            MovementPattern movementPattern = getMovementPatternByName(pattern);
+                            if (movementPattern != null && exercise.getSynergistMuscles().containsAll(movementPattern.getSynergistMuscles())) {
+                                exercises.add(exercise);
+                                break;
+                            }
+                        }
                     }
                 }
                 ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExercises);
@@ -127,6 +144,12 @@ public class SelectExercisesFragment extends Fragment {
                 Log.d(TAG, "Error de base de datos: " + error.getMessage());
             }
         });
+    }
+
+    private MovementPattern getMovementPatternByName(String name) {
+        // Aquí debes implementar la lógica para obtener el patrón de movimiento por su nombre.
+        // Esto puede ser desde una base de datos, una lista en memoria, etc.
+        return null; // Implementa esta lógica según tu necesidad
     }
 
     private static class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {

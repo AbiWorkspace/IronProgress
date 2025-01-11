@@ -1,5 +1,6 @@
 package com.example.diets.model;
 
+import java.util.List;
 public class Exercise {
     private int id;
     private String name;
@@ -9,10 +10,11 @@ public class Exercise {
     private String loadIntensity;
     private String image;
     private String description;
-    private String movementType; // Nuevo campo para empuje o tracción
+    private String movementType;
+    private List<String> synergistMuscles;
 
     // Constructor
-    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description, String movementType) {
+    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description, String movementType, List<String> synergistMuscles) {
         this.id = id;
         this.name = name;
         this.equipmentType = equipmentType;
@@ -21,7 +23,8 @@ public class Exercise {
         this.loadIntensity = loadIntensity;
         this.image = image;
         this.description = description;
-        this.movementType = movementType; // Inicialización del nuevo campo
+        this.movementType = movementType;
+        this.synergistMuscles = synergistMuscles;
     }
 
     // Getters and Setters
@@ -97,6 +100,14 @@ public class Exercise {
         this.movementType = movementType;
     }
 
+    public List<String> getSynergistMuscles() {
+        return synergistMuscles;
+    }
+
+    public void setSynergistMuscles(List<String> synergistMuscles) {
+        this.synergistMuscles = synergistMuscles;
+    }
+
     @Override
     public String toString() {
         return "Exercise{" +
@@ -109,6 +120,7 @@ public class Exercise {
                 ", image='" + image + '\'' +
                 ", description='" + description + '\'' +
                 ", movementType='" + movementType + '\'' +
+                ", synergistMuscles=" + synergistMuscles +
                 '}';
     }
 }
