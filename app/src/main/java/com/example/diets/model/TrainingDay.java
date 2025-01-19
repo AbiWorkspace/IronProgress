@@ -4,31 +4,41 @@ import java.io.Serializable;
 import java.util.List;
 
 public class TrainingDay implements Serializable {
-    private String dayName;
-    private List<String> movementPatterns;
+    private int dayIndex;
+    private List<MovementPattern> movementPatterns; // Cambiado a List<MovementPattern>
+    private List<Exercise> exercises;
 
     public TrainingDay() {
         // Constructor vacío necesario para Firebase
     }
 
-    public TrainingDay(String dayName, List<String> movementPatterns) {
-        this.dayName = dayName;
+    public TrainingDay(int dayIndex, List<MovementPattern> movementPatterns, List<Exercise> exercises) {
+        this.dayIndex = dayIndex;
         this.movementPatterns = movementPatterns;
+        this.exercises = exercises;
     }
 
-    public String getDayName() {
-        return dayName;
+    public int getDayIndex() {
+        return dayIndex;
     }
 
-    public void setDayName(String dayName) {
-        this.dayName = dayName;
+    public void setDayIndex(int dayIndex) {
+        this.dayIndex = dayIndex;
     }
 
-    public List<String> getMovementPatterns() {
+    public List<MovementPattern> getMovementPatterns() {
         return movementPatterns;
     }
 
-    public void setMovementPatterns(List<String> movementPatterns) {
+    public void setMovementPatterns(List<MovementPattern> movementPatterns) {
         this.movementPatterns = movementPatterns;
+    }
+
+    public List<Exercise> getExercises() {
+        return exercises;
+    }
+
+    public void setExercises(List<Exercise> exercises) {
+        this.exercises = exercises;
     }
 }

@@ -1,6 +1,8 @@
 package com.example.diets.model;
 
+import java.util.ArrayList;
 import java.util.List;
+
 public class Exercise {
     private int id;
     private String name;
@@ -11,10 +13,16 @@ public class Exercise {
     private String image;
     private String description;
     private String movementType;
-    private List<String> synergistMuscles;
+    private List<Muscle> synergistMuscles = new ArrayList<>(); // Inicialización de la lista
+    private List<String> goals = new ArrayList<>();
+    private List<MovementPattern> movementPatterns = new ArrayList<>();
 
-    // Constructor
-    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description, String movementType, List<String> synergistMuscles) {
+    // Constructor sin argumentos requerido por Firebase
+    public Exercise() {
+    }
+
+    // Constructor con argumentos
+    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description, String movementType, List<Muscle> synergistMuscles, List<String> goals, List<MovementPattern> movementPatterns) {
         this.id = id;
         this.name = name;
         this.equipmentType = equipmentType;
@@ -24,10 +32,12 @@ public class Exercise {
         this.image = image;
         this.description = description;
         this.movementType = movementType;
-        this.synergistMuscles = synergistMuscles;
+        this.synergistMuscles = synergistMuscles != null ? synergistMuscles : new ArrayList<>();
+        this.goals = goals != null ? goals : new ArrayList<>();
+        this.movementPatterns = movementPatterns != null ? movementPatterns : new ArrayList<>();
     }
 
-    // Getters and Setters
+    // Getters y Setters
     public int getId() {
         return id;
     }
@@ -100,12 +110,28 @@ public class Exercise {
         this.movementType = movementType;
     }
 
-    public List<String> getSynergistMuscles() {
+    public List<Muscle> getSynergistMuscles() {
         return synergistMuscles;
     }
 
-    public void setSynergistMuscles(List<String> synergistMuscles) {
+    public void setSynergistMuscles(List<Muscle> synergistMuscles) {
         this.synergistMuscles = synergistMuscles;
+    }
+
+    public List<String> getGoals() {
+        return goals;
+    }
+
+    public void setGoals(List<String> goals) {
+        this.goals = goals;
+    }
+
+    public List<MovementPattern> getMovementPatterns() {
+        return movementPatterns;
+    }
+
+    public void setMovementPatterns(List<MovementPattern> movementPatterns) {
+        this.movementPatterns = movementPatterns;
     }
 
     @Override
@@ -121,6 +147,8 @@ public class Exercise {
                 ", description='" + description + '\'' +
                 ", movementType='" + movementType + '\'' +
                 ", synergistMuscles=" + synergistMuscles +
+                ", goals=" + goals +
+                ", movementPatterns=" + movementPatterns +
                 '}';
     }
 }

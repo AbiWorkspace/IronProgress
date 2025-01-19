@@ -9,6 +9,8 @@ import android.widget.LinearLayout;
 import com.example.diets.R;
 import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.model.ExerciseDistribution;
+import com.example.diets.model.MovementPattern;
+import com.example.diets.model.Muscle;
 import com.example.diets.model.TrainingDay;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -164,8 +166,26 @@ public class ExerciseDistributionFragment extends Fragment {
 
         TextView distributionText = new TextView(getContext());
         StringBuilder distributionDetails = new StringBuilder();
-        for (TrainingDay day : exerciseDistribution.getTrainingDays()) {
-            distributionDetails.append(day.getDayName()).append(": ").append(day.getMovementPatterns()).append("\n");
+        List<TrainingDay> trainingDaysList = exerciseDistribution.getTrainingDays();
+        for (int i = 0; i < trainingDaysList.size(); i++) {
+            TrainingDay day = trainingDaysList.get(i);
+            distributionDetails.append("Día ").append(i + 1).append(":\n");
+            if (day.getMovementPatterns() != null) {
+                for (MovementPattern pattern : day.getMovementPatterns()) {
+                    distributionDetails.append("  - Patrón: ").append(pattern.getName()).append("\n");
+                    distributionDetails.append("    Músculos: ");
+                    if (pattern.getSynergistMuscles() != null) {
+                        for (Muscle muscle : pattern.getSynergistMuscles()) {
+                            distributionDetails.append(muscle.getName()).append(", ");
+                        }
+                        // Eliminar la última coma y espacio
+                        if (!pattern.getSynergistMuscles().isEmpty()) {
+                            distributionDetails.setLength(distributionDetails.length() - 2);
+                        }
+                    }
+                    distributionDetails.append("\n");
+                }
+            }
         }
         distributionText.setText(distributionDetails.toString());
         distributionText.setTextColor(getResources().getColor(R.color.white));
@@ -191,7 +211,8 @@ public class ExerciseDistributionFragment extends Fragment {
         radioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
                 selectedDistribution = exerciseDistribution.getTitle();
-                trainingDays = exerciseDistribution.getTrainingDays();
+                List<TrainingDay> tempTrainingDays = exerciseDistribution.getTrainingDays();
+                trainingDays = new ArrayList<>(tempTrainingDays); // Asignar a la variable de instancia
                 for (RadioButton rb : radioButtons) {
                     if (rb != buttonView) {
                         rb.setChecked(false);

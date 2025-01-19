@@ -1,21 +1,26 @@
 package com.example.diets.model;
 
+import java.util.ArrayList;
 import java.util.List;
 import com.example.diets.model.Muscle;
 
 public class MovementPattern {
     private int id;
     private String name;
-    private List<Muscle> synergistMuscles;
+    private List<Muscle> synergistMuscles = new ArrayList<>(); // Inicialización de la lista
 
-    // Constructor
+    // Constructor sin argumentos requerido por Firebase
+    public MovementPattern() {
+    }
+
+    // Constructor con argumentos
     public MovementPattern(int id, String name, List<Muscle> synergistMuscles) {
         this.id = id;
         this.name = name;
-        this.synergistMuscles = synergistMuscles;
+        this.synergistMuscles = synergistMuscles != null ? synergistMuscles : new ArrayList<>();
     }
 
-    // Getters and Setters
+    // Getters y Setters
     public int getId() {
         return id;
     }

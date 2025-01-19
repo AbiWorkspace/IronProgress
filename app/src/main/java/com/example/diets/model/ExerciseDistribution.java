@@ -11,10 +11,10 @@ public class ExerciseDistribution {
     private String frecuencia;
     private boolean recomendado;
 
-    public ExerciseDistribution() {
-        // Constructor vacío necesario para Firebase
-    }
+    // Constructor vacío necesario para Firebase
+    public ExerciseDistribution() {}
 
+    // Constructor completo
     public ExerciseDistribution(String title, int numberOfDays, List<TrainingDay> trainingDays, boolean frecuenciaSimetrica, String frecuencia, boolean recomendado) {
         this.title = title;
         this.numberOfDays = numberOfDays;
@@ -24,6 +24,7 @@ public class ExerciseDistribution {
         this.recomendado = recomendado;
     }
 
+    // Getters y Setters
     public String getTitle() {
         return title;
     }

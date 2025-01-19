@@ -4,13 +4,17 @@ public class Muscle {
     private int id;
     private String name;
 
-    // Constructor
+    // Constructor sin argumentos requerido por Firebase
+    public Muscle() {
+    }
+
+    // Constructor con argumentos
     public Muscle(int id, String name) {
         this.id = id;
         this.name = name;
     }
 
-    // Getters and Setters
+    // Getters y Setters
     public int getId() {
         return id;
     }
