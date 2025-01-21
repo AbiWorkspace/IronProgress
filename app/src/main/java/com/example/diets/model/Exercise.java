@@ -1,9 +1,9 @@
 package com.example.diets.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-
-public class Exercise {
+public class Exercise implements Serializable {
     private int id;
     private String name;
     private String equipmentType;
@@ -59,7 +59,11 @@ public class Exercise {
     }
 
     public void setEquipmentType(String equipmentType) {
-        this.equipmentType = equipmentType;
+        if (equipmentType.equals("mancuernas") || equipmentType.equals("barra") || equipmentType.equals("cable")) {
+            this.equipmentType = equipmentType;
+        } else {
+            this.equipmentType = "desconocido";
+        }
     }
 
     public String getExerciseType() {
@@ -67,7 +71,11 @@ public class Exercise {
     }
 
     public void setExerciseType(String exerciseType) {
-        this.exerciseType = exerciseType;
+        if (exerciseType.equals("fuerza") || exerciseType.equals("hipertrofia")) {
+            this.exerciseType = exerciseType;
+        } else {
+            this.exerciseType = "desconocido";
+        }
     }
 
     public String getMusclesWorked() {
@@ -107,7 +115,11 @@ public class Exercise {
     }
 
     public void setMovementType(String movementType) {
-        this.movementType = movementType;
+        if (movementType.equals("compound") || movementType.equals("isolation")) {
+            this.movementType = movementType;
+        } else {
+            this.movementType = "desconocido";
+        }
     }
 
     public List<Muscle> getSynergistMuscles() {

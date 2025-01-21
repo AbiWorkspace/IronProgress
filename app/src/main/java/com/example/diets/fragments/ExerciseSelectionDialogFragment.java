@@ -119,45 +119,50 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
                         Log.d(TAG, "loadExercises: Ejercicio recuperado: " + exercise.getName());
                         Log.d(TAG, "loadExercises: Musculos: " + exercise.getMusclesWorked());
 
-                        // Dividir los músculos trabajados en una lista y normalizar los nombres
-                        List<String> musclesWorkedList = Arrays.stream(exercise.getMusclesWorked().split(",\\s*"))
-                                .map(String::toLowerCase)
-                                .collect(Collectors.toList());
+                        // Verificar si getMusclesWorked() no es null antes de dividir
+                        if (exercise.getMusclesWorked() != null) {
+                            // Dividir los músculos trabajados en una lista y normalizar los nombres
+                            List<String> musclesWorkedList = Arrays.stream(exercise.getMusclesWorked().split(",\\s*"))
+                                    .map(String::toLowerCase)
+                                    .collect(Collectors.toList());
 
-                        for (MovementPattern pattern : movementPatterns) {
-                            Log.d(TAG, "loadExercises: Revisando patrón de movimiento: " + pattern.getName());
-                            if (pattern.getSynergistMuscles() != null && !musclesWorkedList.isEmpty()) {
-                                // Convertir los músculos sinergistas del patrón en una lista de nombres y normalizar los nombres
-                                List<String> synergistMusclesList = pattern.getSynergistMuscles().stream()
-                                        .map(muscle -> muscle.getName().toLowerCase())
-                                        .collect(Collectors.toList());
+                            for (MovementPattern pattern : movementPatterns) {
+                                Log.d(TAG, "loadExercises: Revisando patrón de movimiento: " + pattern.getName());
+                                if (pattern.getSynergistMuscles() != null && !musclesWorkedList.isEmpty()) {
+                                    // Convertir los músculos sinergistas del patrón en una lista de nombres y normalizar los nombres
+                                    List<String> synergistMusclesList = pattern.getSynergistMuscles().stream()
+                                            .map(muscle -> muscle.getName().toLowerCase())
+                                            .collect(Collectors.toList());
 
-                                // Mostrar las listas de músculos para comparación
-                                Log.d(TAG, "loadExercises: Muscles Worked List: " + musclesWorkedList);
-                                Log.d(TAG, "loadExercises: Synergist Muscles List: " + synergistMusclesList);
+                                    // Mostrar las listas de músculos para comparación
+                                    Log.d(TAG, "loadExercises: Muscles Worked List: " + musclesWorkedList);
+                                    Log.d(TAG, "loadExercises: Synergist Muscles List: " + synergistMusclesList);
 
-                                // Verificar si hay al menos un músculo en común entre las dos listas
-                                boolean anyMuscleMatch = musclesWorkedList.stream()
-                                        .anyMatch(synergistMusclesList::contains);
+                                    // Verificar si hay al menos un músculo en común entre las dos listas
+                                    boolean anyMuscleMatch = musclesWorkedList.stream()
+                                            .anyMatch(synergistMusclesList::contains);
 
-                                // Mostrar el resultado de la comparación
-                                Log.d(TAG, "loadExercises: anyMuscleMatch: " + anyMuscleMatch);
+                                    // Mostrar el resultado de la comparación
+                                    Log.d(TAG, "loadExercises: anyMuscleMatch: " + anyMuscleMatch);
 
-                                if (anyMuscleMatch) {
-                                    Log.d(TAG, "loadExercises: El ejercicio coincide parcialmente con el patrón de movimiento: " + pattern.getName());
-                                    exercises.add(exercise);
-                                    break;
+                                    if (anyMuscleMatch) {
+                                        Log.d(TAG, "loadExercises: El ejercicio coincide parcialmente con el patrón de movimiento: " + pattern.getName());
+                                        exercises.add(exercise);
+                                        break;
+                                    } else {
+                                        Log.d(TAG, "loadExercises: El ejercicio no coincide con el patrón de movimiento: " + pattern.getName());
+                                    }
                                 } else {
-                                    Log.d(TAG, "loadExercises: El ejercicio no coincide con el patrón de movimiento: " + pattern.getName());
-                                }
-                            } else {
-                                if (pattern.getSynergistMuscles() == null) {
-                                    Log.d(TAG, "loadExercises: El patrón de movimiento no tiene músculos sinergistas.");
-                                }
-                                if (musclesWorkedList.isEmpty()) {
-                                    Log.d(TAG, "loadExercises: El ejercicio no tiene músculos trabajados.");
+                                    if (pattern.getSynergistMuscles() == null) {
+                                        Log.d(TAG, "loadExercises: El patrón de movimiento no tiene músculos sinergistas.");
+                                    }
+                                    if (musclesWorkedList.isEmpty()) {
+                                        Log.d(TAG, "loadExercises: El ejercicio no tiene músculos trabajados.");
+                                    }
                                 }
                             }
+                        } else {
+                            Log.d(TAG, "loadExercises: MusclesWorked es nulo para el ejercicio: " + exercise.getName());
                         }
                     } else {
                         Log.d(TAG, "loadExercises: Ejercicio es nulo");

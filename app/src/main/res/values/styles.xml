@@ -2,7 +2,7 @@
     <!-- Tema de la aplicación -->
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Personaliza tu tema aquí -->
-        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimary">@color/red</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
         <item name="windowActionBar">false</item>
@@ -12,7 +12,7 @@
     <!-- Estilo para TextInputLayout con caja delineada -->
     <style name="Widget.MaterialComponents.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
         <item name="boxBackgroundMode">outline</item>
-        <item name="boxStrokeColor">@color/colorPrimary</item>
+        <item name="boxStrokeColor">@color/red</item>
         <item name="boxStrokeWidth">2dp</item>
         <item name="boxCornerRadiusTopStart">4dp</item>
         <item name="boxCornerRadiusTopEnd">4dp</item>
@@ -36,5 +36,9 @@
     <style name="RedButton" parent="Widget.AppCompat.Button">
         <item name="android:background">#E63946</item>
         <item name="android:textColor">#FFFFFF</item>
+    </style>
+    <style name="CustomButtonStyle" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/red</item>
+        <item name="android:textColor">@color/white</item>
     </style>
 </resources>

@@ -276,4 +276,18 @@
         <item>Menos de 1 hora al día</item>
         <item>1-2 horas al día</item>
         <item>Más de 2 horas al día</item>
-    </string-array></resources>
+    </string-array>
+    <string-array name="equipment_types">
+        <item>mancuernas</item>
+        <item>barra</item>
+        <item>cable</item>
+    </string-array>
+    <string-array name="exercise_types">
+        <item>fuerza</item>
+        <item>hipertrofia</item>
+    </string-array>
+    <string-array name="movement_types">
+        <item>libre</item>
+        <item>guiado</item>
+    </string-array>
+</resources>
