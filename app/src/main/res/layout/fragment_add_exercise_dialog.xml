@@ -1,7 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?><ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/dark_gray">
+    android:background="#1C1C1C">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,15 +16,21 @@
             android:text="Agregar Ejercicio"
             android:textSize="24sp"
             android:textStyle="bold"
-            android:textColor="@color/white"
+            android:textColor="#FFFFFF"
             android:layout_gravity="center"
             android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Nombre del Ejercicio"
+            android:textColor="#B0B0B0"
+            android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@color/black"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <EditText
@@ -31,58 +38,76 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Nombre"
-                android:background="@color/dark_gray"
-                android:textColor="@color/white"
-                android:textColorHint="@color/hintColor"
+                android:background="#2F2F2F"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#B0B0B0"
                 android:padding="16dp" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tipo de Equipo"
+            android:textColor="#B0B0B0"
+            android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@color/black"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <Spinner
                 android:id="@+id/equipmentTypeSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@color/dark_gray"
+                android:background="#2F2F2F"
                 android:padding="16dp"
-                android:textColor="@color/white" />
+                android:textColor="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tipo de Ejercicio"
+            android:textColor="#B0B0B0"
+            android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@color/black"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <Spinner
                 android:id="@+id/exerciseTypeSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@color/dark_gray"
+                android:background="#2F2F2F"
                 android:padding="16dp"
-                android:textColor="@color/white" />
+                android:textColor="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Músculos Trabajados"
+            android:textColor="#B0B0B0"
+            android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@color/black"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <Spinner
                 android:id="@+id/musclesWorkedSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@color/dark_gray"
+                android:background="#2F2F2F"
                 android:padding="16dp"
-                android:textColor="@color/white" />
+                android:textColor="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <Button
@@ -100,13 +125,19 @@
             android:layout_height="200dp"
             android:layout_marginBottom="16dp"
             android:scaleType="centerCrop"
-            android:background="@color/dark_gray" />
+            android:background="#2F2F2F" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Descripción del Ejercicio"
+            android:textColor="#B0B0B0"
+            android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@color/black"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <EditText
@@ -114,26 +145,32 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Descripción"
-                android:background="@color/dark_gray"
-                android:textColor="@color/white"
-                android:textColorHint="@color/hintColor"
+                android:background="#2F2F2F"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#B0B0B0"
                 android:padding="16dp" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Tipo de Movimiento"
+            android:textColor="#B0B0B0"
+            android:layout_marginBottom="8dp" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@color/black"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <Spinner
                 android:id="@+id/movementTypeSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@color/dark_gray"
+                android:background="#2F2F2F"
                 android:padding="16dp"
-                android:textColor="@color/white" />
+                android:textColor="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <Button

@@ -172,7 +172,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
                     Log.d(TAG, "loadExercises: No se encontraron ejercicios que coincidan con los criterios.");
                 }
                 if (recyclerView != null) {
-                    ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExercises);
+                    ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExercises, ExerciseSelectionDialogFragment.this);
                     recyclerView.setAdapter(adapter);
                     adapter.notifyDataSetChanged();
                     Log.d(TAG, "loadExercises: Adaptador de ejercicios configurado");
@@ -191,10 +191,12 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
     private static class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
         private final List<Exercise> exercises;
         private final List<String> selectedExercises;
+        private final Fragment parentFragment;
 
-        ExercisesAdapter(List<Exercise> exercises, List<String> selectedExercises) {
+        ExercisesAdapter(List<Exercise> exercises, List<String> selectedExercises, Fragment parentFragment) {
             this.exercises = exercises;
             this.selectedExercises = selectedExercises;
+            this.parentFragment = parentFragment;
         }
 
         @NonNull
@@ -202,7 +204,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
         public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             Log.d(TAG, "onCreateViewHolder: Creating view holder");
             View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_exercise, parent, false);
-            return new ViewHolder(view);
+            return new ViewHolder(view, parentFragment);
         }
 
         @Override
@@ -226,15 +228,28 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
             return exercises.size();
         }
 
-        static class ViewHolder extends RecyclerView.ViewHolder {
+        static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
             TextView exerciseName;
             CheckBox checkBox;
+            Fragment parentFragment;
 
-            ViewHolder(View itemView) {
+            ViewHolder(View itemView, Fragment parentFragment) {
                 super(itemView);
                 exerciseName = itemView.findViewById(R.id.exerciseName);
                 checkBox = itemView.findViewById(R.id.checkBox);
-                Log.d(TAG, "ViewHolder: ViewHolder inicializado");
+                this.parentFragment = parentFragment;
+                itemView.setOnClickListener(this);
+            }
+
+            @Override
+            public void onClick(View v) {
+                int position = getAdapterPosition();
+                Exercise exercise = ((ExercisesAdapter) getBindingAdapter()).exercises.get(position);
+                ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
+                FragmentTransaction transaction = parentFragment.getParentFragmentManager().beginTransaction();
+                transaction.replace(R.id.fragment_container, fragment);
+                transaction.addToBackStack(null);
+                transaction.commit();
             }
         }
     }

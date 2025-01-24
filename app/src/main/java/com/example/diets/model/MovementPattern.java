@@ -1,10 +1,13 @@
 package com.example.diets.model;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import com.example.diets.model.Muscle;
 
-public class MovementPattern {
+public class MovementPattern implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int id;
     private String name;
     private List<Muscle> synergistMuscles = new ArrayList<>(); // Inicialización de la lista

@@ -8,6 +8,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -17,6 +18,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
 import com.example.diets.activitys.AddExerciseDialogFragment;
+import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.model.Exercise;
 
 import java.io.FileInputStream;
@@ -27,7 +29,7 @@ import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener {
+public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener, ExercisesAdapter.OnExerciseClickListener {
     private RecyclerView recyclerView;
     private ExercisesAdapter adapter;
     private List<Exercise> exercises = new ArrayList<>();
@@ -50,7 +52,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
 
         if (recyclerView != null) {
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new ExercisesAdapter(exercises);
+            adapter = new ExercisesAdapter(exercises, this);
             recyclerView.setAdapter(adapter);
             Log.d("CreatedExercisesFragment", "onViewCreated: RecyclerView configurado");
         } else {
@@ -122,44 +124,17 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         }
     }
 
-    private static class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
-        private final List<Exercise> exercises;
+    @Override
+    public void onExerciseClick(int position) {
+        Exercise exercise = exercises.get(position);
+        showExerciseDetails(exercise);
+    }
 
-        ExercisesAdapter(List<Exercise> exercises) {
-            this.exercises = exercises;
-            Log.d("ExercisesAdapter", "ExercisesAdapter: Adaptador inicializado con " + exercises.size() + " ejercicios");
-        }
-
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            Log.d("ExercisesAdapter", "onCreateViewHolder: Creando ViewHolder");
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_exercise, parent, false);
-            return new ViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            Exercise exercise = exercises.get(position);
-            holder.exerciseName.setText(exercise.getName());
-            Log.d("ExercisesAdapter", "onBindViewHolder: Enlazando ViewHolder para el ejercicio: " + exercise.getName());
-        }
-
-        @Override
-        public int getItemCount() {
-            int count = exercises.size();
-            Log.d("ExercisesAdapter", "getItemCount: Número de ejercicios en el adaptador: " + count);
-            return count;
-        }
-
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView exerciseName;
-
-            ViewHolder(View itemView) {
-                super(itemView);
-                exerciseName = itemView.findViewById(R.id.exerciseName);
-                Log.d("ExercisesAdapter", "ViewHolder: ViewHolder inicializado");
-            }
-        }
+    private void showExerciseDetails(Exercise exercise) {
+        ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
+        getParentFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit();
     }
 }

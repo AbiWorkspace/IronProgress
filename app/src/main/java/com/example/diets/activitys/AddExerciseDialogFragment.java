@@ -34,8 +34,10 @@ import com.google.firebase.database.ValueEventListener;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
-
+import java.util.Set;
 public class AddExerciseDialogFragment extends DialogFragment {
     private static final int PICK_IMAGE_REQUEST = 1;
 
@@ -44,7 +46,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
     private Button saveButton, cancelButton, selectImageButton;
     private ImageView imagePreview;
     private AddExerciseListener listener;
-    private List<String> musclesList = new ArrayList<>();
+    private Set<String> musclesSet = new HashSet<>();
     private String imageBase64;
 
     public interface AddExerciseListener {
@@ -100,8 +102,14 @@ public class AddExerciseDialogFragment extends DialogFragment {
 
         saveButton.setOnClickListener(v -> {
             Log.d("AddExerciseDialogFragment", "saveButton: Botón de guardar presionado");
+            String exerciseName = nameEditText.getText().toString().trim();
+            if (exerciseName.isEmpty()) {
+                nameEditText.setError("El nombre del ejercicio no puede ser nulo");
+                return;
+            }
+
             Exercise newExercise = new Exercise();
-            newExercise.setName(nameEditText.getText().toString());
+            newExercise.setName(exerciseName);
             newExercise.setEquipmentType(equipmentTypeSpinner.getSelectedItem().toString());
             newExercise.setExerciseType(exerciseTypeSpinner.getSelectedItem().toString());
             newExercise.setMusclesWorked(musclesWorkedSpinner.getSelectedItem().toString());
@@ -124,22 +132,35 @@ public class AddExerciseDialogFragment extends DialogFragment {
 
     private void loadMusclesFromDatabase() {
         Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Cargando músculos desde la base de datos");
-        DatabaseReference musclesRef = FirebaseDatabase.getInstance().getReference().child("muscles");
-        musclesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+        DatabaseReference exercisesRef = FirebaseDatabase.getInstance().getReference().child("exercises");
+        exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                musclesList.clear();
-                for (DataSnapshot muscleSnapshot : snapshot.getChildren()) {
-                    Muscle muscle = muscleSnapshot.getValue(Muscle.class);
-                    if (muscle != null) {
-                        musclesList.add(muscle.getName());
-                        Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Músculo agregado: " + muscle.getName());
+                Log.d("AddExerciseDialogFragment", "onDataChange: Datos recibidos de la base de datos");
+                musclesSet.clear();
+                if (snapshot.exists()) {
+                    Log.d("AddExerciseDialogFragment", "onDataChange: Snapshot existe y contiene " + snapshot.getChildrenCount() + " elementos");
+                    for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
+                        Log.d("AddExerciseDialogFragment", "onDataChange: Procesando snapshot: " + exerciseSnapshot.getKey());
+                        Exercise exercise = exerciseSnapshot.getValue(Exercise.class);
+                        if (exercise != null && exercise.getMusclesWorked() != null) {
+                            String[] musclesArray = exercise.getMusclesWorked().split(",");
+                            for (String muscle : musclesArray) {
+                                musclesSet.add(capitalizeFirstLetter(muscle.trim().toLowerCase()));
+                            }
+                            Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Músculos agregados: " + exercise.getMusclesWorked());
+                        } else {
+                            Log.w("AddExerciseDialogFragment", "loadMusclesFromDatabase: Exercise o musclesWorked es null en snapshot: " + exerciseSnapshot.getKey());
+                        }
                     }
+                    Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Lista de músculos agregados: " + musclesSet);
+                } else {
+                    Log.w("AddExerciseDialogFragment", "onDataChange: Snapshot no existe o está vacío");
                 }
-                ArrayAdapter<String> musclesAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, musclesList);
+                ArrayAdapter<String> musclesAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, new ArrayList<>(musclesSet));
                 musclesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 musclesWorkedSpinner.setAdapter(musclesAdapter);
-                Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Adaptador de músculos configurado");
+                Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Adaptador de músculos configurado con " + musclesSet.size() + " elementos");
             }
 
             @Override
@@ -147,6 +168,13 @@ public class AddExerciseDialogFragment extends DialogFragment {
                 Log.e("AddExerciseDialogFragment", "Error al cargar músculos desde la base de datos", error.toException());
             }
         });
+    }
+
+    private String capitalizeFirstLetter(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+        return input.substring(0, 1).toUpperCase() + input.substring(1);
     }
 
     @Override

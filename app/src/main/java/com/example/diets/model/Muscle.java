@@ -1,6 +1,10 @@
 package com.example.diets.model;
 
-public class Muscle {
+import java.io.Serializable;
+
+public class Muscle implements Serializable {
+    private static final long serialVersionUID = 1L;
+
     private int id;
     private String name;
 

@@ -278,16 +278,16 @@
         <item>Más de 2 horas al día</item>
     </string-array>
     <string-array name="equipment_types">
-        <item>mancuernas</item>
-        <item>barra</item>
-        <item>cable</item>
+        <item>Mancuernas</item>
+        <item>Barra</item>
+        <item>Cable</item>
     </string-array>
     <string-array name="exercise_types">
-        <item>fuerza</item>
-        <item>hipertrofia</item>
+        <item>Fuerza</item>
+        <item>Hipertrofia</item>
     </string-array>
     <string-array name="movement_types">
-        <item>libre</item>
-        <item>guiado</item>
+        <item>Libre</item>
+        <item>Guiado</item>
     </string-array>
 </resources>

@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 
 import com.example.diets.R;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+
 public class MenuPopupFragment extends DialogFragment {
     @Nullable
     @Override

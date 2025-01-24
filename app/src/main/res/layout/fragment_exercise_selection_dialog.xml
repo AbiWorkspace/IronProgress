@@ -6,13 +6,19 @@
     android:padding="16dp"
     android:background="#1C1C1C">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerView"
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="#1C1C1C"
-        android:padding="8dp" />
+        android:padding="8dp">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1C1C1C" />
+    </ScrollView>
 
     <Button
         android:id="@+id/doneButton"
@@ -26,6 +32,5 @@
         android:textColor="#FFFFFF"
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp" />
-
 
 </LinearLayout>
