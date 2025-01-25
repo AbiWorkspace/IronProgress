@@ -9,12 +9,14 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.example.diets.R;
 import com.example.diets.adapters.ViewPagerAdapter;
 import com.example.diets.fragments.ExerciseDistributionFragment;
+import com.example.diets.fragments.MenuPopupFragment;
+import com.example.diets.model.Exercise;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.example.diets.fragments.SelectExercisesFragment;
 
-public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener {
+public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener, MenuPopupFragment.OnExerciseSelectedListener {
 
     private DrawerLayout drawerLayout;
     private ViewPager2 viewPager;
@@ -79,6 +81,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
+
     public void switchToSelectExercisesFragment(Bundle data) {
         // Crea el nuevo fragmento y actualiza el adaptador
         SelectExercisesFragment fragment = new SelectExercisesFragment();
@@ -87,5 +90,17 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         // Reemplazar el fragmento en la lista del adaptador
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
+    }
+
+    @Override
+    public void onExerciseSelected(Exercise exercise) {
+        // Encuentra el fragmento de selección de ejercicios y actualiza la lista de ejercicios seleccionados
+        ViewPagerAdapter adapter = (ViewPagerAdapter) viewPager.getAdapter();
+        if (adapter != null) {
+            SelectExercisesFragment fragment = (SelectExercisesFragment) adapter.getFragment(0); // Suponiendo que SelectExercisesFragment está en la posición 0
+            if (fragment != null) {
+                fragment.addSelectedExercise(exercise);
+            }
+        }
     }
 }

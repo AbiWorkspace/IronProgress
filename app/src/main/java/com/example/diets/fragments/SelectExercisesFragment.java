@@ -38,6 +38,8 @@ import com.example.diets.model.TrainingDay;
 
 import java.util.ArrayList;
 import java.util.List;
+
+
 public class SelectExercisesFragment extends Fragment {
     private static final String TAG = "SelectExercisesFragment";
     private List<String> selectedExercises = new ArrayList<>();
@@ -287,6 +289,32 @@ public class SelectExercisesFragment extends Fragment {
                 super(itemView);
                 exerciseName = itemView.findViewById(R.id.exerciseName);
                 checkBox = itemView.findViewById(R.id.checkBox);
+            }
+        }
+    }
+    public void addSelectedExercise(Exercise exercise) {
+        selectedExercises.add(exercise.getName());
+        // Actualiza la interfaz de usuario para reflejar el nuevo ejercicio seleccionado
+        updateSelectedExercisesUI();
+    }
+
+    private void updateSelectedExercisesUI() {
+        // Implementa la lógica para actualizar la interfaz de usuario
+        // Por ejemplo, notificar al adaptador del RecyclerView
+        for (int i = 0; i < containerLayout.getChildCount(); i++) {
+            View child = containerLayout.getChildAt(i);
+            if (child instanceof LinearLayout) {
+                LinearLayout dayContainer = (LinearLayout) child;
+                for (int j = 0; j < dayContainer.getChildCount(); j++) {
+                    View dayChild = dayContainer.getChildAt(j);
+                    if (dayChild instanceof RecyclerView) {
+                        RecyclerView recyclerView = (RecyclerView) dayChild;
+                        RecyclerView.Adapter adapter = recyclerView.getAdapter();
+                        if (adapter != null) {
+                            adapter.notifyDataSetChanged();
+                        }
+                    }
+                }
             }
         }
     }

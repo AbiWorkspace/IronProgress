@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
 public class ExerciseSelectionDialogFragment extends DialogFragment {
     private static final String TAG = "ExerciseSelectionDialogFragment";
     private RecyclerView recyclerView;
@@ -251,6 +252,12 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
                 transaction.addToBackStack(null);
                 transaction.commit();
             }
+        }
+    }
+    private void onExerciseSelected(Exercise exercise) {
+        MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
+        if (parentFragment != null) {
+            parentFragment.exerciseSelected(exercise);
         }
     }
 }

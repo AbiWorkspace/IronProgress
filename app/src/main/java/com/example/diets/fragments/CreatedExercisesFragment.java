@@ -77,6 +77,14 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         dialog.setAddExerciseListener(this);
         dialog.show(getChildFragmentManager(), "AddExerciseDialogFragment");
     }
+    @Override
+    public void onExerciseClick(int position) {
+        Exercise exercise = exercises.get(position);
+        MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
+        if (parentFragment != null) {
+            parentFragment.exerciseSelected(exercise);
+        }
+    }
 
     @Override
     public void onExerciseAdded(Exercise exercise) {
@@ -124,11 +132,6 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         }
     }
 
-    @Override
-    public void onExerciseClick(int position) {
-        Exercise exercise = exercises.get(position);
-        showExerciseDetails(exercise);
-    }
 
     private void showExerciseDetails(Exercise exercise) {
         ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
