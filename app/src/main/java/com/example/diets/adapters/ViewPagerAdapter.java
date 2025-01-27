@@ -9,7 +9,6 @@ import com.example.diets.fragments.EntrenamientoFragment;
 
 import java.util.ArrayList;
 import java.util.List;
-
 public class ViewPagerAdapter extends FragmentStateAdapter {
 
     private final List<Fragment> fragmentList = new ArrayList<>();
@@ -46,6 +45,13 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
         if (position >= 0 && position < fragmentList.size()) {
             fragmentList.remove(position);
         }
+    }
+
+    /**
+     * Obtiene un fragmento en una posición específica.
+     */
+    public Fragment getFragment(int position) {
+        return fragmentList.get(position);
     }
 
     @NonNull

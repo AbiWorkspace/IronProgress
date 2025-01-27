@@ -1,9 +1,5 @@
 package com.example.diets.fragments;
 
-import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
-
-import android.app.Activity;
-import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -12,22 +8,16 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.TextView;
-import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
-import com.example.diets.model.ExerciseDistribution;
 import com.example.diets.model.MovementPattern;
-import com.example.diets.model.Muscle;
 import com.example.diets.model.TrainingDay;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.database.DataSnapshot;
@@ -35,12 +25,10 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-
 public class ExerciseSelectionDialogFragment extends DialogFragment {
     private static final String TAG = "ExerciseSelectionDialogFragment";
     private RecyclerView recyclerView;
@@ -85,13 +73,23 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
         } else {
             Log.d(TAG, "onViewCreated: No se recibieron argumentos");
         }
-
         doneButton.setOnClickListener(v -> {
             Log.d(TAG, "onViewCreated: Botón doneButton presionado");
-            // Lógica para manejar los ejercicios seleccionados
+            // Pasar los ejercicios seleccionados al fragmento padre
+            MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
+            if (parentFragment != null) {
+                for (String exerciseName : selectedExercises) {
+                    Exercise selectedExercise = findExerciseByName(exerciseName);
+                    if (selectedExercise != null) {
+                        Log.d(TAG, "onViewCreated: Pasando ejercicio seleccionado: " + selectedExercise.getName());
+                        parentFragment.exerciseSelected(selectedExercise);
+                    }
+                }
+                // Cerrar el MenuPopupFragment
+                parentFragment.dismiss();
+            }
             dismiss();
         });
-
         Log.d(TAG, "onViewCreated: Método onViewCreated finalizado");
     }
 
@@ -189,6 +187,15 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
         });
     }
 
+    private Exercise findExerciseByName(String name) {
+        for (Exercise exercise : exercises) {
+            if (exercise.getName().equals(name)) {
+                return exercise;
+            }
+        }
+        return null;
+    }
+
     private static class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
         private final List<Exercise> exercises;
         private final List<String> selectedExercises;
@@ -246,18 +253,22 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
             public void onClick(View v) {
                 int position = getAdapterPosition();
                 Exercise exercise = ((ExercisesAdapter) getBindingAdapter()).exercises.get(position);
+                Log.d(TAG, "onClick: Ejercicio seleccionado: " + exercise.getName());
                 ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
-                FragmentTransaction transaction = parentFragment.getParentFragmentManager().beginTransaction();
-                transaction.replace(R.id.fragment_container, fragment);
-                transaction.addToBackStack(null);
-                transaction.commit();
+
+                // Obtener el FragmentManager desde el contexto del fragmento padre
+                Fragment parentFragmentInstance = parentFragment;
+                if (parentFragmentInstance != null) {
+                    Log.d(TAG, "onClick: parentFragment no es nulo");
+                    FragmentTransaction transaction = parentFragmentInstance.getParentFragmentManager().beginTransaction();
+                    SelectExercisesFragment selectExercisesFragment = new SelectExercisesFragment();
+                    transaction.replace(R.id.fragment_container, selectExercisesFragment);
+                    transaction.commit();
+                    Log.d(TAG, "onClick: Transacción de fragmento completada");
+                } else {
+                    Log.e(TAG, "onClick: parentFragment es nulo");
+                }
             }
-        }
-    }
-    private void onExerciseSelected(Exercise exercise) {
-        MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
-        if (parentFragment != null) {
-            parentFragment.exerciseSelected(exercise);
         }
     }
 }

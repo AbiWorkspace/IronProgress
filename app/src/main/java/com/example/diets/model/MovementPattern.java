@@ -4,23 +4,24 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import com.example.diets.model.Muscle;
-
 public class MovementPattern implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private int id;
     private String name;
     private List<Muscle> synergistMuscles = new ArrayList<>(); // Inicialización de la lista
+    private List<Exercise> exercises = new ArrayList<>(); // Lista de ejercicios asociados
 
     // Constructor sin argumentos requerido por Firebase
     public MovementPattern() {
     }
 
     // Constructor con argumentos
-    public MovementPattern(int id, String name, List<Muscle> synergistMuscles) {
+    public MovementPattern(int id, String name, List<Muscle> synergistMuscles, List<Exercise> exercises) {
         this.id = id;
         this.name = name;
         this.synergistMuscles = synergistMuscles != null ? synergistMuscles : new ArrayList<>();
+        this.exercises = exercises != null ? exercises : new ArrayList<>();
     }
 
     // Getters y Setters
@@ -48,12 +49,21 @@ public class MovementPattern implements Serializable {
         this.synergistMuscles = synergistMuscles;
     }
 
+    public List<Exercise> getExercises() {
+        return exercises;
+    }
+
+    public void setExercises(List<Exercise> exercises) {
+        this.exercises = exercises;
+    }
+
     @Override
     public String toString() {
         return "MovementPattern{" +
                 "id=" + id +
                 ", name='" + name + '\'' +
                 ", synergistMuscles=" + synergistMuscles +
+                ", exercises=" + exercises +
                 '}';
     }
 }

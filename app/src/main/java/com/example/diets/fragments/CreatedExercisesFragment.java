@@ -28,11 +28,11 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
-
 public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener, ExercisesAdapter.OnExerciseClickListener {
     private RecyclerView recyclerView;
     private ExercisesAdapter adapter;
     private List<Exercise> exercises = new ArrayList<>();
+    private List<Exercise> selectedExercises = new ArrayList<>(); // Añadir esta línea
     private static final String FILE_NAME = "exercises.json";
 
     @Nullable
@@ -52,19 +52,16 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
 
         if (recyclerView != null) {
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new ExercisesAdapter(exercises, this);
+            adapter = new ExercisesAdapter(exercises, selectedExercises, this, this); // Pasar el Fragment en lugar del FragmentManager
             recyclerView.setAdapter(adapter);
             Log.d("CreatedExercisesFragment", "onViewCreated: RecyclerView configurado");
         } else {
             Log.e("CreatedExercisesFragment", "RecyclerView es nulo");
         }
 
-        addExerciseButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Log.d("CreatedExercisesFragment", "addExerciseButton: Botón de agregar ejercicio presionado");
-                showAddExerciseDialog();
-            }
+        addExerciseButton.setOnClickListener(v -> {
+            Log.d("CreatedExercisesFragment", "addExerciseButton: Botón de agregar ejercicio presionado");
+            showAddExerciseDialog();
         });
 
         // Cargar ejercicios desde el almacenamiento interno
@@ -77,6 +74,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         dialog.setAddExerciseListener(this);
         dialog.show(getChildFragmentManager(), "AddExerciseDialogFragment");
     }
+
     @Override
     public void onExerciseClick(int position) {
         Exercise exercise = exercises.get(position);
@@ -131,7 +129,6 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
             Log.e("CreatedExercisesFragment", "Error al cargar ejercicios", e);
         }
     }
-
 
     private void showExerciseDetails(Exercise exercise) {
         ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);

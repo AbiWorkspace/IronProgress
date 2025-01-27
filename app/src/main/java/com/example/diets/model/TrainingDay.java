@@ -2,10 +2,9 @@ package com.example.diets.model;
 
 import java.io.Serializable;
 import java.util.List;
-
 public class TrainingDay implements Serializable {
     private int dayIndex;
-    private List<MovementPattern> movementPatterns; // Cambiado a List<MovementPattern>
+    private List<MovementPattern> movementPatterns;
     private List<Exercise> exercises;
 
     public TrainingDay() {
