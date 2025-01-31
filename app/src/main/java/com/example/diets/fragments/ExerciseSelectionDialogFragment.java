@@ -16,6 +16,7 @@ import androidx.fragment.app.FragmentTransaction;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
+import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.TrainingDay;
@@ -35,7 +36,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
     private Button doneButton;
     private BottomNavigationView bottomNavigationView;
     private List<Exercise> exercises = new ArrayList<>();
-    private List<String> selectedExercises = new ArrayList<>();
+    private List<Exercise> selectedExercises = new ArrayList<>();
     private DatabaseReference mDatabase;
 
     @Nullable
@@ -78,12 +79,9 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
             // Pasar los ejercicios seleccionados al fragmento padre
             MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
             if (parentFragment != null) {
-                for (String exerciseName : selectedExercises) {
-                    Exercise selectedExercise = findExerciseByName(exerciseName);
-                    if (selectedExercise != null) {
-                        Log.d(TAG, "onViewCreated: Pasando ejercicio seleccionado: " + selectedExercise.getName());
-                        parentFragment.exerciseSelected(selectedExercise);
-                    }
+                for (Exercise exercise : selectedExercises) {
+                    Log.d(TAG, "onViewCreated: Pasando ejercicio seleccionado: " + exercise.getName());
+                    parentFragment.exerciseSelected(exercise);
                 }
                 // Cerrar el MenuPopupFragment
                 parentFragment.dismiss();
@@ -147,6 +145,8 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
                                     if (anyMuscleMatch) {
                                         Log.d(TAG, "loadExercises: El ejercicio coincide parcialmente con el patrón de movimiento: " + pattern.getName());
                                         exercises.add(exercise);
+                                        // Añadir el ejercicio al patrón de movimiento
+                                        pattern.getExercises().add(exercise);
                                         break;
                                     } else {
                                         Log.d(TAG, "loadExercises: El ejercicio no coincide con el patrón de movimiento: " + pattern.getName());
@@ -171,7 +171,13 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
                     Log.d(TAG, "loadExercises: No se encontraron ejercicios que coincidan con los criterios.");
                 }
                 if (recyclerView != null) {
-                    ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExercises, ExerciseSelectionDialogFragment.this);
+                    List<String> selectedExerciseNames = selectedExercises.stream()
+                            .map(Exercise::getName)
+                            .collect(Collectors.toList());
+                    ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
+                        addExerciseToSelection(exercise);
+                        Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
+                    });
                     recyclerView.setAdapter(adapter);
                     adapter.notifyDataSetChanged();
                     Log.d(TAG, "loadExercises: Adaptador de ejercicios configurado");
@@ -196,79 +202,12 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
         return null;
     }
 
-    private static class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
-        private final List<Exercise> exercises;
-        private final List<String> selectedExercises;
-        private final Fragment parentFragment;
-
-        ExercisesAdapter(List<Exercise> exercises, List<String> selectedExercises, Fragment parentFragment) {
-            this.exercises = exercises;
-            this.selectedExercises = selectedExercises;
-            this.parentFragment = parentFragment;
-        }
-
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            Log.d(TAG, "onCreateViewHolder: Creating view holder");
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_exercise, parent, false);
-            return new ViewHolder(view, parentFragment);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            Exercise exercise = exercises.get(position);
-            holder.exerciseName.setText(exercise.getName());
-            holder.checkBox.setOnCheckedChangeListener(null);
-            holder.checkBox.setChecked(selectedExercises.contains(exercise.getName()));
-            holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (isChecked) {
-                    selectedExercises.add(exercise.getName());
-                } else {
-                    selectedExercises.remove(exercise.getName());
-                }
-                Log.d(TAG, "onBindViewHolder: Ejercicio seleccionado actualizado. Total seleccionados: " + selectedExercises.size());
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return exercises.size();
-        }
-
-        static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
-            TextView exerciseName;
-            CheckBox checkBox;
-            Fragment parentFragment;
-
-            ViewHolder(View itemView, Fragment parentFragment) {
-                super(itemView);
-                exerciseName = itemView.findViewById(R.id.exerciseName);
-                checkBox = itemView.findViewById(R.id.checkBox);
-                this.parentFragment = parentFragment;
-                itemView.setOnClickListener(this);
-            }
-
-            @Override
-            public void onClick(View v) {
-                int position = getAdapterPosition();
-                Exercise exercise = ((ExercisesAdapter) getBindingAdapter()).exercises.get(position);
-                Log.d(TAG, "onClick: Ejercicio seleccionado: " + exercise.getName());
-                ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
-
-                // Obtener el FragmentManager desde el contexto del fragmento padre
-                Fragment parentFragmentInstance = parentFragment;
-                if (parentFragmentInstance != null) {
-                    Log.d(TAG, "onClick: parentFragment no es nulo");
-                    FragmentTransaction transaction = parentFragmentInstance.getParentFragmentManager().beginTransaction();
-                    SelectExercisesFragment selectExercisesFragment = new SelectExercisesFragment();
-                    transaction.replace(R.id.fragment_container, selectExercisesFragment);
-                    transaction.commit();
-                    Log.d(TAG, "onClick: Transacción de fragmento completada");
-                } else {
-                    Log.e(TAG, "onClick: parentFragment es nulo");
-                }
-            }
+    public void addExerciseToSelection(Exercise exercise) {
+        if (!selectedExercises.contains(exercise)) {
+            selectedExercises.add(exercise);
+            Log.d(TAG, "addExerciseToSelection: Ejercicio añadido: " + exercise.getName());
+        } else {
+            Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
     }
 }

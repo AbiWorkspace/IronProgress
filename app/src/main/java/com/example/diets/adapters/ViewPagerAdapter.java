@@ -9,6 +9,7 @@ import com.example.diets.fragments.EntrenamientoFragment;
 
 import java.util.ArrayList;
 import java.util.List;
+
 public class ViewPagerAdapter extends FragmentStateAdapter {
 
     private final List<Fragment> fragmentList = new ArrayList<>();

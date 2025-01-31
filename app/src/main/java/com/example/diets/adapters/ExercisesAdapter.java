@@ -18,24 +18,23 @@ import com.example.diets.fragments.ExerciseDetailsFragment;
 import com.example.diets.fragments.SelectExercisesFragment;
 import com.example.diets.model.Exercise;
 import java.util.List;
+
 public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
     private final List<Exercise> exercises;
-    private final List<Exercise> selectedExercises;
-    private final OnExerciseClickListener onExerciseClickListener;
-    private final Fragment parentFragment;
+    private final List<String> selectedExercises;
+    private final OnExerciseClickListener listener;
 
-    public ExercisesAdapter(List<Exercise> exercises, List<Exercise> selectedExercises, OnExerciseClickListener onExerciseClickListener, Fragment parentFragment) {
+    public ExercisesAdapter(List<Exercise> exercises, List<String> selectedExercises, OnExerciseClickListener listener) {
         this.exercises = exercises;
         this.selectedExercises = selectedExercises;
-        this.onExerciseClickListener = onExerciseClickListener;
-        this.parentFragment = parentFragment;
+        this.listener = listener;
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_exercise, parent, false);
-        return new ViewHolder(view, onExerciseClickListener, parentFragment);
+        return new ViewHolder(view);
     }
 
     @Override
@@ -43,13 +42,18 @@ public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.View
         Exercise exercise = exercises.get(position);
         holder.exerciseName.setText(exercise.getName());
         holder.checkBox.setOnCheckedChangeListener(null);
-        holder.checkBox.setChecked(selectedExercises.contains(exercise));
+        holder.checkBox.setChecked(selectedExercises.contains(exercise.getName()));
         holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
-                selectedExercises.add(exercise);
+                if (!selectedExercises.contains(exercise.getName())) {
+                    selectedExercises.add(exercise.getName());
+                    Log.d("ExercisesAdapter", "Ejercicio seleccionado: " + exercise.getName());
+                }
             } else {
-                selectedExercises.remove(exercise);
+                selectedExercises.remove(exercise.getName());
+                Log.d("ExercisesAdapter", "Ejercicio deseleccionado: " + exercise.getName());
             }
+            listener.onExerciseClick(exercise);
         });
     }
 
@@ -58,43 +62,18 @@ public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.View
         return exercises.size();
     }
 
-    static class ViewHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+    public interface OnExerciseClickListener {
+        void onExerciseClick(Exercise exercise);
+    }
+
+    static class ViewHolder extends RecyclerView.ViewHolder {
         TextView exerciseName;
         CheckBox checkBox;
-        OnExerciseClickListener onExerciseClickListener;
-        Fragment parentFragment;
 
-        ViewHolder(View itemView, OnExerciseClickListener onExerciseClickListener, Fragment parentFragment) {
+        ViewHolder(View itemView) {
             super(itemView);
             exerciseName = itemView.findViewById(R.id.exerciseName);
             checkBox = itemView.findViewById(R.id.checkBox);
-            this.onExerciseClickListener = onExerciseClickListener;
-            this.parentFragment = parentFragment;
-            itemView.setOnClickListener(this);
         }
-
-        @Override
-        public void onClick(View v) {
-            onExerciseClickListener.onExerciseClick(getAdapterPosition());
-
-            // Reemplazar el fragmento cuando se haga clic en un ejercicio
-            int position = getAdapterPosition();
-            Exercise exercise = ((ExercisesAdapter) getBindingAdapter()).exercises.get(position);
-            ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
-
-            // Obtener el FragmentManager desde el contexto del fragmento padre
-            if (parentFragment != null) {
-                FragmentTransaction transaction = parentFragment.getParentFragmentManager().beginTransaction();
-                SelectExercisesFragment selectExercisesFragment = new SelectExercisesFragment();
-                transaction.replace(R.id.fragment_container, selectExercisesFragment);
-                transaction.commit();
-            } else {
-                Log.e(TAG, "onClick: parentFragment es nulo");
-            }
-        }
-    }
-
-    public interface OnExerciseClickListener {
-        void onExerciseClick(int position);
     }
 }

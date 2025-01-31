@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,7 +33,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     private RecyclerView recyclerView;
     private ExercisesAdapter adapter;
     private List<Exercise> exercises = new ArrayList<>();
-    private List<Exercise> selectedExercises = new ArrayList<>(); // Añadir esta línea
+    private List<String> selectedExercises = new ArrayList<>(); // Ensure this is a List<String>
     private static final String FILE_NAME = "exercises.json";
 
     @Nullable
@@ -52,7 +53,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
 
         if (recyclerView != null) {
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-            adapter = new ExercisesAdapter(exercises, selectedExercises, this, this); // Pasar el Fragment en lugar del FragmentManager
+            adapter = new ExercisesAdapter(exercises, selectedExercises, this); // Pass the Fragment as the listener
             recyclerView.setAdapter(adapter);
             Log.d("CreatedExercisesFragment", "onViewCreated: RecyclerView configurado");
         } else {
@@ -76,8 +77,8 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     }
 
     @Override
-    public void onExerciseClick(int position) {
-        Exercise exercise = exercises.get(position);
+    public void onExerciseClick(Exercise exercise) {
+        // Implementación del método de la interfaz OnExerciseClickListener
         MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
         if (parentFragment != null) {
             parentFragment.exerciseSelected(exercise);

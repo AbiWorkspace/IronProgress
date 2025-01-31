@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager2.widget.ViewPager2;
 import com.example.diets.R;
+import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.adapters.ViewPagerAdapter;
 import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.example.diets.fragments.MenuPopupFragment;
@@ -15,8 +16,7 @@ import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.example.diets.fragments.SelectExercisesFragment;
-
-public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener, MenuPopupFragment.OnExerciseSelectedListener {
+public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener, MenuPopupFragment.OnExerciseSelectedListener, ExercisesAdapter.OnExerciseClickListener {
 
     private DrawerLayout drawerLayout;
     private ViewPager2 viewPager;
@@ -102,5 +102,11 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
                 fragment.addSelectedExercise(exercise);
             }
         }
+    }
+
+    @Override
+    public void onExerciseClick(Exercise exercise) {
+        // Implementación del método de la interfaz OnExerciseClickListener
+        // Aquí puedes manejar el evento de clic en el ejercicio
     }
 }
