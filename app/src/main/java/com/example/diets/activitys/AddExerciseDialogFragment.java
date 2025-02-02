@@ -1,7 +1,11 @@
 package com.example.diets.activitys;
 
+
+
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
@@ -31,16 +35,23 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+import com.google.gson.Gson;
 
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 public class AddExerciseDialogFragment extends DialogFragment {
     private static final int PICK_IMAGE_REQUEST = 1;
+    private static final String FILE_NAME = "exercises.json"; // Añadir esta línea
 
     private EditText nameEditText, descriptionEditText;
     private Spinner equipmentTypeSpinner, exerciseTypeSpinner, movementTypeSpinner, musclesWorkedSpinner, movementPatternSpinner;
@@ -111,26 +122,49 @@ public class AddExerciseDialogFragment extends DialogFragment {
             String exerciseName = nameEditText.getText().toString().trim();
             if (exerciseName.isEmpty()) {
                 nameEditText.setError("El nombre del ejercicio no puede ser nulo");
+                Log.d("AddExerciseDialogFragment", "saveButton: El nombre del ejercicio está vacío");
                 return;
             }
 
             Exercise newExercise = new Exercise();
             newExercise.setName(exerciseName);
-            newExercise.setEquipmentType(equipmentTypeSpinner.getSelectedItem().toString());
-            newExercise.setExerciseType(exerciseTypeSpinner.getSelectedItem().toString());
-            newExercise.setMusclesWorked(musclesWorkedSpinner.getSelectedItem().toString());
-            newExercise.setDescription(descriptionEditText.getText().toString());
-            newExercise.setMovementType(movementTypeSpinner.getSelectedItem().toString());
+            Log.d("AddExerciseDialogFragment", "saveButton: Nombre del ejercicio establecido: " + exerciseName);
+
+            String equipmentType = equipmentTypeSpinner.getSelectedItem().toString();
+            newExercise.setEquipmentType(equipmentType);
+            Log.d("AddExerciseDialogFragment", "saveButton: Tipo de equipo establecido: " + equipmentType);
+
+            String exerciseType = exerciseTypeSpinner.getSelectedItem().toString();
+            newExercise.setExerciseType(exerciseType);
+            Log.d("AddExerciseDialogFragment", "saveButton: Tipo de ejercicio establecido: " + exerciseType);
+
+            String musclesWorked = musclesWorkedSpinner.getSelectedItem().toString();
+            newExercise.setMusclesWorked(musclesWorked);
+            Log.d("AddExerciseDialogFragment", "saveButton: Músculos trabajados establecidos: " + musclesWorked);
+
+            String description = descriptionEditText.getText().toString();
+            newExercise.setDescription(description);
+            Log.d("AddExerciseDialogFragment", "saveButton: Descripción establecida: " + description);
+
+            String movementType = movementTypeSpinner.getSelectedItem().toString();
+            newExercise.setMovementType(movementType);
+            Log.d("AddExerciseDialogFragment", "saveButton: Tipo de movimiento establecido: " + movementType);
 
             // Añadir el patrón de movimiento seleccionado
             String selectedPatternName = movementPatternSpinner.getSelectedItem().toString();
             MovementPattern selectedPattern = new MovementPattern();
             selectedPattern.setName(selectedPatternName);
             newExercise.getMovementPatterns().add(selectedPattern);
+            Log.d("AddExerciseDialogFragment", "saveButton: Patrón de movimiento agregado: " + selectedPatternName);
+
+            // Guardar el ejercicio en el almacenamiento interno
+            saveExerciseToInternalStorage(newExercise);
 
             if (listener != null) {
                 Log.d("AddExerciseDialogFragment", "saveButton: Llamando al listener para agregar el ejercicio");
                 listener.onExerciseAdded(newExercise);
+            } else {
+                Log.d("AddExerciseDialogFragment", "saveButton: Listener es null");
             }
             dismiss();
         });
@@ -140,7 +174,41 @@ public class AddExerciseDialogFragment extends DialogFragment {
             dismiss();
         });
     }
+    private List<Exercise> loadExercisesFromInternalStorage() {
+        List<Exercise> exercises = new ArrayList<>();
+        try {
+            Log.d("AddExerciseDialogFragment", "loadExercisesFromInternalStorage: Cargando ejercicios desde el almacenamiento interno");
+            FileInputStream fis = getContext().openFileInput(FILE_NAME);
+            ObjectInputStream ois = new ObjectInputStream(fis);
+            exercises = (List<Exercise>) ois.readObject();
+            ois.close();
+            fis.close();
+            Log.d("AddExerciseDialogFragment", "loadExercisesFromInternalStorage: Ejercicios cargados exitosamente");
+        } catch (IOException | ClassNotFoundException e) {
+            Log.e("AddExerciseDialogFragment", "Error al cargar ejercicios", e);
+        }
+        return exercises;
+    }
+    private void saveExerciseToInternalStorage(Exercise exercise) {
+        Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: Guardando ejercicio en almacenamiento interno");
+        try {
+            // Cargar ejercicios existentes
+            List<Exercise> exercises = loadExercisesFromInternalStorage();
 
+            // Añadir el nuevo ejercicio
+            exercises.add(exercise);
+
+            // Guardar todos los ejercicios en un archivo JSON
+            FileOutputStream fos = getContext().openFileOutput(FILE_NAME, Context.MODE_PRIVATE);
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(new ArrayList<>(exercises)); // Asegurarse de escribir una nueva lista
+            oos.close();
+            fos.close();
+            Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: Ejercicio guardado exitosamente");
+        } catch (IOException e) {
+            Log.e("AddExerciseDialogFragment", "Error al guardar ejercicio", e);
+        }
+    }
     private void loadMusclesFromDatabase() {
         Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Cargando músculos desde la base de datos");
         DatabaseReference exercisesRef = FirebaseDatabase.getInstance().getReference().child("exercises");

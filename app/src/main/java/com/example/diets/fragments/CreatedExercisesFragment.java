@@ -20,6 +20,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -50,7 +51,7 @@ import java.util.stream.Collectors;
 public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener, ExercisesAdapter.OnExerciseClickListener {
     private static final String TAG = "CreatedExercisesFragment";
     private RecyclerView recyclerView;
-    private Button doneButton;
+    private Button doneButton, deleteExerciseButton;
     private List<Exercise> exercises = new ArrayList<>();
     private List<Exercise> selectedExercises = new ArrayList<>();
     private static final String FILE_NAME = "exercises.json";
@@ -69,7 +70,8 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         super.onViewCreated(view, savedInstanceState);
         recyclerView = view.findViewById(R.id.recyclerView);
         doneButton = view.findViewById(R.id.doneButton);
-        Button addExerciseButton = view.findViewById(R.id.add_exercise_button); // Añadir esta línea
+        Button addExerciseButton = view.findViewById(R.id.add_exercise_button);
+        deleteExerciseButton = view.findViewById(R.id.delete_exercise_button);
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
         if (recyclerView != null) {
@@ -99,13 +101,36 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
 
         addExerciseButton.setOnClickListener(v -> {
             Log.d(TAG, "onViewCreated: Botón add_exercise_button presionado");
-            // Aquí puedes abrir un diálogo para añadir un nuevo ejercicio
             AddExerciseDialogFragment dialogFragment = new AddExerciseDialogFragment();
             dialogFragment.setTargetFragment(this, 0);
             dialogFragment.show(getParentFragmentManager(), "AddExerciseDialogFragment");
         });
 
+        deleteExerciseButton.setOnClickListener(v -> {
+            Log.d(TAG, "onViewCreated: Botón delete_exercise_button presionado");
+            showDeleteConfirmationDialog();
+        });
+
         Log.d(TAG, "onViewCreated: Método onViewCreated finalizado");
+    }
+
+    private void showDeleteConfirmationDialog() {
+        new AlertDialog.Builder(getContext())
+                .setTitle("Eliminar Ejercicio")
+                .setMessage("¿Estás seguro de que deseas eliminar los ejercicios seleccionados?")
+                .setPositiveButton("Sí", (dialog, which) -> {
+                    deleteSelectedExercises();
+                })
+                .setNegativeButton("No", null)
+                .show();
+    }
+
+    private void deleteSelectedExercises() {
+        exercises.removeAll(selectedExercises);
+        selectedExercises.clear();
+        saveExercisesToInternalStorage();
+        adapter.notifyDataSetChanged();
+        Log.d(TAG, "deleteSelectedExercises: Ejercicios eliminados y almacenamiento interno actualizado");
     }
 
     @Override
