@@ -39,7 +39,8 @@ import java.util.stream.Collectors;
 
 public class SelectExercisesFragment extends Fragment {
     private static final String TAG = "SelectExercisesFragment";
-    private List<Exercise> selectedExercises = new ArrayList<>();    private LinearLayout containerLayout;
+    private List<Exercise> selectedExercises = new ArrayList<>();
+    private LinearLayout containerLayout;
     private DatabaseReference mDatabase;
     private List<TrainingDay> trainingDays;
     private String userGoal; // Meta del usuario
@@ -94,6 +95,7 @@ public class SelectExercisesFragment extends Fragment {
                 .addOnSuccessListener(aVoid -> Log.d(TAG, "Ejercicios seleccionados guardados exitosamente"))
                 .addOnFailureListener(e -> Log.e(TAG, "Error al guardar los ejercicios seleccionados", e));
     }
+
     private void createExerciseContainers(List<TrainingDay> trainingDays) {
         Log.d(TAG, "createExerciseContainers: Iniciando creación de contenedores");
         for (int i = 0; i < trainingDays.size(); i++) {
@@ -228,6 +230,7 @@ public class SelectExercisesFragment extends Fragment {
             }
         });
     }
+
     private void showExerciseSelectionDialog(TrainingDay trainingDay, String userGoal) {
         MenuPopupFragment dialogFragment = new MenuPopupFragment();
         Bundle args = new Bundle();
@@ -374,23 +377,25 @@ public class SelectExercisesFragment extends Fragment {
         }
     }
     public void addSelectedExercise(Exercise exercise) {
-        Log.d(TAG, "addSelectedExercise: Añadiendo ejercicio seleccionado: " + exercise.getName());
-        selectedExercises.add(exercise);
-        // Añadir el ejercicio seleccionado al dayContainer correspondiente
-        addExerciseToDayContainer(exercise);
-    }
-
-    public List<String> getSelectedExercises() {
-        return selectedExercises.stream()
-                .map(Exercise::getName)
-                .collect(Collectors.toList());
+        if (!selectedExercises.contains(exercise)) {
+            Log.d(TAG, "addSelectedExercise: Añadiendo ejercicio seleccionado: " + exercise.getName());
+            selectedExercises.add(exercise);
+            // Añadir el ejercicio seleccionado al dayContainer correspondiente
+            addExerciseToDayContainer(exercise);
+        } else {
+            Log.d(TAG, "addSelectedExercise: Ejercicio ya estaba en la lista: " + exercise.getName());
+        }
     }
 
     private void addExerciseToDayContainer(Exercise exercise) {
+        Log.d(TAG, "addExerciseToDayContainer: Iniciando proceso para añadir ejercicio al contenedor del día");
         for (TrainingDay trainingDay : trainingDays) {
+            Log.d(TAG, "addExerciseToDayContainer: Revisando trainingDay: " + trainingDay.getDayIndex());
             if (trainingDay.getMovementPatterns().stream().anyMatch(pattern -> pattern.getExercises().contains(exercise))) {
+                Log.d(TAG, "addExerciseToDayContainer: Ejercicio coincide con un patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
                 LinearLayout dayContainer = dayContainers.get(trainingDay);
                 if (dayContainer != null) {
+                    Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
                     TextView exerciseView = new TextView(getContext());
                     exerciseView.setText(exercise.getName());
                     exerciseView.setTextColor(Color.WHITE);
@@ -401,11 +406,16 @@ public class SelectExercisesFragment extends Fragment {
                     dayContainer.addView(exerciseView, addButtonIndex);
 
                     Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
+                } else {
+                    Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
                 }
                 break;
+            } else {
+                Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con ningún patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
             }
         }
     }
+
     public void addExerciseToSelection(Exercise exercise) {
         if (!selectedExercises.contains(exercise)) {
             selectedExercises.add(exercise);
@@ -414,49 +424,6 @@ public class SelectExercisesFragment extends Fragment {
             Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
     }
-    private LinearLayout getDayContainerForExercise(Exercise exercise) {
-        Log.d(TAG, "getDayContainerForExercise: Iniciando búsqueda de dayContainer para exercise: " + exercise.getName());
-        Log.d(TAG, "getDayContainerForExercise: Número de trainingDays: " + trainingDays.size());
 
-        for (TrainingDay trainingDay : trainingDays) {
-            Log.d(TAG, "getDayContainerForExercise: Revisando trainingDay con containerId: " + trainingDay.getContainerId());
-            Log.d(TAG, "getDayContainerForExercise: trainingDay.getDayIndex(): " + trainingDay.getDayIndex());
-            Log.d(TAG, "getDayContainerForExercise: trainingDay.getMovementPatterns(): " + trainingDay.getMovementPatterns());
-
-            List<MovementPattern> patterns = trainingDay.getMovementPatterns();
-            if (patterns != null) {
-                Log.d(TAG, "getDayContainerForExercise: Número de patterns en trainingDay: " + patterns.size());
-                for (MovementPattern pattern : patterns) {
-                    Log.d(TAG, "getDayContainerForExercise: Revisando pattern: " + pattern.getName());
-                    Log.d(TAG, "getDayContainerForExercise: pattern.getExercises(): " + pattern.getExercises());
-
-                    List<Exercise> exercises = pattern.getExercises();
-                    if (exercises != null) {
-                        Log.d(TAG, "getDayContainerForExercise: Número de exercises en pattern: " + exercises.size());
-                        for (Exercise patternExercise : exercises) {
-                            Log.d(TAG, "getDayContainerForExercise: Revisando exercise en pattern: " + patternExercise.getName());
-                            Log.d(TAG, "getDayContainerForExercise: Comparando " + patternExercise.getName() + " con " + exercise.getName());
-                            if (patternExercise.getName().equals(exercise.getName())) {
-                                Log.d(TAG, "getDayContainerForExercise: Encontrado dayContainer para exercise: " + exercise.getName());
-                                LinearLayout container = dayContainers.get(trainingDay);
-                                if (container != null) {
-                                    Log.d(TAG, "getDayContainerForExercise: dayContainer encontrado con ID: " + container.getId());
-                                } else {
-                                    Log.e(TAG, "getDayContainerForExercise: dayContainer es nulo para trainingDay con containerId: " + trainingDay.getContainerId());
-                                }
-                                return container;
-                            }
-                        }
-                    } else {
-                        Log.e(TAG, "getDayContainerForExercise: pattern.getExercises() es nulo para pattern: " + pattern.getName());
-                    }
-                }
-            } else {
-                Log.e(TAG, "getDayContainerForExercise: trainingDay.getMovementPatterns() es nulo para trainingDay: " + trainingDay.getDayIndex());
-            }
-        }
-        Log.e(TAG, "getDayContainerForExercise: No se encontró dayContainer para exercise: " + exercise.getName());
-        return null; // Si no se encuentra el contenedor correspondiente
-    }
 
 }

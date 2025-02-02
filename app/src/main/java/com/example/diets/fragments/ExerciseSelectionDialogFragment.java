@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+
 public class ExerciseSelectionDialogFragment extends DialogFragment {
     private static final String TAG = "ExerciseSelectionDialogFragment";
     private RecyclerView recyclerView;
@@ -193,14 +194,6 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
         });
     }
 
-    private Exercise findExerciseByName(String name) {
-        for (Exercise exercise : exercises) {
-            if (exercise.getName().equals(name)) {
-                return exercise;
-            }
-        }
-        return null;
-    }
 
     public void addExerciseToSelection(Exercise exercise) {
         if (!selectedExercises.contains(exercise)) {

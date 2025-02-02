@@ -19,9 +19,6 @@ import androidx.fragment.app.FragmentManager;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-
-import java.util.List;
-
 public class MenuPopupFragment extends DialogFragment {
     public interface OnExerciseSelectedListener {
         void onExerciseSelected(Exercise exercise);
@@ -91,26 +88,13 @@ public class MenuPopupFragment extends DialogFragment {
         FragmentManager fragmentManager = getParentFragmentManager();
         Log.d(TAG, "exerciseSelected: Obteniendo FragmentManager: " + fragmentManager);
 
-        List<Fragment> fragments = fragmentManager.getFragments();
-        Log.d(TAG, "exerciseSelected: FragmentManager fragments: " + fragments);
-
-        for (Fragment fragment : fragments) {
-            Log.d(TAG, "exerciseSelected: Fragment en lista: " + fragment + ", tag: " + fragment.getTag());
-        }
-
         SelectExercisesFragment selectExercisesFragment = (SelectExercisesFragment) fragmentManager.findFragmentByTag("f0");
-        Log.d(TAG, "exerciseSelected: Fragment encontrado por tag: " + selectExercisesFragment);
-
         if (selectExercisesFragment != null) {
-            Log.d(TAG, "exerciseSelected: Pasando ejercicio a SelectExercisesFragment: " + exercise.getName());
-            Log.d(TAG, "exerciseSelected: selectExercisesFragment hashCode: " + selectExercisesFragment.hashCode());
-            Log.d(TAG, "exerciseSelected: selectedExercises size before: " + selectExercisesFragment.getSelectedExercises().size());
+            Log.d(TAG, "exerciseSelected: SelectExercisesFragment encontrado");
             selectExercisesFragment.addSelectedExercise(exercise);
-            Log.d(TAG, "exerciseSelected: selectedExercises size after: " + selectExercisesFragment.getSelectedExercises().size());
+            Log.d(TAG, "exerciseSelected: Ejercicio añadido: " + exercise.getName());
         } else {
             Log.d(TAG, "exerciseSelected: SelectExercisesFragment es nulo");
-            Log.d(TAG, "exerciseSelected: FragmentManager fragments: " + fragmentManager.getFragments());
-            Log.d(TAG, "exerciseSelected: FragmentManager back stack entry count: " + fragmentManager.getBackStackEntryCount());
         }
     }
 }

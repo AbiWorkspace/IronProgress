@@ -24,6 +24,7 @@ import androidx.fragment.app.DialogFragment;
 
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
+import com.example.diets.model.MovementPattern;
 import com.example.diets.model.Muscle;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -42,12 +43,13 @@ public class AddExerciseDialogFragment extends DialogFragment {
     private static final int PICK_IMAGE_REQUEST = 1;
 
     private EditText nameEditText, descriptionEditText;
-    private Spinner equipmentTypeSpinner, exerciseTypeSpinner, movementTypeSpinner, musclesWorkedSpinner;
+    private Spinner equipmentTypeSpinner, exerciseTypeSpinner, movementTypeSpinner, musclesWorkedSpinner, movementPatternSpinner;
     private Button saveButton, cancelButton, selectImageButton;
     private ImageView imagePreview;
     private AddExerciseListener listener;
     private Set<String> musclesSet = new HashSet<>();
     private String imageBase64;
+    private Set<String> movementPatternsSet = new HashSet<>();
 
     public interface AddExerciseListener {
         void onExerciseAdded(Exercise exercise);
@@ -69,6 +71,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
         equipmentTypeSpinner = view.findViewById(R.id.equipmentTypeSpinner);
         exerciseTypeSpinner = view.findViewById(R.id.exerciseTypeSpinner);
         musclesWorkedSpinner = view.findViewById(R.id.musclesWorkedSpinner);
+        movementPatternSpinner = view.findViewById(R.id.movementPatternSpinner);
         descriptionEditText = view.findViewById(R.id.descriptionEditText);
         movementTypeSpinner = view.findViewById(R.id.movementTypeSpinner);
         saveButton = view.findViewById(R.id.saveButton);
@@ -95,6 +98,9 @@ public class AddExerciseDialogFragment extends DialogFragment {
         // Cargar músculos desde la base de datos
         loadMusclesFromDatabase();
 
+        // Cargar patrones de movimiento desde la base de datos
+        loadMovementPatternsFromDatabase();
+
         selectImageButton.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
             startActivityForResult(intent, PICK_IMAGE_REQUEST);
@@ -113,9 +119,14 @@ public class AddExerciseDialogFragment extends DialogFragment {
             newExercise.setEquipmentType(equipmentTypeSpinner.getSelectedItem().toString());
             newExercise.setExerciseType(exerciseTypeSpinner.getSelectedItem().toString());
             newExercise.setMusclesWorked(musclesWorkedSpinner.getSelectedItem().toString());
-            newExercise.setImage(imageBase64);
             newExercise.setDescription(descriptionEditText.getText().toString());
             newExercise.setMovementType(movementTypeSpinner.getSelectedItem().toString());
+
+            // Añadir el patrón de movimiento seleccionado
+            String selectedPatternName = movementPatternSpinner.getSelectedItem().toString();
+            MovementPattern selectedPattern = new MovementPattern();
+            selectedPattern.setName(selectedPatternName);
+            newExercise.getMovementPatterns().add(selectedPattern);
 
             if (listener != null) {
                 Log.d("AddExerciseDialogFragment", "saveButton: Llamando al listener para agregar el ejercicio");
@@ -136,36 +147,61 @@ public class AddExerciseDialogFragment extends DialogFragment {
         exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                Log.d("AddExerciseDialogFragment", "onDataChange: Datos recibidos de la base de datos");
                 musclesSet.clear();
                 if (snapshot.exists()) {
-                    Log.d("AddExerciseDialogFragment", "onDataChange: Snapshot existe y contiene " + snapshot.getChildrenCount() + " elementos");
                     for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                        Log.d("AddExerciseDialogFragment", "onDataChange: Procesando snapshot: " + exerciseSnapshot.getKey());
                         Exercise exercise = exerciseSnapshot.getValue(Exercise.class);
                         if (exercise != null && exercise.getMusclesWorked() != null) {
                             String[] musclesArray = exercise.getMusclesWorked().split(",");
                             for (String muscle : musclesArray) {
                                 musclesSet.add(capitalizeFirstLetter(muscle.trim().toLowerCase()));
                             }
-                            Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Músculos agregados: " + exercise.getMusclesWorked());
-                        } else {
-                            Log.w("AddExerciseDialogFragment", "loadMusclesFromDatabase: Exercise o musclesWorked es null en snapshot: " + exerciseSnapshot.getKey());
                         }
                     }
-                    Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Lista de músculos agregados: " + musclesSet);
-                } else {
-                    Log.w("AddExerciseDialogFragment", "onDataChange: Snapshot no existe o está vacío");
                 }
+                // Configurar el adaptador del spinner de músculos
                 ArrayAdapter<String> musclesAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, new ArrayList<>(musclesSet));
                 musclesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 musclesWorkedSpinner.setAdapter(musclesAdapter);
                 Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Adaptador de músculos configurado con " + musclesSet.size() + " elementos");
+
+                loadMovementPatternsFromDatabase(); // Llamamos al método para cargar los patrones de movimiento después de cargar los músculos
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
                 Log.e("AddExerciseDialogFragment", "Error al cargar músculos desde la base de datos", error.toException());
+            }
+        });
+    }
+
+    private void loadMovementPatternsFromDatabase() {
+        Log.d("AddExerciseDialogFragment", "loadMovementPatternsFromDatabase: Cargando patrones de movimiento desde la base de datos");
+        DatabaseReference distributionsRef = FirebaseDatabase.getInstance().getReference().child("exerciseDistributions");
+        distributionsRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                movementPatternsSet.clear();
+                if (snapshot.exists()) {
+                    for (DataSnapshot distributionSnapshot : snapshot.getChildren()) {
+                        for (DataSnapshot trainingDaySnapshot : distributionSnapshot.child("trainingDays").getChildren()) {
+                            for (DataSnapshot patternSnapshot : trainingDaySnapshot.child("movementPatterns").getChildren()) {
+                                String patternName = patternSnapshot.child("name").getValue(String.class);
+                                if (patternName != null && !musclesSet.contains(capitalizeFirstLetter(patternName.trim().toLowerCase()))) {
+                                    movementPatternsSet.add(capitalizeFirstLetter(patternName.trim().toLowerCase()));
+                                }
+                            }
+                        }
+                    }
+                }
+                ArrayAdapter<String> patternsAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, new ArrayList<>(movementPatternsSet));
+                patternsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                movementPatternSpinner.setAdapter(patternsAdapter);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e("AddExerciseDialogFragment", "Error al cargar patrones de movimiento desde la base de datos", error.toException());
             }
         });
     }

@@ -25,7 +25,21 @@
         android:id="@+id/add_exercise_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="#E63946"
+        android:hint="agregar ejercicio"
+        android:padding="16dp"
         android:text="Agregar Ejercicio"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/doneButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Done"
         android:layout_gravity="center"
         android:padding="16dp"
         android:textSize="18sp"

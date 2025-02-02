@@ -110,6 +110,28 @@
                 android:textColor="#FFFFFF" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Patrón de Movimiento"
+            android:textColor="#B0B0B0"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <Spinner
+                android:id="@+id/movementPatternSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#2F2F2F"
+                android:padding="16dp"
+                android:textColor="#FFFFFF" />
+        </com.google.android.material.textfield.TextInputLayout>
+
         <Button
             android:id="@+id/selectImageButton"
             android:layout_width="match_parent"

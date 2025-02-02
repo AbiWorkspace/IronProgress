@@ -91,6 +91,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
+//metodo encargado de añadir los ejericicios
 
     @Override
     public void onExerciseSelected(Exercise exercise) {
@@ -99,7 +100,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         if (adapter != null) {
             SelectExercisesFragment fragment = (SelectExercisesFragment) adapter.getFragment(0); // Suponiendo que SelectExercisesFragment está en la posición 0
             if (fragment != null) {
-                fragment.addSelectedExercise(exercise);
+//                fragment.addSelectedExercise(exercise);
             }
         }
     }
