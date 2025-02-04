@@ -169,6 +169,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
                 adapter = new ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
                     addExerciseToSelection(exercise);
                     Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
+                    showExerciseDetails(exercise); // Mostrar detalles del ejercicio
                 });
                 recyclerView.setAdapter(adapter);
                 adapter.notifyDataSetChanged();
@@ -189,7 +190,13 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
             Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
     }
-
+    private void showExerciseDetails(Exercise exercise) {
+        ExerciseDetailsFragment detailsFragment = ExerciseDetailsFragment.newInstance(exercise);
+        getParentFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, detailsFragment)
+                .addToBackStack(null)
+                .commit();
+    }
     @Override
     public void onExerciseAdded(Exercise exercise) {
         Log.d(TAG, "onExerciseAdded: Ejercicio agregado: " + exercise.getName());

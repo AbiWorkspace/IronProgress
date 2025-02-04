@@ -59,4 +59,11 @@ public class ExerciseDetailsFragment extends Fragment {
             getParentFragmentManager().popBackStack();
         });
     }
+    private void showExerciseDetails(Exercise exercise) {
+        ExerciseDetailsFragment detailsFragment = ExerciseDetailsFragment.newInstance(exercise);
+        getParentFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, detailsFragment)
+                .addToBackStack(null)
+                .commit();
+    }
 }

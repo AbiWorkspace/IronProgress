@@ -55,6 +55,11 @@ public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.View
             }
             listener.onExerciseClick(exercise);
         });
+
+        // Añadir OnClickListener para ver los detalles del ejercicio
+        holder.itemView.setOnClickListener(v -> {
+            listener.onExerciseClick(exercise);
+        });
     }
 
     @Override
