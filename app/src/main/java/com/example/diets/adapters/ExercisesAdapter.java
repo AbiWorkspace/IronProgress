@@ -9,16 +9,10 @@ import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
-import com.example.diets.fragments.ExerciseDetailsFragment;
-import com.example.diets.fragments.SelectExercisesFragment;
 import com.example.diets.model.Exercise;
 import java.util.List;
-
 public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
     private final List<Exercise> exercises;
     private final List<String> selectedExercises;
@@ -53,12 +47,13 @@ public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.View
                 selectedExercises.remove(exercise.getName());
                 Log.d("ExercisesAdapter", "Ejercicio deseleccionado: " + exercise.getName());
             }
-            listener.onExerciseClick(exercise);
         });
 
         // Añadir OnClickListener para ver los detalles del ejercicio
         holder.itemView.setOnClickListener(v -> {
-            listener.onExerciseClick(exercise);
+            if (!holder.checkBox.isPressed()) { // Verificar que el CheckBox no está siendo presionado
+                listener.onExerciseClick(exercise);
+            }
         });
     }
 
