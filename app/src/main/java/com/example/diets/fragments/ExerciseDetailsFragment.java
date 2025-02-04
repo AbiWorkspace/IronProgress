@@ -12,6 +12,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
+
 public class ExerciseDetailsFragment extends Fragment {
 
     private static final String ARG_EXERCISE = "exercise";

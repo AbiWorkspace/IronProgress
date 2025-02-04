@@ -3,8 +3,10 @@ package com.example.diets.model;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Objects;
 public class Exercise implements Serializable {
+    private static final long serialVersionUID = 1L; // Añadido serialVersionUID
+
     private int id;
     private String name;
     private String equipmentType;
@@ -148,6 +150,19 @@ public class Exercise implements Serializable {
     }
 
     @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Exercise exercise = (Exercise) o;
+        return id == exercise.id && Objects.equals(name, exercise.name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, name);
+    }
+
+    @Override
     public String toString() {
         return "Exercise{" +
                 "id=" + id +
@@ -155,7 +170,7 @@ public class Exercise implements Serializable {
                 ", equipmentType='" + equipmentType + '\'' +
                 ", exerciseType='" + exerciseType + '\'' +
                 ", musclesWorked='" + musclesWorked + '\'' +
-                ", loadIntensity='" + loadIntensity + '\'' +
+                ", loadIntensity='" + loadIntensity + '\'' +  // Corregido aquí
                 ", image='" + image + '\'' +
                 ", description='" + description + '\'' +
                 ", movementType='" + movementType + '\'' +

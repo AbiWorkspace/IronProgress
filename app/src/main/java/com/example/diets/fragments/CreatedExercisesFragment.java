@@ -1,52 +1,31 @@
 package com.example.diets.fragments;
 
-import android.content.ClipData;
 import android.content.Context;
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.DragEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.RelativeLayout;
-import android.widget.TextView;
-import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-
 import com.example.diets.R;
 import com.example.diets.activitys.AddExerciseDialogFragment;
 import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.model.Exercise;
-import com.example.diets.model.MovementPattern;
-import com.example.diets.model.TrainingDay;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener, ExercisesAdapter.OnExerciseClickListener {
@@ -127,11 +106,51 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     }
 
     private void deleteSelectedExercises() {
+        // Mostrar ejercicios antes de la eliminación
+        Log.d(TAG, "deleteSelectedExercises: Ejercicios antes de la eliminación: " + exercises.toString());
+        Log.d(TAG, "deleteSelectedExercises: Ejercicios seleccionados para eliminar: " + selectedExercises.toString());
+
+        // Eliminar los ejercicios seleccionados
         exercises.removeAll(selectedExercises);
         selectedExercises.clear();
+
+        // Guardar los cambios en el almacenamiento interno
         saveExercisesToInternalStorage();
+
+        // Notificar al adaptador que los datos han cambiado
         adapter.notifyDataSetChanged();
+
+        // Mostrar ejercicios después de la eliminación
+        Log.d(TAG, "deleteSelectedExercises: Ejercicios después de la eliminación: " + exercises.toString());
+        Log.d(TAG, "deleteSelectedExercises: Ejercicios seleccionados después de limpiar la lista: " + selectedExercises.toString());
+
+        // Verificar que los ejercicios se han guardado correctamente
+        loadExercisesFromInternalStorage();
+        Log.d(TAG, "deleteSelectedExercises: Ejercicios después de recargar desde el almacenamiento interno: " + exercises.toString());
+
         Log.d(TAG, "deleteSelectedExercises: Ejercicios eliminados y almacenamiento interno actualizado");
+    }
+
+    private void saveExercisesToInternalStorage() {
+        try {
+            Log.d(TAG, "saveExercisesToInternalStorage: Guardando ejercicios en el almacenamiento interno");
+            FileOutputStream fos = getContext().openFileOutput(FILE_NAME, Context.MODE_PRIVATE);
+            ObjectOutputStream oos = new ObjectOutputStream(fos);
+            oos.writeObject(new ArrayList<>(exercises)); // Asegurarse de escribir una nueva lista
+            oos.close();
+            fos.close();
+            Log.d(TAG, "saveExercisesToInternalStorage: Ejercicios guardados en el almacenamiento interno");
+
+            // Verificar que los ejercicios se han guardado correctamente
+            FileInputStream fis = getContext().openFileInput(FILE_NAME);
+            ObjectInputStream ois = new ObjectInputStream(fis);
+            List<Exercise> loadedExercises = (List<Exercise>) ois.readObject();
+            ois.close();
+            fis.close();
+            Log.d(TAG, "saveExercisesToInternalStorage: Ejercicios cargados desde el almacenamiento interno para verificación: " + loadedExercises.toString());
+        } catch (IOException | ClassNotFoundException e) {
+            Log.e(TAG, "Error al guardar ejercicios", e);
+        }
     }
 
     @Override
@@ -190,6 +209,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
             Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
     }
+
     private void showExerciseDetails(Exercise exercise) {
         ExerciseDetailsFragment detailsFragment = ExerciseDetailsFragment.newInstance(exercise);
         getParentFragmentManager().beginTransaction()
@@ -197,6 +217,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
                 .addToBackStack(null)
                 .commit();
     }
+
     @Override
     public void onExerciseAdded(Exercise exercise) {
         Log.d(TAG, "onExerciseAdded: Ejercicio agregado: " + exercise.getName());
@@ -208,19 +229,5 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     @Override
     public void onExerciseClick(Exercise exercise) {
         addExerciseToSelection(exercise);
-    }
-
-    private void saveExercisesToInternalStorage() {
-        try {
-            Log.d(TAG, "saveExercisesToInternalStorage: Guardando ejercicios en el almacenamiento interno");
-            FileOutputStream fos = getContext().openFileOutput(FILE_NAME, Context.MODE_PRIVATE);
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(new ArrayList<>(exercises)); // Asegurarse de escribir una nueva lista
-            oos.close();
-            fos.close();
-            Log.d(TAG, "saveExercisesToInternalStorage: Ejercicios guardados en el almacenamiento interno");
-        } catch (IOException e) {
-            Log.e(TAG, "Error al guardar ejercicios", e);
-        }
     }
 }
