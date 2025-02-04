@@ -240,6 +240,7 @@ public class SelectExercisesFragment extends Fragment {
         dialogFragment.show(getParentFragmentManager(), "ExerciseSelectionDialog");
         Log.d(TAG, "showExerciseSelectionDialog: Mostrando diálogo de selección de ejercicios");
     }
+
     private void loadExercises(MovementPattern pattern) {
         DatabaseReference exercisesRef = mDatabase.child("exercises");
         exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -391,29 +392,46 @@ public class SelectExercisesFragment extends Fragment {
         Log.d(TAG, "addExerciseToDayContainer: Iniciando proceso para añadir ejercicio al contenedor del día");
         for (TrainingDay trainingDay : trainingDays) {
             Log.d(TAG, "addExerciseToDayContainer: Revisando trainingDay: " + trainingDay.getDayIndex());
-            if (trainingDay.getMovementPatterns().stream().anyMatch(pattern -> pattern.getExercises().contains(exercise))) {
-                Log.d(TAG, "addExerciseToDayContainer: Ejercicio coincide con un patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
-                LinearLayout dayContainer = dayContainers.get(trainingDay);
-                if (dayContainer != null) {
-                    Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
-                    TextView exerciseView = new TextView(getContext());
-                    exerciseView.setText(exercise.getName());
-                    exerciseView.setTextColor(Color.WHITE);
-                    exerciseView.setTextSize(18);
+            for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
+                Log.d(TAG, "addExerciseToDayContainer: Revisando patrón de movimiento: " + pattern.getName());
+                Log.d(TAG, "addExerciseToDayContainer: Muscles Worked List: " + exercise.getMusclesWorked());
+                Log.d(TAG, "addExerciseToDayContainer: Synergist Muscles List: " + pattern.getSynergistMuscles());
 
-                    // Añadir el ejercicio justo encima del botón "Agregar Ejercicios"
-                    int addButtonIndex = dayContainer.getChildCount() - 1;
-                    dayContainer.addView(exerciseView, addButtonIndex);
+                List<String> musclesWorkedList = Arrays.stream(exercise.getMusclesWorked().split(",\\s*"))
+                        .map(String::toLowerCase)
+                        .collect(Collectors.toList());
+                List<String> synergistMusclesList = pattern.getSynergistMuscles().stream()
+                        .map(muscle -> muscle.getName().toLowerCase())
+                        .collect(Collectors.toList());
 
-                    Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
+                boolean anyMuscleMatch = musclesWorkedList.stream()
+                        .anyMatch(synergistMusclesList::contains);
+
+                if (anyMuscleMatch) {
+                    Log.d(TAG, "addExerciseToDayContainer: Ejercicio coincide con un patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
+                    LinearLayout dayContainer = dayContainers.get(trainingDay);
+                    if (dayContainer != null) {
+                        Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
+                        TextView exerciseView = new TextView(getContext());
+                        exerciseView.setText(exercise.getName());
+                        exerciseView.setTextColor(Color.WHITE);
+                        exerciseView.setTextSize(18);
+
+                        // Añadir el ejercicio justo encima del botón "Agregar Ejercicios"
+                        int addButtonIndex = dayContainer.getChildCount() - 1;
+                        dayContainer.addView(exerciseView, addButtonIndex);
+
+                        Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
+                    } else {
+                        Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
+                    }
+                    return; // Salir del método una vez que el ejercicio se ha añadido
                 } else {
-                    Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
+                    Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con el patrón de movimiento: " + pattern.getName());
                 }
-                break;
-            } else {
-                Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con ningún patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
             }
         }
+        Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con ningún patrón de movimiento en ningún trainingDay");
     }
 
     public void addExerciseToSelection(Exercise exercise) {
