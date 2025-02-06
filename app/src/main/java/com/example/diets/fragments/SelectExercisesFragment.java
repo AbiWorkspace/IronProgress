@@ -13,10 +13,12 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -37,7 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class SelectExercisesFragment extends Fragment {
+public class SelectExercisesFragment extends Fragment implements ExercisesAdapter.OnExerciseSelectionChangedListener {
     private static final String TAG = "SelectExercisesFragment";
     private List<Exercise> selectedExercises = new ArrayList<>();
     private LinearLayout containerLayout;
@@ -180,7 +182,7 @@ public class SelectExercisesFragment extends Fragment {
             Button addButton = new Button(getContext());
             addButton.setText("Agregar Ejercicios");
             addButton.setTextColor(Color.WHITE);
-            addButton.setBackgroundColor(Color.parseColor("#E63946"));
+            addButton.setBackground(ContextCompat.getDrawable(getContext(), R.drawable.rounded_button));
             addButton.setOnClickListener(v -> showExerciseSelectionDialog(trainingDay, userGoal));
             dayContainer.addView(addButton);
 
@@ -240,7 +242,6 @@ public class SelectExercisesFragment extends Fragment {
         dialogFragment.show(getParentFragmentManager(), "ExerciseSelectionDialog");
         Log.d(TAG, "showExerciseSelectionDialog: Mostrando diálogo de selección de ejercicios");
     }
-
     private void loadExercises(MovementPattern pattern) {
         DatabaseReference exercisesRef = mDatabase.child("exercises");
         exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -306,7 +307,7 @@ public class SelectExercisesFragment extends Fragment {
                     com.example.diets.adapters.ExercisesAdapter adapter = new com.example.diets.adapters.ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
                         addExerciseToSelection(exercise);
                         Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
-                    });
+                    }, SelectExercisesFragment.this); // Pasar 'this' como OnExerciseSelectionChangedListener
                     recyclerView.setAdapter(adapter);
                     adapter.notifyDataSetChanged();
                     Log.d(TAG, "loadExercises: Adaptador de ejercicios configurado");
@@ -321,62 +322,21 @@ public class SelectExercisesFragment extends Fragment {
             }
         });
     }
-    private static class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
-        private final List<Exercise> exercises;
-        private final List<String> selectedExercises;
-        private final OnExerciseClickListener listener;
 
-        ExercisesAdapter(List<Exercise> exercises, List<String> selectedExercises, OnExerciseClickListener listener) {
-            this.exercises = exercises;
-            this.selectedExercises = selectedExercises;
-            this.listener = listener;
-        }
-
-        @NonNull
-        @Override
-        public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_exercise, parent, false);
-            return new ViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-            Exercise exercise = exercises.get(position);
-            holder.exerciseName.setText(exercise.getName());
-            holder.checkBox.setOnCheckedChangeListener(null);
-            holder.checkBox.setChecked(selectedExercises.contains(exercise.getName()));
-            holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                if (isChecked) {
-                    selectedExercises.add(exercise.getName());
-                    Log.d(TAG, "onBindViewHolder: Ejercicio seleccionado: " + exercise.getName());
-                } else {
-                    selectedExercises.remove(exercise.getName());
-                    Log.d(TAG, "onBindViewHolder: Ejercicio deseleccionado: " + exercise.getName());
-                }
-                listener.onExerciseClick(exercise);
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return exercises.size();
-        }
-
-        static class ViewHolder extends RecyclerView.ViewHolder {
-            TextView exerciseName;
-            CheckBox checkBox;
-
-            ViewHolder(View itemView) {
-                super(itemView);
-                exerciseName = itemView.findViewById(R.id.exerciseName);
-                checkBox = itemView.findViewById(R.id.checkBox);
-            }
-        }
-
-        interface OnExerciseClickListener {
-            void onExerciseClick(Exercise exercise);
+    @Override
+    public void onExerciseSelected(Exercise exercise) {
+        if (!selectedExercises.contains(exercise)) {
+            selectedExercises.add(exercise);
+            Log.d(TAG, "onExerciseSelected: Ejercicio añadido: " + exercise.getName());
         }
     }
+
+    @Override
+    public void onExerciseDeselected(Exercise exercise) {
+        selectedExercises.remove(exercise);
+        Log.d(TAG, "onExerciseDeselected: Ejercicio eliminado: " + exercise.getName());
+    }
+
     public void addSelectedExercise(Exercise exercise) {
         if (!selectedExercises.contains(exercise)) {
             Log.d(TAG, "addSelectedExercise: Añadiendo ejercicio seleccionado: " + exercise.getName());
@@ -412,16 +372,44 @@ public class SelectExercisesFragment extends Fragment {
                     LinearLayout dayContainer = dayContainers.get(trainingDay);
                     if (dayContainer != null) {
                         Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
-                        TextView exerciseView = new TextView(getContext());
-                        exerciseView.setText(exercise.getName());
-                        exerciseView.setTextColor(Color.WHITE);
-                        exerciseView.setTextSize(18);
 
-                        // Añadir el ejercicio justo encima del botón "Agregar Ejercicios"
+                        // Inflar el contenedor personalizado
+                        LayoutInflater inflater = LayoutInflater.from(getContext());
+                        View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
+
+                        // Configurar el nombre del ejercicio
+                        TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
+                        exerciseNameView.setText(exercise.getName());
+
+                        // Añadir el contenedor del ejercicio justo encima del botón "Agregar Ejercicios"
                         int addButtonIndex = dayContainer.getChildCount() - 1;
-                        dayContainer.addView(exerciseView, addButtonIndex);
+                        dayContainer.addView(exerciseContainer, addButtonIndex);
 
                         Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
+
+                        // Configurar el menú de tres puntos
+                        ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
+                        menuButton.setOnClickListener(v -> {
+                            PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
+                            popupMenu.inflate(R.menu.exercise_item_menu);
+                            popupMenu.setOnMenuItemClickListener(item -> {
+                                int itemId = item.getItemId();
+                                if (itemId == R.id.action_edit) {
+                                    // Lógica para editar el ejercicio
+                                    Log.d(TAG, "Editar ejercicio: " + exercise.getName());
+                                    return true;
+                                } else if (itemId == R.id.action_delete) {
+                                    // Lógica para eliminar el ejercicio
+                                    Log.d(TAG, "Eliminar ejercicio: " + exercise.getName());
+                                    dayContainer.removeView(exerciseContainer);
+                                    selectedExercises.remove(exercise);
+                                    return true;
+                                } else {
+                                    return false;
+                                }
+                            });
+                            popupMenu.show();
+                        });
                     } else {
                         Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
                     }
@@ -442,6 +430,4 @@ public class SelectExercisesFragment extends Fragment {
             Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
     }
-
-
 }

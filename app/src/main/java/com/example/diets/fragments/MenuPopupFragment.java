@@ -19,6 +19,7 @@ import androidx.fragment.app.FragmentManager;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+
 public class MenuPopupFragment extends DialogFragment {
     public interface OnExerciseSelectedListener {
         void onExerciseSelected(Exercise exercise);

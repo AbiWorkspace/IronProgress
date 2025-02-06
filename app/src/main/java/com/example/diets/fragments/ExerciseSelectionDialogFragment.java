@@ -31,7 +31,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class ExerciseSelectionDialogFragment extends DialogFragment {
+public class ExerciseSelectionDialogFragment extends DialogFragment implements ExercisesAdapter.OnExerciseSelectionChangedListener {
     private static final String TAG = "ExerciseSelectionDialogFragment";
     private RecyclerView recyclerView;
     private Button doneButton;
@@ -75,17 +75,29 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
         } else {
             Log.d(TAG, "onViewCreated: No se recibieron argumentos");
         }
+
         doneButton.setOnClickListener(v -> {
             Log.d(TAG, "onViewCreated: Botón doneButton presionado");
-            // Pasar los ejercicios seleccionados al fragmento padre
             MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
             if (parentFragment != null) {
-                for (Exercise exercise : selectedExercises) {
-                    Log.d(TAG, "onViewCreated: Pasando ejercicio seleccionado: " + exercise.getName());
-                    parentFragment.exerciseSelected(exercise);
+                Log.d(TAG, "onViewCreated: parentFragment no es nulo");
+                List<Exercise> checkedExercises = new ArrayList<>();
+                Log.d(TAG, "onViewCreated: Lista de ejercicios seleccionados: " + selectedExercises);
+                for (Exercise exercise : exercises) {
+                    Log.d(TAG, "onViewCreated: Revisando ejercicio: " + exercise.getName());
+                    if (selectedExercises.contains(exercise)) {
+                        checkedExercises.add(exercise);
+                        Log.d(TAG, "PPPPP onViewCreated: Pasando ejercicio seleccionado: " + exercise.getName());
+                    }
                 }
-                // Cerrar el MenuPopupFragment
+                Log.d(TAG, "onViewCreated: Lista de ejercicios seleccionados para enviar: " + checkedExercises);
+                for (Exercise exercise : checkedExercises) {
+                    parentFragment.exerciseSelected(exercise);
+                    Log.d(TAG, "onViewCreated: Ejercicio enviado: " + exercise.getName());
+                }
                 parentFragment.dismiss();
+            } else {
+                Log.d(TAG, "onViewCreated: parentFragment es nulo");
             }
             dismiss();
         });
@@ -172,7 +184,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
                         addExerciseToSelection(exercise);
                         Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
                         showExerciseDetails(exercise); // Mostrar detalles del ejercicio
-                    });
+                    }, ExerciseSelectionDialogFragment.this); // Pasar 'this' como OnExerciseSelectionChangedListener
                     recyclerView.setAdapter(adapter);
                     adapter.notifyDataSetChanged();
                     Log.d(TAG, "loadExercises: Adaptador de ejercicios configurado");
@@ -187,6 +199,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
             }
         });
     }
+
     private void showExerciseDetails(Exercise exercise) {
         ExerciseDetailsFragment detailsFragment = ExerciseDetailsFragment.newInstance(exercise);
         getParentFragmentManager().beginTransaction()
@@ -202,5 +215,19 @@ public class ExerciseSelectionDialogFragment extends DialogFragment {
         } else {
             Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
+    }
+
+    @Override
+    public void onExerciseSelected(Exercise exercise) {
+        if (!selectedExercises.contains(exercise)) {
+            selectedExercises.add(exercise);
+            Log.d(TAG, "onExerciseSelected: Ejercicio añadido: " + exercise.getName());
+        }
+    }
+
+    @Override
+    public void onExerciseDeselected(Exercise exercise) {
+        selectedExercises.remove(exercise);
+        Log.d(TAG, "onExerciseDeselected: Ejercicio eliminado: " + exercise.getName());
     }
 }

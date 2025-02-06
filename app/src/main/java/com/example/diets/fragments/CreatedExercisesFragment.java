@@ -27,8 +27,7 @@ import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
-
-public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener, ExercisesAdapter.OnExerciseClickListener {
+public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener, ExercisesAdapter.OnExerciseClickListener, ExercisesAdapter.OnExerciseSelectionChangedListener {
     private static final String TAG = "CreatedExercisesFragment";
     private RecyclerView recyclerView;
     private Button doneButton, deleteExerciseButton;
@@ -189,7 +188,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
                     addExerciseToSelection(exercise);
                     Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
                     showExerciseDetails(exercise); // Mostrar detalles del ejercicio
-                });
+                }, this); // Pasar 'this' como OnExerciseSelectionChangedListener
                 recyclerView.setAdapter(adapter);
                 adapter.notifyDataSetChanged();
                 Log.d(TAG, "loadExercisesFromInternalStorage: Adaptador de ejercicios configurado");
@@ -229,5 +228,19 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     @Override
     public void onExerciseClick(Exercise exercise) {
         addExerciseToSelection(exercise);
+    }
+
+    @Override
+    public void onExerciseSelected(Exercise exercise) {
+        if (!selectedExercises.contains(exercise)) {
+            selectedExercises.add(exercise);
+            Log.d(TAG, "onExerciseSelected: Ejercicio añadido: " + exercise.getName());
+        }
+    }
+
+    @Override
+    public void onExerciseDeselected(Exercise exercise) {
+        selectedExercises.remove(exercise);
+        Log.d(TAG, "onExerciseDeselected: Ejercicio eliminado: " + exercise.getName());
     }
 }
