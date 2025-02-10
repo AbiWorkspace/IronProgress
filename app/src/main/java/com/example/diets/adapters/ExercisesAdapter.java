@@ -4,6 +4,7 @@ import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
 
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
@@ -13,7 +14,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import java.util.List;
-
 public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
     private final List<Exercise> exercises;
     private final List<String> selectedExercises;
@@ -60,14 +60,19 @@ public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.View
 
         holder.itemView.setOnClickListener(v -> {
             Log.d("ExercisesAdapter", "Contenedor clickeado");
-            if (v.getId() != R.id.checkBox) {
-                listener.onExerciseClick(exercise);
-                Log.d("ExercisesAdapter", "Detalles del ejercicio mostrados: " + exercise.getName());
-            }
+            listener.onExerciseClick(exercise);
+            Log.d("ExercisesAdapter", "Detalles del ejercicio mostrados: " + exercise.getName());
         });
 
         holder.checkBox.setOnTouchListener((v, event) -> {
             v.getParent().requestDisallowInterceptTouchEvent(true);
+            return false;
+        });
+
+        holder.itemView.setOnTouchListener((v, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                holder.checkBox.setPressed(false);
+            }
             return false;
         });
     }

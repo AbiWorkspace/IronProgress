@@ -181,8 +181,8 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
                             .map(Exercise::getName)
                             .collect(Collectors.toList());
                     ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
-                        addExerciseToSelection(exercise);
-                        Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
+//                        addExerciseToSelection(exercise);
+                        Log.d(TAG, "EXERCISESELECTIONDIALOGFRAGMENT onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
                         showExerciseDetails(exercise); // Mostrar detalles del ejercicio
                     }, ExerciseSelectionDialogFragment.this); // Pasar 'this' como OnExerciseSelectionChangedListener
                     recyclerView.setAdapter(adapter);

@@ -16,6 +16,8 @@ import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -23,6 +25,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
+import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.MovementPattern;
@@ -32,6 +35,8 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -77,27 +82,66 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         Button saveButton = view.findViewById(R.id.saveButton);
         saveButton.setOnClickListener(v -> {
             Log.d(TAG, "Ejercicios seleccionados: " + selectedExercises);
-            // Aquí puedes agregar la lógica para guardar los ejercicios seleccionados
             saveSelectedExercises();
         });
     }
 
     private void saveSelectedExercises() {
+        // Validar que cada contenedor tenga al menos un ejercicio
+        boolean allContainersHaveExercises = true;
+        for (TrainingDay trainingDay : trainingDays) {
+            if (trainingDay.getExercises().isEmpty()) {
+                allContainersHaveExercises = false;
+                Log.d(TAG, "saveSelectedExercises: El contenedor del día " + trainingDay.getDayIndex() + " está vacío.");
+                break; // Salir del bucle si algún contenedor está vacío
+            }
+        }
+
+        if (!allContainersHaveExercises) {
+            Toast.makeText(getContext(), "Cada contenedor debe tener al menos un ejercicio", Toast.LENGTH_SHORT).show();
+            return; // Salir del método si algún contenedor está vacío
+        }
+
         // Obtener la referencia a la base de datos
         DatabaseReference selectedExercisesRef = mDatabase.child("selectedExercises");
 
-        // Crear un mapa para almacenar los ejercicios seleccionados
+        // Crear un mapa para almacenar los ejercicios seleccionados y sus contenedores
         Map<String, Object> exercisesMap = new HashMap<>();
-        for (Exercise exercise : selectedExercises) {
-            exercisesMap.put(exercise.getName(), true);
+        for (TrainingDay trainingDay : trainingDays) {
+            Map<String, Object> dayMap = new HashMap<>();
+            for (Exercise exercise : trainingDay.getExercises()) {
+                dayMap.put(exercise.getName(), true);
+            }
+            exercisesMap.put("Day " + trainingDay.getDayIndex(), dayMap);
+
+            // Mostrar en consola los ejercicios guardados en cada contenedor
+            Log.d(TAG, "saveSelectedExercises: Guardando ejercicios para Day " + trainingDay.getDayIndex());
+            for (Exercise exercise : trainingDay.getExercises()) {
+                Log.d(TAG, "saveSelectedExercises: Ejercicio guardado en Day " + trainingDay.getDayIndex() + ": " + exercise.getName());
+            }
         }
 
         // Guardar los ejercicios seleccionados en la base de datos
         selectedExercisesRef.setValue(exercisesMap)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "Ejercicios seleccionados guardados exitosamente"))
-                .addOnFailureListener(e -> Log.e(TAG, "Error al guardar los ejercicios seleccionados", e));
-    }
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Ejercicios seleccionados guardados exitosamente");
+                    Toast.makeText(getContext(), "Ejercicios seleccionados guardados exitosamente", Toast.LENGTH_SHORT).show();
 
+                    // Cambiar al nuevo fragmento después de guardar los ejercicios
+                    Bundle data = new Bundle();
+                    data.putSerializable("trainingDays", (Serializable) trainingDays);
+                    data.putString("userGoal", userGoal);
+
+                    ViewPagerActivity activity = (ViewPagerActivity) getActivity();
+                    if (activity != null) {
+                        activity.switchToAssignLoadFragment(data);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error al guardar los ejercicios seleccionados", e);
+                    Toast.makeText(getContext(), "Error al guardar los ejercicios seleccionados", Toast.LENGTH_SHORT).show();
+                });
+    }
     private void createExerciseContainers(List<TrainingDay> trainingDays) {
         Log.d(TAG, "createExerciseContainers: Iniciando creación de contenedores");
         for (int i = 0; i < trainingDays.size(); i++) {
@@ -175,7 +219,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
                 RecyclerView recyclerView = new RecyclerView(getContext());
                 recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-                loadExercises(pattern);
+                loadExercises(pattern, trainingDay); // Pasar también el TrainingDay
                 dayContainer.addView(recyclerView);
             }
 
@@ -183,7 +227,11 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             addButton.setText("Agregar Ejercicios");
             addButton.setTextColor(Color.WHITE);
             addButton.setBackground(ContextCompat.getDrawable(getContext(), R.drawable.rounded_button));
-            addButton.setOnClickListener(v -> showExerciseSelectionDialog(trainingDay, userGoal));
+            addButton.setTag(trainingDay); // Asociar el botón con el TrainingDay correspondiente
+            addButton.setOnClickListener(v -> {
+                TrainingDay day = (TrainingDay) v.getTag();
+                showExerciseSelectionDialog(day, userGoal);
+            });
             dayContainer.addView(addButton);
 
             containerLayout.addView(dayContainer);
@@ -242,7 +290,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         dialogFragment.show(getParentFragmentManager(), "ExerciseSelectionDialog");
         Log.d(TAG, "showExerciseSelectionDialog: Mostrando diálogo de selección de ejercicios");
     }
-    private void loadExercises(MovementPattern pattern) {
+    private void loadExercises(MovementPattern pattern, TrainingDay trainingDay) {
         DatabaseReference exercisesRef = mDatabase.child("exercises");
         exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -305,7 +353,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
                             .map(Exercise::getName)
                             .collect(Collectors.toList());
                     com.example.diets.adapters.ExercisesAdapter adapter = new com.example.diets.adapters.ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
-                        addExerciseToSelection(exercise);
+                        addExerciseToSelection(exercise, trainingDay); // Pasar también el TrainingDay
                         Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
                     }, SelectExercisesFragment.this); // Pasar 'this' como OnExerciseSelectionChangedListener
                     recyclerView.setAdapter(adapter);
@@ -337,97 +385,100 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         Log.d(TAG, "onExerciseDeselected: Ejercicio eliminado: " + exercise.getName());
     }
 
-    public void addSelectedExercise(Exercise exercise) {
+    public void addSelectedExercise(Exercise exercise, TrainingDay trainingDay) {
         if (!selectedExercises.contains(exercise)) {
             Log.d(TAG, "addSelectedExercise: Añadiendo ejercicio seleccionado: " + exercise.getName());
             selectedExercises.add(exercise);
             // Añadir el ejercicio seleccionado al dayContainer correspondiente
-            addExerciseToDayContainer(exercise);
+            addExerciseToDayContainer(exercise, trainingDay);
         } else {
             Log.d(TAG, "addSelectedExercise: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
     }
 
-    private void addExerciseToDayContainer(Exercise exercise) {
+    private void addExerciseToDayContainer(Exercise exercise, TrainingDay trainingDay) {
         Log.d(TAG, "addExerciseToDayContainer: Iniciando proceso para añadir ejercicio al contenedor del día");
-        for (TrainingDay trainingDay : trainingDays) {
-            Log.d(TAG, "addExerciseToDayContainer: Revisando trainingDay: " + trainingDay.getDayIndex());
-            for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
-                Log.d(TAG, "addExerciseToDayContainer: Revisando patrón de movimiento: " + pattern.getName());
-                Log.d(TAG, "addExerciseToDayContainer: Muscles Worked List: " + exercise.getMusclesWorked());
-                Log.d(TAG, "addExerciseToDayContainer: Synergist Muscles List: " + pattern.getSynergistMuscles());
+        for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
+            Log.d(TAG, "addExerciseToDayContainer: Revisando patrón de movimiento: " + pattern.getName());
+            Log.d(TAG, "addExerciseToDayContainer: Muscles Worked List: " + exercise.getMusclesWorked());
+            Log.d(TAG, "addExerciseToDayContainer: Synergist Muscles List: " + pattern.getSynergistMuscles());
 
-                List<String> musclesWorkedList = Arrays.stream(exercise.getMusclesWorked().split(",\\s*"))
-                        .map(String::toLowerCase)
-                        .collect(Collectors.toList());
-                List<String> synergistMusclesList = pattern.getSynergistMuscles().stream()
-                        .map(muscle -> muscle.getName().toLowerCase())
-                        .collect(Collectors.toList());
+            List<String> musclesWorkedList = Arrays.stream(exercise.getMusclesWorked().split(",\\s*"))
+                    .map(String::toLowerCase)
+                    .collect(Collectors.toList());
+            List<String> synergistMusclesList = pattern.getSynergistMuscles().stream()
+                    .map(muscle -> muscle.getName().toLowerCase())
+                    .collect(Collectors.toList());
 
-                boolean anyMuscleMatch = musclesWorkedList.stream()
-                        .anyMatch(synergistMusclesList::contains);
+            boolean anyMuscleMatch = musclesWorkedList.stream()
+                    .anyMatch(synergistMusclesList::contains);
 
-                if (anyMuscleMatch) {
-                    Log.d(TAG, "addExerciseToDayContainer: Ejercicio coincide con un patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
-                    LinearLayout dayContainer = dayContainers.get(trainingDay);
-                    if (dayContainer != null) {
-                        Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
+            if (anyMuscleMatch) {
+                Log.d(TAG, "addExerciseToDayContainer: Ejercicio coincide con un patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
+                LinearLayout dayContainer = dayContainers.get(trainingDay);
+                if (dayContainer != null) {
+                    Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
 
-                        // Inflar el contenedor personalizado
-                        LayoutInflater inflater = LayoutInflater.from(getContext());
-                        View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
+                    // Inflar el contenedor personalizado
+                    LayoutInflater inflater = LayoutInflater.from(getContext());
+                    View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
 
-                        // Configurar el nombre del ejercicio
-                        TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
-                        exerciseNameView.setText(exercise.getName());
+                    // Configurar el nombre del ejercicio
+                    TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
+                    exerciseNameView.setText(exercise.getName());
 
-                        // Añadir el contenedor del ejercicio justo encima del botón "Agregar Ejercicios"
-                        int addButtonIndex = dayContainer.getChildCount() - 1;
-                        dayContainer.addView(exerciseContainer, addButtonIndex);
+                    // Añadir el contenedor del ejercicio justo encima del botón "Agregar Ejercicios"
+                    int addButtonIndex = dayContainer.getChildCount() - 1;
+                    dayContainer.addView(exerciseContainer, addButtonIndex);
 
-                        Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
+                    Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
 
-                        // Configurar el menú de tres puntos
-                        ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
-                        menuButton.setOnClickListener(v -> {
-                            PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
-                            popupMenu.inflate(R.menu.exercise_item_menu);
-                            popupMenu.setOnMenuItemClickListener(item -> {
-                                int itemId = item.getItemId();
-                                if (itemId == R.id.action_edit) {
-                                    // Lógica para editar el ejercicio
-                                    Log.d(TAG, "Editar ejercicio: " + exercise.getName());
-                                    return true;
-                                } else if (itemId == R.id.action_delete) {
-                                    // Lógica para eliminar el ejercicio
-                                    Log.d(TAG, "Eliminar ejercicio: " + exercise.getName());
-                                    dayContainer.removeView(exerciseContainer);
-                                    selectedExercises.remove(exercise);
-                                    return true;
-                                } else {
-                                    return false;
-                                }
-                            });
-                            popupMenu.show();
+                    // Añadir el ejercicio a la lista de ejercicios del TrainingDay
+                    trainingDay.getExercises().add(exercise);
+
+                    // Configurar el menú de tres puntos
+                    ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
+                    menuButton.setOnClickListener(v -> {
+                        PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
+                        popupMenu.inflate(R.menu.exercise_item_menu);
+                        popupMenu.setOnMenuItemClickListener(item -> {
+                            int itemId = item.getItemId();
+                            if (itemId == R.id.action_edit) {
+                                // Lógica para editar el ejercicio
+                                Log.d(TAG, "Editar ejercicio: " + exercise.getName());
+                                return true;
+                            } else if (itemId == R.id.action_delete) {
+                                // Lógica para eliminar el ejercicio
+                                Log.d(TAG, "Eliminar ejercicio: " + exercise.getName());
+                                dayContainer.removeView(exerciseContainer);
+                                selectedExercises.remove(exercise);
+                                trainingDay.getExercises().remove(exercise); // Eliminar el ejercicio de la lista del TrainingDay
+                                return true;
+                            } else {
+                                return false;
+                            }
                         });
-                    } else {
-                        Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
-                    }
-                    return; // Salir del método una vez que el ejercicio se ha añadido
+                        popupMenu.show();
+                    });
                 } else {
-                    Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con el patrón de movimiento: " + pattern.getName());
+                    Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
                 }
+                return; // Salir del método una vez que el ejercicio se ha añadido
+            } else {
+                Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con el patrón de movimiento: " + pattern.getName());
             }
         }
         Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con ningún patrón de movimiento en ningún trainingDay");
     }
 
-    public void addExerciseToSelection(Exercise exercise) {
+    public void addExerciseToSelection(Exercise exercise, TrainingDay trainingDay) {
         if (!selectedExercises.contains(exercise)) {
             selectedExercises.add(exercise);
             Log.d(TAG, "addExerciseToSelection: Ejercicio añadido: " + exercise.getName());
+            addExerciseToDayContainer(exercise, trainingDay);
         } else {
             Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
         }
     }
+
 }

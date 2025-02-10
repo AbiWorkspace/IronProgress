@@ -104,7 +104,15 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
             }
         }
     }
+    public void switchToAssignLoadFragment(Bundle data) {
+        // Crea el nuevo fragmento y actualiza el adaptador
+        AssignLoadFragment fragment = new AssignLoadFragment();
+        fragment.setArguments(data);
 
+        // Reemplazar el fragmento en la lista del adaptador
+        adapter.replaceFragment(0, fragment);
+        viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
+    }
     @Override
     public void onExerciseClick(Exercise exercise) {
         // Implementación del método de la interfaz OnExerciseClickListener

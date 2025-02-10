@@ -18,14 +18,15 @@ import androidx.fragment.app.FragmentManager;
 
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
+import com.example.diets.model.TrainingDay;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-
 public class MenuPopupFragment extends DialogFragment {
     public interface OnExerciseSelectedListener {
         void onExerciseSelected(Exercise exercise);
     }
 
     private OnExerciseSelectedListener listener;
+    private TrainingDay trainingDay; // Añadir campo para TrainingDay
 
     @Override
     public void onAttach(@NonNull Context context) {
@@ -73,6 +74,12 @@ public class MenuPopupFragment extends DialogFragment {
         if (savedInstanceState == null) {
             navigationView.setSelectedItemId(R.id.navigation_exercises);
         }
+
+        // Obtener el TrainingDay del Bundle
+        Bundle args = getArguments();
+        if (args != null) {
+            trainingDay = (TrainingDay) args.getSerializable("trainingDay");
+        }
     }
 
     public void exerciseSelected(Exercise exercise) {
@@ -92,7 +99,7 @@ public class MenuPopupFragment extends DialogFragment {
         SelectExercisesFragment selectExercisesFragment = (SelectExercisesFragment) fragmentManager.findFragmentByTag("f0");
         if (selectExercisesFragment != null) {
             Log.d(TAG, "exerciseSelected: SelectExercisesFragment encontrado");
-            selectExercisesFragment.addSelectedExercise(exercise);
+            selectExercisesFragment.addSelectedExercise(exercise, trainingDay); // Pasar también el TrainingDay
             Log.d(TAG, "exerciseSelected: Ejercicio añadido: " + exercise.getName());
         } else {
             Log.d(TAG, "exerciseSelected: SelectExercisesFragment es nulo");
