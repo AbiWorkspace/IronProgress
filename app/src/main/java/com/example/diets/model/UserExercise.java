@@ -4,7 +4,14 @@ public class UserExercise extends Exercise {
     private boolean isCompleted;
     private int maxReps;
     private int currentLoad;
-    // Otros campos específicos del usuario
+
+    // Constructor sin argumentos requerido por Firebase
+    public UserExercise() {
+        super();
+        this.isCompleted = false;
+        this.maxReps = 0;
+        this.currentLoad = 0;
+    }
 
     public UserExercise(Exercise exercise) {
         super(exercise.getId(), exercise.getName(), exercise.getEquipmentType(), exercise.getExerciseType(), exercise.getMusclesWorked(), exercise.getLoadIntensity(), exercise.getImage(), exercise.getDescription(), exercise.getMovementType(), exercise.getSynergistMuscles(), exercise.getGoals(), exercise.getMovementPatterns());
@@ -36,6 +43,4 @@ public class UserExercise extends Exercise {
     public void setCurrentLoad(int currentLoad) {
         this.currentLoad = currentLoad;
     }
-
-    // Otros getters y setters
 }

@@ -4,6 +4,9 @@ import static android.content.ContentValues.TAG;
 
 import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class User {
     // Properties
     private String id;
@@ -29,6 +32,10 @@ public class User {
     private String profilePhotoUrl; // URL de la foto de perfil
     private String profilePhoto;
 
+    // Nuevas propiedades para ejercicios y patrones de movimiento del usuario
+    private List<UserExercise> userExercises;
+    private List<UserMovementPattern> userMovementPatterns;
+
     // Constructor sin argumentos requerido por Firebase
     public User() {
         this.firstTime = true;
@@ -39,6 +46,8 @@ public class User {
         this.latitude = 0.0; // Inicialización predeterminada
         this.longitude = 0.0; // Inicialización predeterminada
         this.profilePhotoUrl = "default"; // Inicialización predeterminada
+        this.userExercises = new ArrayList<>(); // Inicialización de la lista
+        this.userMovementPatterns = new ArrayList<>(); // Inicialización de la lista
     }
 
     // Constructor con argumentos
@@ -61,8 +70,28 @@ public class User {
         this.latitude = 0.0; // Inicialización predeterminada
         this.longitude = 0.0; // Inicialización predeterminada
         this.profilePhotoUrl = "default"; // Inicialización predeterminada
+        this.userExercises = new ArrayList<>(); // Inicialización de la lista
+        this.userMovementPatterns = new ArrayList<>(); // Inicialización de la lista
     }
 
+    // Getters y Setters para las nuevas propiedades
+    public List<UserExercise> getUserExercises() {
+        return userExercises;
+    }
+
+    public void setUserExercises(List<UserExercise> userExercises) {
+        this.userExercises = userExercises;
+    }
+
+    public List<UserMovementPattern> getUserMovementPatterns() {
+        return userMovementPatterns;
+    }
+
+    public void setUserMovementPatterns(List<UserMovementPattern> userMovementPatterns) {
+        this.userMovementPatterns = userMovementPatterns;
+    }
+
+    // Resto de los getters y setters...
     public String getId() {
         return id != null && !id.isEmpty() ? id : "Sin ID";
     }
@@ -249,6 +278,7 @@ public class User {
     public String getProfilePhotoUrl() {
         return profilePhotoUrl != null ? profilePhotoUrl : "default";
     }
+
     public String getProfilePhoto() {
         return profilePhoto;
     }
@@ -260,7 +290,6 @@ public class User {
     public void setProfilePhotoUrl(String profilePhotoUrl) {
         this.profilePhotoUrl = profilePhotoUrl;
     }
-
     // Métodos para restar valores
     public void subtractCaloriesToday(double calories) {
         if (calories < 0) {

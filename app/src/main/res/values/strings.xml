@@ -8,4 +8,6 @@
     <string name="menu">Menú</string>
     <string name="add_food_item">Añadir alimento</string>
     <string name="training_icon">Icono de entrenamiento</string>
+    <string name="status_button">Estado del ejercicio</string>
+
 </resources>

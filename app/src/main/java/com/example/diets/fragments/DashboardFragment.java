@@ -1,4 +1,4 @@
-package com.example.diets.activitys;
+package com.example.diets.fragments;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -11,6 +11,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.example.diets.R;
+import com.example.diets.activitys.MainActivity;
+import com.example.diets.activitys.WeightActivity;
 import com.example.diets.model.User;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;

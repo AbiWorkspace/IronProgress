@@ -30,6 +30,8 @@ import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.TrainingDay;
+import com.example.diets.model.UserExercise;
+import com.example.diets.model.UserMovementPattern;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -49,6 +51,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
     private List<Exercise> selectedExercises = new ArrayList<>();
     private LinearLayout containerLayout;
     private DatabaseReference mDatabase;
+    private String userId;
     private List<TrainingDay> trainingDays;
     private String userGoal; // Meta del usuario
     private RecyclerView recyclerView; // Añadir esta línea
@@ -76,6 +79,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             String selectedDistribution = data.getString("selectedDistribution");
             trainingDays = (List<TrainingDay>) data.getSerializable("trainingDays");
             userGoal = data.getString("userGoal"); // Obtener la meta del usuario
+            userId = data.getString("userId"); // Obtener el userId
             createExerciseContainers(trainingDays);
         }
 
@@ -85,49 +89,45 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             saveSelectedExercises();
         });
     }
-
     private void saveSelectedExercises() {
-        // Validar que cada contenedor tenga al menos un ejercicio
         boolean allContainersHaveExercises = true;
         for (TrainingDay trainingDay : trainingDays) {
             if (trainingDay.getExercises().isEmpty()) {
                 allContainersHaveExercises = false;
                 Log.d(TAG, "saveSelectedExercises: El contenedor del día " + trainingDay.getDayIndex() + " está vacío.");
-                break; // Salir del bucle si algún contenedor está vacío
+                break;
             }
         }
 
         if (!allContainersHaveExercises) {
             Toast.makeText(getContext(), "Cada contenedor debe tener al menos un ejercicio", Toast.LENGTH_SHORT).show();
-            return; // Salir del método si algún contenedor está vacío
+            return;
         }
 
-        // Obtener la referencia a la base de datos
-        DatabaseReference selectedExercisesRef = mDatabase.child("selectedExercises");
+        DatabaseReference userRef = mDatabase.child("users").child(userId); // Asegúrate de tener el userId disponible
+        DatabaseReference userExercisesRef = userRef.child("userExercises");
+        DatabaseReference userMovementPatternsRef = userRef.child("userMovementPatterns");
 
-        // Crear un mapa para almacenar los ejercicios seleccionados y sus contenedores
-        Map<String, Object> exercisesMap = new HashMap<>();
+        List<UserExercise> userExercises = new ArrayList<>();
+        List<UserMovementPattern> userMovementPatterns = new ArrayList<>();
+
         for (TrainingDay trainingDay : trainingDays) {
-            Map<String, Object> dayMap = new HashMap<>();
-            for (Exercise exercise : trainingDay.getExercises()) {
-                dayMap.put(exercise.getName(), true);
-            }
-            exercisesMap.put("Day " + trainingDay.getDayIndex(), dayMap);
-
-            // Mostrar en consola los ejercicios guardados en cada contenedor
-            Log.d(TAG, "saveSelectedExercises: Guardando ejercicios para Day " + trainingDay.getDayIndex());
-            for (Exercise exercise : trainingDay.getExercises()) {
-                Log.d(TAG, "saveSelectedExercises: Ejercicio guardado en Day " + trainingDay.getDayIndex() + ": " + exercise.getName());
+            for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
+                UserMovementPattern userMovementPattern = new UserMovementPattern(pattern);
+                for (Exercise exercise : trainingDay.getExercises()) {
+                    UserExercise userExercise = new UserExercise(exercise);
+                    userExercises.add(userExercise);
+                    userMovementPattern.getUserExercises().add(userExercise);
+                }
+                userMovementPatterns.add(userMovementPattern);
             }
         }
 
-        // Guardar los ejercicios seleccionados en la base de datos
-        selectedExercisesRef.setValue(exercisesMap)
+        userExercisesRef.setValue(userExercises)
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "Ejercicios seleccionados guardados exitosamente");
                     Toast.makeText(getContext(), "Ejercicios seleccionados guardados exitosamente", Toast.LENGTH_SHORT).show();
 
-                    // Cambiar al nuevo fragmento después de guardar los ejercicios
                     Bundle data = new Bundle();
                     data.putSerializable("trainingDays", (Serializable) trainingDays);
                     data.putString("userGoal", userGoal);
@@ -140,6 +140,14 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Error al guardar los ejercicios seleccionados", e);
                     Toast.makeText(getContext(), "Error al guardar los ejercicios seleccionados", Toast.LENGTH_SHORT).show();
+                });
+
+        userMovementPatternsRef.setValue(userMovementPatterns)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Patrones de movimiento guardados exitosamente");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error al guardar los patrones de movimiento", e);
                 });
     }
     private void createExerciseContainers(List<TrainingDay> trainingDays) {
@@ -239,46 +247,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             Log.d(TAG, "createExerciseContainers: dayContainer añadido para trainingDay: " + trainingDay.getDayIndex() + " con ID: " + containerId);
         }
 
-        containerLayout.setOnDragListener((v, event) -> {
-            switch (event.getAction()) {
-                case DragEvent.ACTION_DRAG_STARTED:
-                    Log.d(TAG, "Drag started");
-                    return true;
-                case DragEvent.ACTION_DRAG_ENTERED:
-                    Log.d(TAG, "Drag entered");
-                    return true;
-                case DragEvent.ACTION_DRAG_LOCATION:
-                    Log.d(TAG, "Drag location: " + event.getY());
-                    return true;
-                case DragEvent.ACTION_DRAG_EXITED:
-                    Log.d(TAG, "Drag exited");
-                    return true;
-                case DragEvent.ACTION_DROP:
-                    Log.d(TAG, "Drop event");
-                    View draggedView = (View) event.getLocalState();
-                    draggedView.setVisibility(View.VISIBLE);
-                    containerLayout.removeView(draggedView);
-                    int dropPosition = (int) event.getY();
-                    int insertIndex = 0;
-                    for (int i = 0; i < containerLayout.getChildCount(); i++) {
-                        View child = containerLayout.getChildAt(i);
-                        if (dropPosition < child.getBottom()) {
-                            insertIndex = i;
-                            break;
-                        }
-                    }
-                    Log.d(TAG, "Inserting at index: " + insertIndex);
-                    containerLayout.addView(draggedView, insertIndex);
-                    return true;
-                case DragEvent.ACTION_DRAG_ENDED:
-                    Log.d(TAG, "Drag ended");
-                    View view = (View) event.getLocalState();
-                    view.setVisibility(View.VISIBLE);
-                    return true;
-                default:
-                    return false;
-            }
-        });
+
     }
 
     private void showExerciseSelectionDialog(TrainingDay trainingDay, String userGoal) {

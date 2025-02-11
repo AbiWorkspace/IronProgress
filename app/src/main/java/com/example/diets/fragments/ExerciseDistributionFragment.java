@@ -12,6 +12,8 @@ import com.example.diets.model.ExerciseDistribution;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.Muscle;
 import com.example.diets.model.TrainingDay;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -28,11 +30,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import java.io.Serializable;
+
 public class ExerciseDistributionFragment extends Fragment {
     private static final String TAG = "ExerciseDistributionFragment";
     private String selectedDistribution = null;
     private DatabaseReference mDatabase;
     private int selectedDays;
+    private String userId;
+
     private List<RadioButton> radioButtons = new ArrayList<>();
     private List<TrainingDay> trainingDays;
 
@@ -48,6 +53,12 @@ public class ExerciseDistributionFragment extends Fragment {
 
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
+        // Obtener el userId del usuario autenticado
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            userId = currentUser.getUid();
+        }
+
         LinearLayout recommendedContainer = view.findViewById(R.id.recommendedContainer);
         LinearLayout notRecommendedContainer = view.findViewById(R.id.notRecommendedContainer);
         Button saveButton = view.findViewById(R.id.saveButton);
@@ -58,6 +69,7 @@ public class ExerciseDistributionFragment extends Fragment {
                 Bundle data = new Bundle();
                 data.putString("selectedDistribution", selectedDistribution);
                 data.putSerializable("trainingDays", (Serializable) trainingDays);
+                data.putString("userId", userId); // Asegúrate de pasar el userId
 
                 // Cambiar al siguiente fragmento
                 ((ViewPagerActivity) getActivity()).switchToSelectExercisesFragment(data);

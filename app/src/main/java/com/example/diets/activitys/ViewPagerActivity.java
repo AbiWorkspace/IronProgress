@@ -1,7 +1,6 @@
 package com.example.diets.activitys;
 
 import android.os.Bundle;
-import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -9,6 +8,9 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.example.diets.R;
 import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.adapters.ViewPagerAdapter;
+import com.example.diets.fragments.AssignLoadFragment;
+import com.example.diets.fragments.DashboardFragment;
+import com.example.diets.fragments.ExerciseDetailsLoadFragment;
 import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.example.diets.fragments.MenuPopupFragment;
 import com.example.diets.model.Exercise;
@@ -16,6 +18,9 @@ import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.example.diets.fragments.SelectExercisesFragment;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
+
 public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener, MenuPopupFragment.OnExerciseSelectedListener, ExercisesAdapter.OnExerciseClickListener {
 
     private DrawerLayout drawerLayout;
@@ -72,15 +77,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         viewPager.setCurrentItem(position);
     }
 
-    public void switchToExerciseDistributionFragment(Bundle data) {
-        // Crea el nuevo fragmento y actualiza el adaptador
-        ExerciseDistributionFragment fragment = new ExerciseDistributionFragment();
-        fragment.setArguments(data);
 
-        // Reemplazar el fragmento en la lista del adaptador
-        adapter.replaceFragment(0, fragment);
-        viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
-    }
 
     public void switchToSelectExercisesFragment(Bundle data) {
         // Crea el nuevo fragmento y actualiza el adaptador
@@ -104,9 +101,36 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
             }
         }
     }
+    // En ViewPagerActivity
+    public void switchToExerciseDistributionFragment(Bundle data) {
+        // Obtener el userId del usuario autenticado
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            String userId = currentUser.getUid();
+            data.putString("userId", userId); // Pasar el userId al Bundle
+        }
+
+        // Crea el nuevo fragmento y actualiza el adaptador
+        ExerciseDistributionFragment fragment = new ExerciseDistributionFragment();
+        fragment.setArguments(data);
+
+        // Reemplazar el fragmento en la lista del adaptador
+        adapter.replaceFragment(0, fragment);
+        viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
+    }
+
     public void switchToAssignLoadFragment(Bundle data) {
         // Crea el nuevo fragmento y actualiza el adaptador
         AssignLoadFragment fragment = new AssignLoadFragment();
+        fragment.setArguments(data);
+
+        // Reemplazar el fragmento en la lista del adaptador
+        adapter.replaceFragment(0, fragment);
+        viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
+    }
+    public void switchToExerciseDetailsLoadFragment(Bundle data) {
+        // Crea el nuevo fragmento y actualiza el adaptador
+        ExerciseDetailsLoadFragment fragment = new ExerciseDetailsLoadFragment();
         fragment.setArguments(data);
 
         // Reemplazar el fragmento en la lista del adaptador
