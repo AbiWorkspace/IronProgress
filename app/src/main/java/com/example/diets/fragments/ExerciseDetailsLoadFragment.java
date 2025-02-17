@@ -103,7 +103,7 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
                 android.R.layout.simple_spinner_item, getRepsOptions());
         repsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         repsSpinner.setAdapter(repsAdapter);
-        repsSpinner.setSelection(userExercise.getMaxReps() - 1); // Ajustar según el valor de repeticiones
+        repsSpinner.setSelection(userExercise.getMaxReps()); // Ajustar según el valor de repeticiones
 
         // Configurar el Spinner de familiaridad
         ArrayAdapter<CharSequence> familiarityAdapter = ArrayAdapter.createFromResource(getContext(),
