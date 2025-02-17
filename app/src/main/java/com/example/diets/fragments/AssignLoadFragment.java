@@ -322,6 +322,12 @@ public class AssignLoadFragment extends Fragment {
                     }
                     // Actualizar los iconos de los botones de estado
                     updateAllStatusButtonIcons();
+
+                    // Actualizar el estado del formulario de entrenamiento
+                    DatabaseReference userRef = mDatabase.child("users").child(userId);
+                    userRef.child("trainingFormCompleted").setValue(true)
+                            .addOnSuccessListener(aVoid1 -> Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: Estado del formulario de entrenamiento actualizado"))
+                            .addOnFailureListener(e -> Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: Error al actualizar el estado del formulario de entrenamiento", e));
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: Error al guardar las cargas asignadas", e);

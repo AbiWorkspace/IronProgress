@@ -31,6 +31,8 @@ public class User {
     private double longitude; // Coordenada de longitud
     private String profilePhotoUrl; // URL de la foto de perfil
     private String profilePhoto;
+    private boolean trainingFormCompleted; // Nueva propiedad
+
 
     // Nuevas propiedades para ejercicios y patrones de movimiento del usuario
     private List<UserExercise> userExercises;
@@ -48,6 +50,8 @@ public class User {
         this.profilePhotoUrl = "default"; // Inicialización predeterminada
         this.userExercises = new ArrayList<>(); // Inicialización de la lista
         this.userMovementPatterns = new ArrayList<>(); // Inicialización de la lista
+        this.trainingFormCompleted = false; // Inicialización predeterminada
+
     }
 
     // Constructor con argumentos
@@ -72,6 +76,8 @@ public class User {
         this.profilePhotoUrl = "default"; // Inicialización predeterminada
         this.userExercises = new ArrayList<>(); // Inicialización de la lista
         this.userMovementPatterns = new ArrayList<>(); // Inicialización de la lista
+        this.trainingFormCompleted = false; // Inicialización predeterminada
+
     }
 
     // Getters y Setters para las nuevas propiedades
@@ -86,7 +92,13 @@ public class User {
     public List<UserMovementPattern> getUserMovementPatterns() {
         return userMovementPatterns;
     }
+    public boolean isTrainingFormCompleted() {
+        return trainingFormCompleted;
+    }
 
+    public void setTrainingFormCompleted(boolean trainingFormCompleted) {
+        this.trainingFormCompleted = trainingFormCompleted;
+    }
     public void setUserMovementPatterns(List<UserMovementPattern> userMovementPatterns) {
         this.userMovementPatterns = userMovementPatterns;
     }
