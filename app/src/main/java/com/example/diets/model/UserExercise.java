@@ -4,6 +4,7 @@ public class UserExercise extends Exercise {
     private boolean isCompleted;
     private int maxReps;
     private int currentLoad;
+    private String familiarity; // Nuevo campo para familiaridad
 
     // Constructor sin argumentos requerido por Firebase
     public UserExercise() {
@@ -11,13 +12,7 @@ public class UserExercise extends Exercise {
         this.isCompleted = false;
         this.maxReps = 0;
         this.currentLoad = 0;
-    }
-
-    public UserExercise(Exercise exercise) {
-        super(exercise.getId(), exercise.getName(), exercise.getEquipmentType(), exercise.getExerciseType(), exercise.getMusclesWorked(), exercise.getLoadIntensity(), exercise.getImage(), exercise.getDescription(), exercise.getMovementType(), exercise.getSynergistMuscles(), exercise.getGoals(), exercise.getMovementPatterns());
-        this.isCompleted = false;
-        this.maxReps = 0;
-        this.currentLoad = 0;
+        this.familiarity = ""; // Inicializar familiaridad
     }
 
     public boolean isCompleted() {
@@ -42,5 +37,13 @@ public class UserExercise extends Exercise {
 
     public void setCurrentLoad(int currentLoad) {
         this.currentLoad = currentLoad;
+    }
+
+    public String getFamiliarity() {
+        return familiarity;
+    }
+
+    public void setFamiliarity(String familiarity) {
+        this.familiarity = familiarity;
     }
 }

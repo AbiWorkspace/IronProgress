@@ -115,7 +115,18 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
                 UserMovementPattern userMovementPattern = new UserMovementPattern(pattern);
                 for (Exercise exercise : trainingDay.getExercises()) {
-                    UserExercise userExercise = new UserExercise(exercise);
+                    UserExercise userExercise = new UserExercise();
+                    userExercise.setName(exercise.getName());
+                    userExercise.setEquipmentType(exercise.getEquipmentType());
+                    userExercise.setExerciseType(exercise.getExerciseType());
+                    userExercise.setMusclesWorked(exercise.getMusclesWorked());
+                    userExercise.setLoadIntensity(exercise.getLoadIntensity());
+                    userExercise.setImage(exercise.getImage());
+                    userExercise.setDescription(exercise.getDescription());
+                    userExercise.setMovementType(exercise.getMovementType());
+                    userExercise.setSynergistMuscles(exercise.getSynergistMuscles());
+                    userExercise.setGoals(exercise.getGoals());
+                    userExercise.setMovementPatterns(exercise.getMovementPatterns());
                     userExercises.add(userExercise);
                     userMovementPattern.getUserExercises().add(userExercise);
                 }
@@ -355,89 +366,98 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
     }
 
     public void addSelectedExercise(Exercise exercise, TrainingDay trainingDay) {
-        if (!selectedExercises.contains(exercise)) {
+        // Obtener el contenedor específico del día
+        LinearLayout dayContainer = dayContainers.get(trainingDay);
+        boolean exerciseAlreadyInContainer = false;
+
+        if (dayContainer != null) {
+            for (int i = 0; i < dayContainer.getChildCount(); i++) {
+                View child = dayContainer.getChildAt(i);
+                TextView exerciseNameView = child.findViewById(R.id.exerciseName);
+                if (exerciseNameView != null && exerciseNameView.getText().toString().equals(exercise.getName())) {
+                    exerciseAlreadyInContainer = true;
+                    break;
+                }
+            }
+        }
+
+        if (!exerciseAlreadyInContainer) {
             Log.d(TAG, "addSelectedExercise: Añadiendo ejercicio seleccionado: " + exercise.getName());
             selectedExercises.add(exercise);
             // Añadir el ejercicio seleccionado al dayContainer correspondiente
             addExerciseToDayContainer(exercise, trainingDay);
         } else {
-            Log.d(TAG, "addSelectedExercise: Ejercicio ya estaba en la lista: " + exercise.getName());
+            Log.d(TAG, "addSelectedExercise: Ejercicio ya estaba en el contenedor del día: " + trainingDay.getDayIndex());
         }
     }
 
     private void addExerciseToDayContainer(Exercise exercise, TrainingDay trainingDay) {
         Log.d(TAG, "addExerciseToDayContainer: Iniciando proceso para añadir ejercicio al contenedor del día");
-        for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
-            Log.d(TAG, "addExerciseToDayContainer: Revisando patrón de movimiento: " + pattern.getName());
-            Log.d(TAG, "addExerciseToDayContainer: Muscles Worked List: " + exercise.getMusclesWorked());
-            Log.d(TAG, "addExerciseToDayContainer: Synergist Muscles List: " + pattern.getSynergistMuscles());
 
-            List<String> musclesWorkedList = Arrays.stream(exercise.getMusclesWorked().split(",\\s*"))
-                    .map(String::toLowerCase)
-                    .collect(Collectors.toList());
-            List<String> synergistMusclesList = pattern.getSynergistMuscles().stream()
-                    .map(muscle -> muscle.getName().toLowerCase())
-                    .collect(Collectors.toList());
+        // Obtener el contenedor específico del día
+        LinearLayout dayContainer = dayContainers.get(trainingDay);
+        if (dayContainer != null) {
+            Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
 
-            boolean anyMuscleMatch = musclesWorkedList.stream()
-                    .anyMatch(synergistMusclesList::contains);
-
-            if (anyMuscleMatch) {
-                Log.d(TAG, "addExerciseToDayContainer: Ejercicio coincide con un patrón de movimiento en trainingDay: " + trainingDay.getDayIndex());
-                LinearLayout dayContainer = dayContainers.get(trainingDay);
-                if (dayContainer != null) {
-                    Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
-
-                    // Inflar el contenedor personalizado
-                    LayoutInflater inflater = LayoutInflater.from(getContext());
-                    View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
-
-                    // Configurar el nombre del ejercicio
-                    TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
-                    exerciseNameView.setText(exercise.getName());
-
-                    // Añadir el contenedor del ejercicio justo encima del botón "Agregar Ejercicios"
-                    int addButtonIndex = dayContainer.getChildCount() - 1;
-                    dayContainer.addView(exerciseContainer, addButtonIndex);
-
-                    Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
-
-                    // Añadir el ejercicio a la lista de ejercicios del TrainingDay
-                    trainingDay.getExercises().add(exercise);
-
-                    // Configurar el menú de tres puntos
-                    ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
-                    menuButton.setOnClickListener(v -> {
-                        PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
-                        popupMenu.inflate(R.menu.exercise_item_menu);
-                        popupMenu.setOnMenuItemClickListener(item -> {
-                            int itemId = item.getItemId();
-                            if (itemId == R.id.action_edit) {
-                                // Lógica para editar el ejercicio
-                                Log.d(TAG, "Editar ejercicio: " + exercise.getName());
-                                return true;
-                            } else if (itemId == R.id.action_delete) {
-                                // Lógica para eliminar el ejercicio
-                                Log.d(TAG, "Eliminar ejercicio: " + exercise.getName());
-                                dayContainer.removeView(exerciseContainer);
-                                selectedExercises.remove(exercise);
-                                trainingDay.getExercises().remove(exercise); // Eliminar el ejercicio de la lista del TrainingDay
-                                return true;
-                            } else {
-                                return false;
-                            }
-                        });
-                        popupMenu.show();
-                    });
-                } else {
-                    Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
+            // Verificar si el ejercicio ya está en el contenedor específico
+            boolean exerciseAlreadyInContainer = false;
+            for (int i = 0; i < dayContainer.getChildCount(); i++) {
+                View child = dayContainer.getChildAt(i);
+                TextView exerciseNameView = child.findViewById(R.id.exerciseName);
+                if (exerciseNameView != null && exerciseNameView.getText().toString().equals(exercise.getName())) {
+                    exerciseAlreadyInContainer = true;
+                    break;
                 }
-                return; // Salir del método una vez que el ejercicio se ha añadido
-            } else {
-                Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con el patrón de movimiento: " + pattern.getName());
             }
+
+            if (!exerciseAlreadyInContainer) {
+                // Inflar el contenedor personalizado
+                LayoutInflater inflater = LayoutInflater.from(getContext());
+                View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
+
+                // Configurar el nombre del ejercicio
+                TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
+                exerciseNameView.setText(exercise.getName());
+
+                // Añadir el contenedor del ejercicio justo encima del botón "Agregar Ejercicios"
+                int addButtonIndex = dayContainer.getChildCount() - 1;
+                dayContainer.addView(exerciseContainer, addButtonIndex);
+
+                Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
+
+                // Añadir el ejercicio a la lista de ejercicios del TrainingDay
+                trainingDay.getExercises().add(exercise);
+
+                // Configurar el menú de tres puntos
+                ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
+                menuButton.setOnClickListener(v -> {
+                    PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
+                    popupMenu.inflate(R.menu.exercise_item_menu);
+                    popupMenu.setOnMenuItemClickListener(item -> {
+                        int itemId = item.getItemId();
+                        if (itemId == R.id.action_edit) {
+                            // Lógica para editar el ejercicio
+                            Log.d(TAG, "Editar ejercicio: " + exercise.getName());
+                            return true;
+                        } else if (itemId == R.id.action_delete) {
+                            // Lógica para eliminar el ejercicio
+                            Log.d(TAG, "Eliminar ejercicio: " + exercise.getName());
+                            dayContainer.removeView(exerciseContainer);
+                            selectedExercises.remove(exercise);
+                            trainingDay.getExercises().remove(exercise); // Eliminar el ejercicio de la lista del TrainingDay
+                            return true;
+                        } else {
+                            return false;
+                        }
+                    });
+                    popupMenu.show();
+                });
+            } else {
+                Log.d(TAG, "addExerciseToDayContainer: Ejercicio ya está en el contenedor del día: " + trainingDay.getDayIndex());
+            }
+        } else {
+            Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
         }
-        Log.d(TAG, "addExerciseToDayContainer: Ejercicio no coincide con ningún patrón de movimiento en ningún trainingDay");
     }
 
     public void addExerciseToSelection(Exercise exercise, TrainingDay trainingDay) {

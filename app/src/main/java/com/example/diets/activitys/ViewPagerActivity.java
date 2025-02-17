@@ -10,6 +10,7 @@ import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.adapters.ViewPagerAdapter;
 import com.example.diets.fragments.AssignLoadFragment;
 import com.example.diets.fragments.DashboardFragment;
+import com.example.diets.fragments.DashboardWorkoutFragment;
 import com.example.diets.fragments.ExerciseDetailsLoadFragment;
 import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.example.diets.fragments.MenuPopupFragment;
@@ -77,8 +78,6 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         viewPager.setCurrentItem(position);
     }
 
-
-
     public void switchToSelectExercisesFragment(Bundle data) {
         // Crea el nuevo fragmento y actualiza el adaptador
         SelectExercisesFragment fragment = new SelectExercisesFragment();
@@ -88,8 +87,15 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
-//metodo encargado de añadir los ejericicios
+    public void switchToExerciseDetailsLoadFragment(Bundle data) {
+        ExerciseDetailsLoadFragment fragment = new ExerciseDetailsLoadFragment();
+        fragment.setArguments(data);
 
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, fragment)
+                .addToBackStack(null)
+                .commit();
+    }
     @Override
     public void onExerciseSelected(Exercise exercise) {
         // Encuentra el fragmento de selección de ejercicios y actualiza la lista de ejercicios seleccionados
@@ -97,11 +103,11 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         if (adapter != null) {
             SelectExercisesFragment fragment = (SelectExercisesFragment) adapter.getFragment(0); // Suponiendo que SelectExercisesFragment está en la posición 0
             if (fragment != null) {
-//                fragment.addSelectedExercise(exercise);
+                // fragment.addSelectedExercise(exercise);
             }
         }
     }
-    // En ViewPagerActivity
+
     public void switchToExerciseDistributionFragment(Bundle data) {
         // Obtener el userId del usuario autenticado
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
@@ -128,15 +134,18 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
-    public void switchToExerciseDetailsLoadFragment(Bundle data) {
-        // Crea el nuevo fragmento y actualiza el adaptador
-        ExerciseDetailsLoadFragment fragment = new ExerciseDetailsLoadFragment();
+
+    public void switchToDashboardWorkoutFragment(Bundle data) {
+
+        DashboardWorkoutFragment fragment = new DashboardWorkoutFragment();
         fragment.setArguments(data);
 
         // Reemplazar el fragmento en la lista del adaptador
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
+
+
     @Override
     public void onExerciseClick(Exercise exercise) {
         // Implementación del método de la interfaz OnExerciseClickListener

@@ -42,7 +42,7 @@
                 android:layout_marginBottom="16dp"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
-                <EditText
+                <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/loadEditText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -60,22 +60,14 @@
                 android:textColor="#BBBBBB"
                 android:layout_marginBottom="8dp" />
 
-            <com.google.android.material.textfield.TextInputLayout
+            <Spinner
+                android:id="@+id/repsSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-                <EditText
-                    android:id="@+id/repsEditText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="Repeticiones"
-                    android:background="#2F2F2F"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#BBBBBB"
-                    android:padding="16dp" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:background="#2F2F2F"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#BBBBBB"
+                android:padding="16dp" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -84,33 +76,41 @@
                 android:textColor="#BBBBBB"
                 android:layout_marginBottom="8dp" />
 
-            <com.google.android.material.textfield.TextInputLayout
+            <Spinner
+                android:id="@+id/familiaritySpinner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-                <EditText
-                    android:id="@+id/familiarityEditText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="Familiaridad"
-                    android:background="#2F2F2F"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#BBBBBB"
-                    android:padding="16dp" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:background="#2F2F2F"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#BBBBBB"
+                android:padding="16dp" />
         </LinearLayout>
     </ScrollView>
 
-    <Button
-        android:id="@+id/backButton"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Regresar"
-        android:layout_gravity="center"
-        android:padding="16dp"
-        android:layout_marginTop="16dp"
-        android:backgroundTint="#E63946"
-        android:textColor="#FFFFFF" />
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="16dp">
+
+        <Button
+            android:id="@+id/backButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Regresar"
+            android:padding="16dp"
+            android:backgroundTint="#E63946"
+            android:textColor="#FFFFFF" />
+
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Guardar"
+            android:padding="16dp"
+            android:backgroundTint="#E63946"
+            android:textColor="#FFFFFF"
+            android:layout_marginStart="16dp" />
+    </LinearLayout>
 </LinearLayout>

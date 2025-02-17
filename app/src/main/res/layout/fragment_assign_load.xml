@@ -40,7 +40,7 @@
         android:id="@+id/saveButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Guardar Cargas"
+        android:text="Finalizar"
         android:textColor="#FFFFFF"
         android:backgroundTint="#E63946"
         android:layout_alignParentBottom="true"

@@ -15,6 +15,12 @@
         <item>Alta actividad</item>
         <item>Muy alta actividad</item>
     </string-array>
+    <string-array name="familiarity_options">
+        <item>Nunca lo hago</item>
+        <item>Poco familiar</item>
+        <item>Familiar</item>
+        <item>Lo hago todas mis sesiones</item>
+    </string-array>
     <string-array name="height_options">
         <item>150</item>
         <item>151</item>

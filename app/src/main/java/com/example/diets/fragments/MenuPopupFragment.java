@@ -20,6 +20,7 @@ import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.TrainingDay;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+
 public class MenuPopupFragment extends DialogFragment {
     public interface OnExerciseSelectedListener {
         void onExerciseSelected(Exercise exercise);
