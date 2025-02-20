@@ -1,7 +1,9 @@
 package com.example.diets.activitys;
 
 import android.os.Bundle;
+import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.viewpager2.widget.ViewPager2;
@@ -15,12 +17,18 @@ import com.example.diets.fragments.ExerciseDetailsLoadFragment;
 import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.example.diets.fragments.MenuPopupFragment;
 import com.example.diets.model.Exercise;
+import com.example.diets.model.User;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 import com.example.diets.fragments.SelectExercisesFragment;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener, MenuPopupFragment.OnExerciseSelectedListener, ExercisesAdapter.OnExerciseClickListener {
 
@@ -39,11 +47,41 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         drawerLayout = findViewById(R.id.drawer_layout);
         NavigationView navigationView = findViewById(R.id.nav_view);
 
+        // Cargar el valor de trainingFormCompleted del usuario
+        loadTrainingFormCompleted();
+    }
+
+    private void loadTrainingFormCompleted() {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser != null) {
+            String userId = currentUser.getUid();
+            DatabaseReference userRef = FirebaseDatabase.getInstance().getReference().child("users").child(userId);
+
+            userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    User user = snapshot.getValue(User.class);
+                    if (user != null) {
+                        boolean trainingFormCompleted = user.isTrainingFormCompleted();
+                        setupViewPager(trainingFormCompleted);
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Log.e("ViewPagerActivity", "Error al cargar el estado de trainingFormCompleted", error.toException());
+                }
+            });
+        }
+    }
+
+    private void setupViewPager(boolean trainingFormCompleted) {
         // Configurar ViewPager
-        adapter = new ViewPagerAdapter(this);
+        adapter = new ViewPagerAdapter(this, trainingFormCompleted);
         viewPager.setAdapter(adapter);
 
         // Configurar TabLayout
+        TabLayout tabLayout = findViewById(R.id.tabLayout);
         new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
             if (position == 0) {
                 tab.setText("Entrenamiento");
@@ -67,11 +105,14 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         });
 
         // Configurar NavigationView
+        NavigationView navigationView = findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(item -> {
             // Manejar clics en el menú
             return true;
         });
     }
+
+    // Resto del código de ViewPagerActivity...
 
     @Override
     public void onNavigationItemSelected(int position) {
@@ -87,6 +128,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
+
     public void switchToExerciseDetailsLoadFragment(Bundle data) {
         ExerciseDetailsLoadFragment fragment = new ExerciseDetailsLoadFragment();
         fragment.setArguments(data);
@@ -96,6 +138,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
                 .addToBackStack(null)
                 .commit();
     }
+
     @Override
     public void onExerciseSelected(Exercise exercise) {
         // Encuentra el fragmento de selección de ejercicios y actualiza la lista de ejercicios seleccionados
@@ -136,7 +179,6 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
     }
 
     public void switchToDashboardWorkoutFragment(Bundle data) {
-
         DashboardWorkoutFragment fragment = new DashboardWorkoutFragment();
         fragment.setArguments(data);
 
@@ -144,7 +186,6 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
-
 
     @Override
     public void onExerciseClick(Exercise exercise) {
