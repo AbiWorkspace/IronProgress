@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
+import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.adapters.TrainingDayAdapter;
 import com.example.diets.model.ExerciseDistribution;
 import com.example.diets.model.TrainingDay;
@@ -28,7 +29,6 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
 public class DashboardWorkoutFragment extends Fragment {
     private RecyclerView recyclerView;
     private TrainingDayAdapter adapter;
@@ -81,9 +81,9 @@ public class DashboardWorkoutFragment extends Fragment {
                     }
                     // Configurar el adaptador del RecyclerView
                     adapter = new TrainingDayAdapter(trainingDays, trainingDay -> {
-                        // Manejar el clic en un día de entrenamiento
+                        // Manejar el clic en un día de entrenamiento o en el botón "Empezar"
                         Log.d("DashboardWorkoutFragment", "getTrainingDaysFromUser: onDataChange: Día de entrenamiento clicado: " + trainingDay);
-                        openTrainingDayDetailFragment(trainingDay);
+                        ((ViewPagerActivity) getActivity()).switchToTrainingDayDetailFragment(trainingDay);
                     });
                     recyclerView.setAdapter(adapter);
                     Log.d("DashboardWorkoutFragment", "getTrainingDaysFromUser: onDataChange: Adapter configurado con los días de entrenamiento");
@@ -99,13 +99,5 @@ public class DashboardWorkoutFragment extends Fragment {
             Log.e("DashboardWorkoutFragment", "getTrainingDaysFromUser: Usuario no autenticado");
         }
     }
-    private void openTrainingDayDetailFragment(TrainingDay trainingDay) {
-        Log.d("DashboardWorkoutFragment", "openTrainingDayDetailFragment: Abriendo detalle del día de entrenamiento: " + trainingDay);
-        // Abrir el fragmento de detalle del día de entrenamiento
-        TrainingDayDetailFragment fragment = TrainingDayDetailFragment.newInstance(trainingDay);
-        getParentFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, fragment)
-                .addToBackStack(null)
-                .commit();
-    }
 }
+

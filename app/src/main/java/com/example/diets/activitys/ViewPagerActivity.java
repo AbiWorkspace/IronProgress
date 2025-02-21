@@ -16,7 +16,10 @@ import com.example.diets.fragments.DashboardWorkoutFragment;
 import com.example.diets.fragments.ExerciseDetailsLoadFragment;
 import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.example.diets.fragments.MenuPopupFragment;
+import com.example.diets.fragments.TrainingDayDetailFragment;
+import com.example.diets.fragments.TrainingDayDetailFragment2;
 import com.example.diets.model.Exercise;
+import com.example.diets.model.TrainingDay;
 import com.example.diets.model.User;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
@@ -185,6 +188,13 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         // Reemplazar el fragmento en la lista del adaptador
         adapter.replaceFragment(0, fragment);
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
+    }
+
+    public void switchToTrainingDayDetailFragment(TrainingDay trainingDay) {
+        TrainingDayDetailFragment2 fragment = TrainingDayDetailFragment2.newInstance(trainingDay);
+        adapter.replaceFragment(0, fragment);
+        viewPager.setAdapter(adapter);
+        viewPager.setCurrentItem(0, true); // Mantiene el ViewPager en la posición de entrenamiento
     }
 
     @Override

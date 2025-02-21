@@ -5,6 +5,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -55,11 +56,13 @@ public class TrainingDayAdapter extends RecyclerView.Adapter<TrainingDayAdapter.
     public static class ViewHolder extends RecyclerView.ViewHolder {
         private TextView dayIndexTextView;
         private LinearLayout exercisesLayout;
+        private Button startWorkoutButton;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             dayIndexTextView = itemView.findViewById(R.id.dayIndexTextView);
             exercisesLayout = itemView.findViewById(R.id.exercisesLayout);
+            startWorkoutButton = itemView.findViewById(R.id.startWorkoutButton);
             Log.d("TrainingDayAdapter", "ViewHolder: ViewHolder creado");
         }
 
@@ -83,6 +86,11 @@ public class TrainingDayAdapter extends RecyclerView.Adapter<TrainingDayAdapter.
 
             itemView.setOnClickListener(v -> {
                 Log.d("TrainingDayAdapter", "bind: Día de entrenamiento clicado: " + trainingDay);
+                listener.onItemClick(trainingDay);
+            });
+
+            startWorkoutButton.setOnClickListener(v -> {
+                Log.d("TrainingDayAdapter", "bind: Botón 'Empezar' clicado: " + trainingDay);
                 listener.onItemClick(trainingDay);
             });
         }
