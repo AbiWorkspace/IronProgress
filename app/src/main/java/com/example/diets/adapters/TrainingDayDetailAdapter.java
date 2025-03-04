@@ -14,6 +14,7 @@ import com.example.diets.R;
 import com.example.diets.model.TrainingDay;
 
 import java.util.List;
+
 public class TrainingDayDetailAdapter extends RecyclerView.Adapter<TrainingDayDetailAdapter.ViewHolder> {
     private List<TrainingDay> trainingDays;
     private OnItemClickListener listener;

@@ -143,7 +143,6 @@ public class AssignLoadFragment extends Fragment {
             }
         });
     }
-
     private UserExercise convertMapToUserExercise(Map<String, Object> map) {
         UserExercise userExercise = new UserExercise();
         userExercise.setName((String) map.get("name"));
@@ -154,27 +153,53 @@ public class AssignLoadFragment extends Fragment {
         userExercise.setImage((String) map.get("image"));
         userExercise.setDescription((String) map.get("description"));
         userExercise.setMovementType((String) map.get("movementType"));
-        userExercise.setSynergistMuscles(convertList(map.get("synergistMuscles"), Muscle.class));
+
+        // 🔹 Convertir lista de Strings a lista de Muscle
+        List<Muscle> synergistMuscles = new ArrayList<>();
+        Object rawSynergistMuscles = map.get("synergistMuscles");
+        if (rawSynergistMuscles instanceof List<?>) {
+            for (Object obj : (List<?>) rawSynergistMuscles) {
+                if (obj instanceof String) {
+                    synergistMuscles.add(new Muscle((String) obj));
+                } else if (obj instanceof Muscle) {
+                    synergistMuscles.add((Muscle) obj);
+                }
+            }
+        }
+        List<String> synergistMuscleNames = new ArrayList<>();
+        for (Muscle muscle : synergistMuscles) {
+            synergistMuscleNames.add(muscle.getName()); // Convertir Muscle a String
+        }
+        userExercise.setSynergistMuscles(synergistMuscleNames);
+
+        // 🔹 Otras conversiones sin cambios
         userExercise.setGoals(convertList(map.get("goals"), String.class));
         userExercise.setMovementPatterns(convertList(map.get("movementPatterns"), MovementPattern.class));
         userExercise.setCompleted(map.get("isCompleted") != null ? (Boolean) map.get("isCompleted") : false);
         userExercise.setMaxReps(map.get("maxReps") != null ? ((Long) map.get("maxReps")).intValue() : 0);
         userExercise.setCurrentLoad(map.get("currentLoad") != null ? ((Long) map.get("currentLoad")).intValue() : 0);
-        userExercise.setFamiliarity((String) map.get("familiarity")); // Añadir familiaridad
+        userExercise.setFamiliarity((String) map.get("familiarity"));
+
         return userExercise;
     }
 
+
     private <T> List<T> convertList(Object obj, Class<T> clazz) {
         List<T> list = new ArrayList<>();
+
         if (obj instanceof List<?>) {
             for (Object item : (List<?>) obj) {
-                if (clazz.isInstance(item)) {
+                if (clazz == Muscle.class && item instanceof String) {
+                    // Convertir String a objeto Muscle
+                    list.add(clazz.cast(new Muscle((String) item)));
+                } else if (clazz.isInstance(item)) {
                     list.add(clazz.cast(item));
                 }
             }
         }
         return list;
     }
+
 
     private void updateAllStatusButtonIcons() {
         for (int i = 0; i < containerLayout.getChildCount(); i++) {

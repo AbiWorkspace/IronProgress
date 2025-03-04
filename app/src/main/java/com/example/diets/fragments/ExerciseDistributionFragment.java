@@ -166,31 +166,33 @@ public class ExerciseDistributionFragment extends Fragment {
         titleText.setText(exerciseDistribution.getTitle());
         titleText.setTextColor(getResources().getColor(R.color.white));
         titleText.setPadding(8, 8, 8, 8);
-        titleText.setTextSize(20); // Tamaño del texto del título
+        titleText.setTextSize(20);
         titleText.setTypeface(null, Typeface.BOLD);
 
         TextView daysText = new TextView(getContext());
         daysText.setText("Número de días: " + exerciseDistribution.getNumberOfDays());
         daysText.setTextColor(getResources().getColor(R.color.white));
         daysText.setPadding(8, 8, 8, 8);
-        daysText.setTextSize(18); // Tamaño del texto de la cantidad de días
+        daysText.setTextSize(18);
         daysText.setTypeface(null, Typeface.BOLD);
 
         TextView distributionText = new TextView(getContext());
         StringBuilder distributionDetails = new StringBuilder();
         List<TrainingDay> trainingDaysList = exerciseDistribution.getTrainingDays();
+
         for (int i = 0; i < trainingDaysList.size(); i++) {
             TrainingDay day = trainingDaysList.get(i);
             distributionDetails.append("Día ").append(i + 1).append(":\n");
+
             if (day.getMovementPatterns() != null) {
                 for (MovementPattern pattern : day.getMovementPatterns()) {
                     distributionDetails.append("  - Patrón: ").append(pattern.getName()).append("\n");
                     distributionDetails.append("    Músculos: ");
+
                     if (pattern.getSynergistMuscles() != null) {
-                        for (Muscle muscle : pattern.getSynergistMuscles()) {
-                            distributionDetails.append(muscle.getName()).append(", ");
+                        for (String muscleName : pattern.getSynergistMuscles()) { // ✅ Cambio aquí
+                            distributionDetails.append(muscleName).append(", ");
                         }
-                        // Eliminar la última coma y espacio
                         if (!pattern.getSynergistMuscles().isEmpty()) {
                             distributionDetails.setLength(distributionDetails.length() - 2);
                         }
@@ -199,6 +201,7 @@ public class ExerciseDistributionFragment extends Fragment {
                 }
             }
         }
+
         distributionText.setText(distributionDetails.toString());
         distributionText.setTextColor(getResources().getColor(R.color.white));
         distributionText.setPadding(8, 8, 8, 8);
@@ -218,13 +221,13 @@ public class ExerciseDistributionFragment extends Fragment {
         ));
 
         distributionLayout.addView(radioButton);
-        radioButtons.add(radioButton); // Añadir el RadioButton a la lista
+        radioButtons.add(radioButton);
 
         radioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
                 selectedDistribution = exerciseDistribution.getTitle();
                 List<TrainingDay> tempTrainingDays = exerciseDistribution.getTrainingDays();
-                trainingDays = new ArrayList<>(tempTrainingDays); // Asignar a la variable de instancia
+                trainingDays = new ArrayList<>(tempTrainingDays);
                 for (RadioButton rb : radioButtons) {
                     if (rb != buttonView) {
                         rb.setChecked(false);
@@ -235,4 +238,5 @@ public class ExerciseDistributionFragment extends Fragment {
 
         container.addView(distributionLayout);
     }
+
 }

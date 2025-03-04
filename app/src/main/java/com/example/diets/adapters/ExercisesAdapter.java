@@ -14,6 +14,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import java.util.List;
+
 public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
     private final List<Exercise> exercises;
     private final List<String> selectedExercises;

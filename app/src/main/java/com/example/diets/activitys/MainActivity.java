@@ -124,30 +124,39 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 Log.d(TAG, "onDataChange llamado");
+
                 if (snapshot.exists()) {
                     Log.d(TAG, "Snapshot existe para el usuario: " + userId);
-                    User user = snapshot.getValue(User.class);
-                    if (user != null) {
-                        Log.d(TAG, "Datos del usuario obtenidos: " + user.toString());
 
-                        // Verificar si es administrador
-                        if (user.isAdmin()) {
-                            Log.d(TAG, "Usuario es administrador, redirigiendo al AdminActivity");
-                            startActivity(new Intent(MainActivity.this, AdminActivity.class));
-                        } else {
-                            // Verificar si es el primer inicio de sesión
-                            if (user.isFirstTime()) {
+                    // ✅ Verificar el contenido del snapshot
+                    Object rawData = snapshot.getValue();
+                    Log.d(TAG, "Datos crudos de Firebase: " + rawData.toString());
+
+                    try {
+                        // ✅ Intentar la conversión de Firebase a User
+                        User user = snapshot.getValue(User.class);
+
+                        if (user != null) {
+                            Log.d(TAG, "Datos del usuario obtenidos: " + user.toString());
+
+                            if (user.isAdmin()) {
+                                Log.d(TAG, "Usuario es administrador, redirigiendo al AdminActivity");
+                                startActivity(new Intent(MainActivity.this, AdminActivity.class));
+                            } else if (user.isFirstTime()) {
                                 Log.d(TAG, "Redirigiendo al formulario");
                                 startActivity(new Intent(MainActivity.this, UserFormActivity.class));
                             } else {
                                 Log.d(TAG, "Redirigiendo al dashboard");
                                 startActivity(new Intent(MainActivity.this, ViewPagerActivity.class));
                             }
+                            finish();
+                        } else {
+                            Log.e(TAG, "El usuario es nulo después de la conversión");
+                            Toast.makeText(MainActivity.this, "Error al obtener datos del usuario", Toast.LENGTH_SHORT).show();
                         }
-                        finish();
-                    } else {
-                        Log.d(TAG, "El usuario es nulo");
-                        Toast.makeText(MainActivity.this, "Error al obtener datos del usuario", Toast.LENGTH_SHORT).show();
+
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error al convertir los datos de Firebase a User", e);
                     }
                 } else {
                     Log.d(TAG, "El snapshot no existe para el usuario: " + userId);

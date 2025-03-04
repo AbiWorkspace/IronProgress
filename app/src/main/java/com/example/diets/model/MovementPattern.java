@@ -1,36 +1,44 @@
 package com.example.diets.model;
 
+import android.util.Log;
+import androidx.annotation.NonNull;
+import java.util.ArrayList;
+import java.util.List;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.ValueEventListener;
+import android.util.Log;
+import androidx.annotation.NonNull;
+import com.google.firebase.database.*;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-import com.example.diets.model.Muscle;
 
 public class MovementPattern implements Serializable {
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L; // 🔹 Importante para evitar problemas de serialización
 
-    private int id;
+    private String id;
     private String name;
-    private List<Muscle> synergistMuscles = new ArrayList<>(); // Inicialización de la lista
-    private List<Exercise> exercises = new ArrayList<>(); // Lista de ejercicios asociados
+    private List<String> synergistMuscles = new ArrayList<>();
+    private List<String> exerciseIds = new ArrayList<>();
 
     // Constructor sin argumentos requerido por Firebase
-    public MovementPattern() {
-    }
+    public MovementPattern() {}
 
-    // Constructor con argumentos
-    public MovementPattern(int id, String name, List<Muscle> synergistMuscles, List<Exercise> exercises) {
+    public MovementPattern(String id, String name, List<String> synergistMuscles, List<String> exerciseIds) {
         this.id = id;
         this.name = name;
-        this.synergistMuscles = synergistMuscles != null ? synergistMuscles : new ArrayList<>();
-        this.exercises = exercises != null ? exercises : new ArrayList<>();
+        this.synergistMuscles = (synergistMuscles != null) ? new ArrayList<>(synergistMuscles) : new ArrayList<>();
+        this.exerciseIds = (exerciseIds != null) ? new ArrayList<>(exerciseIds) : new ArrayList<>();
     }
 
     // Getters y Setters
-    public int getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(String id) {
         this.id = id;
     }
 
@@ -42,29 +50,64 @@ public class MovementPattern implements Serializable {
         this.name = name;
     }
 
-    public List<Muscle> getSynergistMuscles() {
+    public List<String> getSynergistMuscles() {
         return synergistMuscles;
     }
 
-    public void setSynergistMuscles(List<Muscle> synergistMuscles) {
-        this.synergistMuscles = synergistMuscles;
+    public void setSynergistMuscles(List<String> synergistMuscles) {
+        this.synergistMuscles = (synergistMuscles != null) ? new ArrayList<>(synergistMuscles) : new ArrayList<>();
     }
 
-    public List<Exercise> getExercises() {
-        return exercises;
+    public List<String> getExerciseIds() {
+        return exerciseIds;
     }
 
-    public void setExercises(List<Exercise> exercises) {
-        this.exercises = exercises;
+    public void setExerciseIds(List<String> exerciseIds) {
+        this.exerciseIds = (exerciseIds != null) ? new ArrayList<>(exerciseIds) : new ArrayList<>();
+    }
+
+    // ✅ Nueva interfaz para la carga asíncrona de ejercicios
+    public interface OnExercisesLoadedListener {
+        void onExercisesLoaded(List<Exercise> exercises);
+    }
+
+    // ✅ Método corregido para obtener ejercicios con un callback
+    public void getExercises(DatabaseReference exercisesRef, final OnExercisesLoadedListener listener) {
+        List<Exercise> exercises = new ArrayList<>();
+
+        if (exerciseIds.isEmpty()) {
+            listener.onExercisesLoaded(exercises);
+            return;
+        }
+
+        for (String exerciseId : exerciseIds) {
+            exercisesRef.child(exerciseId).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    Exercise exercise = snapshot.getValue(Exercise.class);
+                    if (exercise != null) {
+                        exercises.add(exercise);
+                    }
+                    if (exercises.size() == exerciseIds.size()) {
+                        listener.onExercisesLoaded(exercises);
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Log.e("Firebase", "Error al obtener ejercicio: " + error.getMessage());
+                }
+            });
+        }
     }
 
     @Override
     public String toString() {
         return "MovementPattern{" +
-                "id=" + id +
+                "id='" + id + '\'' +
                 ", name='" + name + '\'' +
                 ", synergistMuscles=" + synergistMuscles +
-                ", exercises=" + exercises +
+                ", exerciseIds=" + exerciseIds +
                 '}';
     }
 }

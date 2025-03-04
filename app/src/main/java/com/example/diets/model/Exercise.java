@@ -4,8 +4,13 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 public class Exercise implements Serializable {
-    private static final long serialVersionUID = 1L; // Añadido serialVersionUID
+    private static final long serialVersionUID = 1L; // Asegurar compatibilidad con Serializable
 
     private int id;
     private String name;
@@ -16,16 +21,16 @@ public class Exercise implements Serializable {
     private String image;
     private String description;
     private String movementType;
-    private List<Muscle> synergistMuscles = new ArrayList<>(); // Inicialización de la lista
+    private List<String> synergistMuscles = new ArrayList<>(); // Ahora se almacena como List<String>
     private List<String> goals = new ArrayList<>();
     private List<MovementPattern> movementPatterns = new ArrayList<>();
 
-    // Constructor sin argumentos requerido por Firebase
+    // Constructor vacío requerido por Firebase
     public Exercise() {
     }
 
     // Constructor con argumentos
-    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description, String movementType, List<Muscle> synergistMuscles, List<String> goals, List<MovementPattern> movementPatterns) {
+    public Exercise(int id, String name, String equipmentType, String exerciseType, String musclesWorked, String loadIntensity, String image, String description, String movementType, List<String> synergistMuscles, List<String> goals, List<MovementPattern> movementPatterns) {
         this.id = id;
         this.name = name;
         this.equipmentType = equipmentType;
@@ -35,12 +40,49 @@ public class Exercise implements Serializable {
         this.image = image;
         this.description = description;
         this.movementType = movementType;
-        this.synergistMuscles = synergistMuscles != null ? synergistMuscles : new ArrayList<>();
-        this.goals = goals != null ? goals : new ArrayList<>();
-        this.movementPatterns = movementPatterns != null ? movementPatterns : new ArrayList<>();
+        this.synergistMuscles = (synergistMuscles != null) ? new ArrayList<>(synergistMuscles) : new ArrayList<>();
+        this.goals = (goals != null) ? new ArrayList<>(goals) : new ArrayList<>();
+        this.movementPatterns = (movementPatterns != null) ? new ArrayList<>(movementPatterns) : new ArrayList<>();
     }
 
-    // Getters y Setters
+    // 🔹 Método para obtener los IDs de los patrones de movimiento
+    public List<String> getMovementPatternIds() {
+        List<String> movementPatternIds = new ArrayList<>();
+        for (MovementPattern pattern : movementPatterns) {
+            if (pattern != null && pattern.getId() != null) {
+                movementPatternIds.add(pattern.getId());
+            }
+        }
+        return movementPatternIds;
+    }
+
+    // ✅ Métodos para los músculos sinergistas (ahora se almacenan como String)
+    public List<String> getSynergistMuscles() {
+        return synergistMuscles;
+    }
+
+    public void setSynergistMuscles(List<String> synergistMuscles) {
+        this.synergistMuscles = (synergistMuscles != null) ? new ArrayList<>(synergistMuscles) : new ArrayList<>();
+    }
+
+    // 🔹 Método auxiliar para obtener la lista de músculos como objetos Muscle
+    public List<Muscle> getSynergistMuscleObjects() {
+        List<Muscle> muscleObjects = new ArrayList<>();
+        for (String muscleName : synergistMuscles) {
+            muscleObjects.add(new Muscle(muscleName));
+        }
+        return muscleObjects;
+    }
+
+    // 🔹 Método auxiliar para establecer los músculos sinergistas desde objetos Muscle
+    public void setSynergistMuscleObjects(List<Muscle> muscleObjects) {
+        this.synergistMuscles.clear();
+        for (Muscle muscle : muscleObjects) {
+            this.synergistMuscles.add(muscle.getName());
+        }
+    }
+
+    // Getters y Setters normales
     public int getId() {
         return id;
     }
@@ -125,14 +167,6 @@ public class Exercise implements Serializable {
         }
     }
 
-    public List<Muscle> getSynergistMuscles() {
-        return synergistMuscles;
-    }
-
-    public void setSynergistMuscles(List<Muscle> synergistMuscles) {
-        this.synergistMuscles = synergistMuscles;
-    }
-
     public List<String> getGoals() {
         return goals;
     }
@@ -170,7 +204,7 @@ public class Exercise implements Serializable {
                 ", equipmentType='" + equipmentType + '\'' +
                 ", exerciseType='" + exerciseType + '\'' +
                 ", musclesWorked='" + musclesWorked + '\'' +
-                ", loadIntensity='" + loadIntensity + '\'' +  // Corregido aquí
+                ", loadIntensity='" + loadIntensity + '\'' +
                 ", image='" + image + '\'' +
                 ", description='" + description + '\'' +
                 ", movementType='" + movementType + '\'' +

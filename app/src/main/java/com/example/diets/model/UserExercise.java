@@ -1,10 +1,22 @@
 package com.example.diets.model;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
 public class UserExercise extends Exercise {
+    private static final long serialVersionUID = 1L; // Asegura compatibilidad de serialización
+
     private boolean isCompleted;
     private int maxReps;
     private int currentLoad;
     private String familiarity; // Nuevo campo para familiaridad
+
+    // Campos específicos del usuario
+    private double weight;
+    private int reps;
+    private double rpe;
 
     // Constructor sin argumentos requerido por Firebase
     public UserExercise() {
@@ -15,6 +27,22 @@ public class UserExercise extends Exercise {
         this.familiarity = ""; // Inicializar familiaridad
     }
 
+    // ✅ Constructor corregido para manejar conversiones de listas
+    public UserExercise(Exercise exercise) {
+        super(exercise.getId(), exercise.getName(), exercise.getEquipmentType(),
+                exercise.getExerciseType(), exercise.getMusclesWorked(), exercise.getLoadIntensity(),
+                exercise.getImage(), exercise.getDescription(), exercise.getMovementType(),
+                safeConvertToList(exercise.getSynergistMuscles()), // ✅ Conversión segura
+                safeConvertToList(exercise.getGoals()), // ✅ Conversión segura
+                safeConvertToMovementPatternList(exercise.getMovementPatterns())); // ✅ Conversión segura
+
+        this.isCompleted = false;
+        this.maxReps = 0;
+        this.currentLoad = 0;
+        this.familiarity = "";
+    }
+
+    // Métodos getter y setter
     public boolean isCompleted() {
         return isCompleted;
     }
@@ -45,5 +73,92 @@ public class UserExercise extends Exercise {
 
     public void setFamiliarity(String familiarity) {
         this.familiarity = familiarity;
+    }
+
+    public double getWeight() {
+        return weight;
+    }
+
+    public void setWeight(double weight) {
+        this.weight = weight;
+    }
+
+    public int getReps() {
+        return reps;
+    }
+
+    public void setReps(int reps) {
+        this.reps = reps;
+    }
+
+    public double getRpe() {
+        return rpe;
+    }
+
+    public void setRpe(double rpe) {
+        this.rpe = rpe;
+    }
+
+    public String getExerciseName() {
+        return super.getName();
+    }
+
+    // ✅ Método corregido para convertir `List<Muscle>` a `List<String>`
+    public List<String> getSynergistMusclesAsString() {
+        return safeConvertToList(super.getSynergistMuscles());
+    }
+
+    // ✅ Sobrecarga para manejar tanto `List<Muscle>` como `List<String>`
+    public void setSynergistMuscles(List<String> synergistMuscles) {
+        super.setSynergistMuscles(safeConvertToList(synergistMuscles));
+    }
+
+    public void setSynergistMusclesFromMuscleList(List<Muscle> synergistMuscles) {
+        if (synergistMuscles != null) {
+            List<String> convertedList = new ArrayList<>();
+            for (Muscle muscle : synergistMuscles) {
+                convertedList.add(muscle.getName()); // Convierte Muscle a String
+            }
+            super.setSynergistMuscles(convertedList);
+        } else {
+            super.setSynergistMuscles(new ArrayList<>());
+        }
+    }
+
+    // ✅ Método seguro para convertir `Object` en `List<String>`
+    private static List<String> safeConvertToList(Object obj) {
+        if (obj instanceof List) {
+            List<String> stringList = new ArrayList<>();
+            for (Object item : (List<?>) obj) {
+                if (item instanceof String) {
+                    stringList.add((String) item);
+                }
+            }
+            return stringList;
+        } else if (obj instanceof String) {
+            return Arrays.asList(((String) obj).split(",\\s*")); // Convierte una string en lista separada por comas
+        }
+        return new ArrayList<>();
+    }
+
+    // ✅ Método seguro para convertir `Object` en `List<MovementPattern>`
+    private static List<MovementPattern> safeConvertToMovementPatternList(Object obj) {
+        if (obj instanceof List) {
+            List<MovementPattern> movementPatterns = new ArrayList<>();
+            for (Object item : (List<?>) obj) {
+                if (item instanceof Map) {
+                    movementPatterns.add(mapToMovementPattern((Map<String, Object>) item));
+                }
+            }
+            return movementPatterns;
+        }
+        return new ArrayList<>();
+    }
+
+    // ✅ Método para convertir `Map<String, Object>` a `MovementPattern`
+    private static MovementPattern mapToMovementPattern(Map<String, Object> dataMap) {
+        MovementPattern pattern = new MovementPattern();
+        pattern.setName((String) dataMap.getOrDefault("name", ""));
+        return pattern;
     }
 }

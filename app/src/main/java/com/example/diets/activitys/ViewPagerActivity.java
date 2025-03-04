@@ -16,8 +16,8 @@ import com.example.diets.fragments.DashboardWorkoutFragment;
 import com.example.diets.fragments.ExerciseDetailsLoadFragment;
 import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.example.diets.fragments.MenuPopupFragment;
-import com.example.diets.fragments.TrainingDayDetailFragment;
 import com.example.diets.fragments.TrainingDayDetailFragment2;
+import com.example.diets.fragments.TrainingDetailFragment;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.TrainingDay;
 import com.example.diets.model.User;
@@ -32,7 +32,6 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
 public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener, MenuPopupFragment.OnExerciseSelectedListener, ExercisesAdapter.OnExerciseClickListener {
 
     private DrawerLayout drawerLayout;
@@ -115,7 +114,14 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         });
     }
 
-    // Resto del código de ViewPagerActivity...
+    // Método para cambiar al fragmento de detalles de entrenamiento
+    public void switchToTrainingDetailFragment(Bundle data) {
+        TrainingDetailFragment fragment = new TrainingDetailFragment();
+        fragment.setArguments(data);
+        adapter.replaceFragment(0, fragment);
+        viewPager.setAdapter(adapter);
+        viewPager.setCurrentItem(0, true); // Cambiar a la posición del nuevo fragmento
+    }
 
     @Override
     public void onNavigationItemSelected(int position) {

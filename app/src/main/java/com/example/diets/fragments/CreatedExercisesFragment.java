@@ -17,16 +17,25 @@ import com.example.diets.R;
 import com.example.diets.activitys.AddExerciseDialogFragment;
 import com.example.diets.adapters.ExercisesAdapter;
 import com.example.diets.model.Exercise;
+import com.google.common.reflect.TypeToken;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.gson.Gson;
+
+import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
 public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener, ExercisesAdapter.OnExerciseClickListener, ExercisesAdapter.OnExerciseSelectionChangedListener {
     private static final String TAG = "CreatedExercisesFragment";
     private RecyclerView recyclerView;
@@ -37,6 +46,7 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     private DatabaseReference mDatabase;
     private ExercisesAdapter adapter;
 
+    private MenuPopupFragment.OnExerciseSelectedListener listener;
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -63,18 +73,17 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         // Cargar ejercicios desde el almacenamiento interno
         loadExercisesFromInternalStorage();
 
+        // ✅ 3. Modificado: Ahora usa el listener para pasar ejercicios a `MenuPopupFragment`
         doneButton.setOnClickListener(v -> {
             Log.d(TAG, "onViewCreated: Botón doneButton presionado");
-            MenuPopupFragment parentFragment = (MenuPopupFragment) getParentFragment();
-            if (parentFragment != null) {
+
+            if (listener != null) {
                 for (Exercise exercise : selectedExercises) {
-                    Log.d(TAG, "onViewCreated: Pasando ejercicio seleccionado: " + exercise.getName());
-                    parentFragment.exerciseSelected(exercise);
+                    listener.onExerciseSelected(exercise); // ✅ Envía ejercicios al `MenuPopupFragment`
                 }
-                parentFragment.dismiss();
-            } else {
-                Log.d(TAG, "onViewCreated: parentFragment es nulo");
             }
+
+            // Cierra el fragmento después de enviar los ejercicios
             getParentFragmentManager().beginTransaction().remove(this).commit();
         });
 
@@ -85,14 +94,15 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
             dialogFragment.show(getParentFragmentManager(), "AddExerciseDialogFragment");
         });
 
-        deleteExerciseButton.setOnClickListener(v -> {
-            Log.d(TAG, "onViewCreated: Botón delete_exercise_button presionado");
-            showDeleteConfirmationDialog();
-        });
-
-        Log.d(TAG, "onViewCreated: Método onViewCreated finalizado");
+        deleteExerciseButton.setOnClickListener(v -> showDeleteConfirmationDialog());
     }
 
+    public void setOnExerciseSelectedListener(MenuPopupFragment.OnExerciseSelectedListener listener) {
+        this.listener = listener;
+    }
+    public interface OnExerciseSelectedListener {
+        void onExerciseSelected(Exercise exercise);
+    }
     private void showDeleteConfirmationDialog() {
         new AlertDialog.Builder(getContext())
                 .setTitle("Eliminar Ejercicio")
@@ -105,50 +115,36 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     }
 
     private void deleteSelectedExercises() {
-        // Mostrar ejercicios antes de la eliminación
         Log.d(TAG, "deleteSelectedExercises: Ejercicios antes de la eliminación: " + exercises.toString());
         Log.d(TAG, "deleteSelectedExercises: Ejercicios seleccionados para eliminar: " + selectedExercises.toString());
 
-        // Eliminar los ejercicios seleccionados
         exercises.removeAll(selectedExercises);
         selectedExercises.clear();
 
-        // Guardar los cambios en el almacenamiento interno
         saveExercisesToInternalStorage();
 
-        // Notificar al adaptador que los datos han cambiado
         adapter.notifyDataSetChanged();
 
-        // Mostrar ejercicios después de la eliminación
         Log.d(TAG, "deleteSelectedExercises: Ejercicios después de la eliminación: " + exercises.toString());
-        Log.d(TAG, "deleteSelectedExercises: Ejercicios seleccionados después de limpiar la lista: " + selectedExercises.toString());
-
-        // Verificar que los ejercicios se han guardado correctamente
-        loadExercisesFromInternalStorage();
-        Log.d(TAG, "deleteSelectedExercises: Ejercicios después de recargar desde el almacenamiento interno: " + exercises.toString());
-
         Log.d(TAG, "deleteSelectedExercises: Ejercicios eliminados y almacenamiento interno actualizado");
     }
 
     private void saveExercisesToInternalStorage() {
         try {
             Log.d(TAG, "saveExercisesToInternalStorage: Guardando ejercicios en el almacenamiento interno");
-            FileOutputStream fos = getContext().openFileOutput(FILE_NAME, Context.MODE_PRIVATE);
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(new ArrayList<>(exercises)); // Asegurarse de escribir una nueva lista
-            oos.close();
-            fos.close();
-            Log.d(TAG, "saveExercisesToInternalStorage: Ejercicios guardados en el almacenamiento interno");
+            File file = new File(getContext().getFilesDir(), FILE_NAME);
+            FileWriter writer = new FileWriter(file);
+            Gson gson = new Gson();
 
-            // Verificar que los ejercicios se han guardado correctamente
-            FileInputStream fis = getContext().openFileInput(FILE_NAME);
-            ObjectInputStream ois = new ObjectInputStream(fis);
-            List<Exercise> loadedExercises = (List<Exercise>) ois.readObject();
-            ois.close();
-            fis.close();
-            Log.d(TAG, "saveExercisesToInternalStorage: Ejercicios cargados desde el almacenamiento interno para verificación: " + loadedExercises.toString());
-        } catch (IOException | ClassNotFoundException e) {
-            Log.e(TAG, "Error al guardar ejercicios", e);
+            // Guardamos en formato JSON correcto
+            String json = gson.toJson(exercises);
+
+            writer.write(json);
+            writer.close();
+
+            Log.d(TAG, "✅ Ejercicios guardados correctamente en JSON: " + json);
+        } catch (IOException e) {
+            Log.e(TAG, "❌ Error al guardar ejercicios", e);
         }
     }
 
@@ -166,37 +162,64 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
 
     private void loadExercisesFromInternalStorage() {
         try {
-            Log.d(TAG, "loadExercisesFromInternalStorage: Cargando ejercicios desde el almacenamiento interno");
-            FileInputStream fis = getContext().openFileInput(FILE_NAME);
-            ObjectInputStream ois = new ObjectInputStream(fis);
-            List<Exercise> loadedExercises = (List<Exercise>) ois.readObject();
-            ois.close();
-            fis.close();
-
-            exercises.clear();
-            exercises.addAll(loadedExercises);
-
-            for (Exercise exercise : exercises) {
-                Log.d(TAG, "Ejercicio cargado: " + exercise.toString());
+            File file = new File(getContext().getFilesDir(), FILE_NAME);
+            if (!file.exists()) {
+                Log.e(TAG, "❌ Archivo de ejercicios no encontrado.");
+                return;
             }
 
-            if (recyclerView != null) {
-                List<String> selectedExerciseNames = selectedExercises.stream()
-                        .map(Exercise::getName)
-                        .collect(Collectors.toList());
-                adapter = new ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
-                    addExerciseToSelection(exercise);
-                    Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
-                    showExerciseDetails(exercise); // Mostrar detalles del ejercicio
-                }, this); // Pasar 'this' como OnExerciseSelectionChangedListener
-                recyclerView.setAdapter(adapter);
-                adapter.notifyDataSetChanged();
-                Log.d(TAG, "loadExercisesFromInternalStorage: Adaptador de ejercicios configurado");
+            BufferedReader reader = new BufferedReader(new FileReader(file));
+            StringBuilder jsonBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                jsonBuilder.append(line);
+            }
+            reader.close();
+
+            String jsonData = jsonBuilder.toString();
+            Log.d(TAG, "📥 JSON leído desde almacenamiento interno: " + jsonData);
+
+            // Validar si el JSON es un array
+            if (!jsonData.trim().startsWith("[")) {
+                Log.e(TAG, "⚠ JSON inválido: Se esperaba un array pero se encontró otra estructura.");
+                return;
+            }
+
+            Gson gson = new Gson();
+            Type listType = new TypeToken<List<Exercise>>() {}.getType();
+            List<Exercise> loadedExercises = gson.fromJson(jsonData, listType);
+
+            if (loadedExercises != null) {
+                exercises.clear();
+                exercises.addAll(loadedExercises);
+                Log.d(TAG, "✅ Ejercicios cargados correctamente: " + exercises.size());
             } else {
-                Log.e(TAG, "loadExercisesFromInternalStorage: RecyclerView es nulo");
+                Log.e(TAG, "❌ Error al convertir JSON a lista de ejercicios.");
             }
-        } catch (IOException | ClassNotFoundException e) {
-            Log.e(TAG, "Error al cargar ejercicios", e);
+
+            setupRecyclerView();
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Error al cargar ejercicios desde almacenamiento interno", e);
+        }
+    }
+    private void setupRecyclerView() {
+        if (recyclerView != null) {
+            List<String> selectedExerciseNames = selectedExercises.stream()
+                    .map(Exercise::getName)
+                    .collect(Collectors.toList());
+
+            adapter = new ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
+                addExerciseToSelection(exercise);
+                Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
+                showExerciseDetails(exercise); // Mostrar detalles del ejercicio
+            }, this); // Pasar 'this' como OnExerciseSelectionChangedListener
+
+            recyclerView.setAdapter(adapter);
+            adapter.notifyDataSetChanged();
+            Log.d(TAG, "✅ Adaptador de ejercicios configurado correctamente.");
+        } else {
+            Log.e(TAG, "❌ setupRecyclerView: RecyclerView es nulo.");
         }
     }
 

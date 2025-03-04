@@ -2,7 +2,7 @@ package com.example.diets.model;
 
 import java.io.Serializable;
 
-public class Muscle implements Serializable {
+public class Muscle {
     private static final long serialVersionUID = 1L;
 
     private int id;
@@ -15,6 +15,12 @@ public class Muscle implements Serializable {
     // Constructor con argumentos
     public Muscle(int id, String name) {
         this.id = id;
+        this.name = name;
+    }
+
+    // ✅ Nuevo constructor que acepta solo el nombre (Solución al error)
+    public Muscle(String name) {
+        this.id = 0; // ID por defecto
         this.name = name;
     }
 

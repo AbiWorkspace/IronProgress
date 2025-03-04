@@ -34,11 +34,10 @@
             android:layout_toEndOf="@id/dayIndexTextView"
             android:layout_marginStart="8dp"
             android:layout_centerVertical="true"/>
-
     </RelativeLayout>
 
     <LinearLayout
-        android:id="@+id/exercisesContainer"
+        android:id="@+id/exercisesLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -55,11 +54,11 @@
             android:textStyle="bold"
             android:layout_marginBottom="8dp"/>
 
-        <LinearLayout
-            android:id="@+id/exercisesLayout"
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/exercisesRecyclerView"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"/>
+            android:scrollbars="vertical"/>
     </LinearLayout>
 
     <Button
