@@ -94,7 +94,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         for (TrainingDay trainingDay : trainingDays) {
             if (trainingDay.getExercises().isEmpty()) {
                 allContainersHaveExercises = false;
-                Log.d(TAG, "saveSelectedExercises: El contenedor del día " + trainingDay.getDayIndex() + " está vacío.");
+                Log.d(TAG, "saveSelectedExercises: ❌ El contenedor del día " + trainingDay.getDayIndex() + " está vacío.");
                 break;
             }
         }
@@ -104,64 +104,79 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             return;
         }
 
-        DatabaseReference userRef = mDatabase.child("users").child(userId); // Asegúrate de tener el userId disponible
+        DatabaseReference userRef = mDatabase.child("users").child(userId);
         DatabaseReference userExercisesRef = userRef.child("userExercises");
         DatabaseReference userMovementPatternsRef = userRef.child("userMovementPatterns");
 
-        List<UserExercise> userExercises = new ArrayList<>();
-        List<UserMovementPattern> userMovementPatterns = new ArrayList<>();
+        List<Map<String, Object>> userExercisesList = new ArrayList<>();
+        List<Map<String, Object>> userMovementPatternsList = new ArrayList<>();
 
         for (TrainingDay trainingDay : trainingDays) {
             for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
-                UserMovementPattern userMovementPattern = new UserMovementPattern(pattern);
+                Map<String, Object> userMovementPattern = new HashMap<>();
+                userMovementPattern.put("name", pattern.getName());
 
+                List<Map<String, Object>> exerciseList = new ArrayList<>();
                 for (Exercise exercise : trainingDay.getExercises()) {
-                    UserExercise userExercise = new UserExercise();
-                    userExercise.setName(exercise.getName());
-                    userExercise.setEquipmentType(exercise.getEquipmentType());
-                    userExercise.setExerciseType(exercise.getExerciseType());
-                    userExercise.setMusclesWorked(exercise.getMusclesWorked());
-                    userExercise.setLoadIntensity(exercise.getLoadIntensity());
-                    userExercise.setImage(exercise.getImage());
-                    userExercise.setDescription(exercise.getDescription());
-                    userExercise.setMovementType(exercise.getMovementType());
-                    userExercise.setSynergistMuscles(exercise.getSynergistMuscles());
-                    userExercise.setGoals(exercise.getGoals());
-                    userExercise.setMovementPatterns(exercise.getMovementPatterns());
-                    userExercises.add(userExercise);
-                    userMovementPattern.getUserExercises().add(userExercise);
+                    exerciseList.add(convertExerciseToMap(exercise)); // ✅ Conversión a Map
                 }
-                userMovementPatterns.add(userMovementPattern);
+                userMovementPattern.put("exercises", exerciseList);
+
+                userMovementPatternsList.add(userMovementPattern);
+                userExercisesList.addAll(exerciseList);
             }
         }
 
-        userExercisesRef.setValue(userExercises)
+        // ✅ Guardar ejercicios en Firebase
+        userExercisesRef.setValue(userExercisesList)
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Ejercicios seleccionados guardados exitosamente");
-                    Toast.makeText(getContext(), "Ejercicios seleccionados guardados exitosamente", Toast.LENGTH_SHORT).show();
-
-                    Bundle data = new Bundle();
-                    data.putSerializable("trainingDays", (Serializable) trainingDays);
-                    data.putString("userGoal", userGoal);
-
-                    ViewPagerActivity activity = (ViewPagerActivity) getActivity();
-                    if (activity != null) {
-                        activity.switchToAssignLoadFragment(data);
-                    }
+                    Log.d(TAG, "✅ Ejercicios seleccionados guardados exitosamente en Firebase");
+                    Toast.makeText(getContext(), "Ejercicios guardados", Toast.LENGTH_SHORT).show();
+                    goToAssignLoadFragment(); // ✅ Llamar al método correcto
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error al guardar los ejercicios seleccionados", e);
-                    Toast.makeText(getContext(), "Error al guardar los ejercicios seleccionados", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "❌ Error al guardar los ejercicios en Firebase", e);
+                    Toast.makeText(getContext(), "Error al guardar los ejercicios", Toast.LENGTH_SHORT).show();
                 });
 
-        userMovementPatternsRef.setValue(userMovementPatterns)
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Patrones de movimiento guardados exitosamente");
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error al guardar los patrones de movimiento", e);
-                });
+        // ✅ Guardar patrones de movimiento en Firebase
+        userMovementPatternsRef.setValue(userMovementPatternsList)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Patrones de movimiento guardados exitosamente"))
+                .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar patrones de movimiento", e));
     }
+
+    // ✅ Método para navegar a `AssignLoadFragment` en `ViewPagerActivity`
+    private void goToAssignLoadFragment() {
+        ViewPagerActivity activity = (ViewPagerActivity) getActivity();
+        if (activity != null) {
+            Bundle data = new Bundle();
+            data.putSerializable("trainingDays", (Serializable) trainingDays);
+            data.putString("userGoal", userGoal);
+            activity.switchToAssignLoadFragment(data); // ✅ Llamar método correctamente
+        } else {
+            Log.e(TAG, "❌ Error: No se pudo obtener ViewPagerActivity");
+        }
+    }
+
+    // ✅ Método para convertir `Exercise` a `Map<String, Object>`
+    private Map<String, Object> convertExerciseToMap(Exercise exercise) {
+        Map<String, Object> exerciseMap = new HashMap<>();
+        exerciseMap.put("name", exercise.getName());
+        exerciseMap.put("equipmentType", exercise.getEquipmentType());
+        exerciseMap.put("exerciseType", exercise.getExerciseType());
+        exerciseMap.put("musclesWorked", exercise.getMusclesWorked());
+        exerciseMap.put("loadIntensity", exercise.getLoadIntensity());
+        exerciseMap.put("image", exercise.getImage());
+        exerciseMap.put("description", exercise.getDescription());
+        exerciseMap.put("movementType", exercise.getMovementType());
+        exerciseMap.put("synergistMuscles", exercise.getSynergistMuscles());
+        exerciseMap.put("goals", exercise.getGoals());
+        exerciseMap.put("movementPatterns", exercise.getMovementPatterns());
+        return exerciseMap;
+    }
+
+
+
     private void createExerciseContainers(List<TrainingDay> trainingDays) {
         Log.d(TAG, "createExerciseContainers: Iniciando creación de contenedores");
         for (int i = 0; i < trainingDays.size(); i++) {

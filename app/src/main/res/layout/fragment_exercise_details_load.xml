@@ -68,6 +68,21 @@
                 android:textColor="#FFFFFF"
                 android:textColorHint="#BBBBBB"
                 android:padding="16dp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Series"
+                android:textColor="#BBBBBB"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/seriesSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#2F2F2F"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#BBBBBB"
+                android:padding="16dp" />
 
             <TextView
                 android:layout_width="match_parent"

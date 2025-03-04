@@ -32,6 +32,7 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
+
 public class ViewPagerActivity extends AppCompatActivity implements DashboardFragment.OnNavigationItemSelectedListener, MenuPopupFragment.OnExerciseSelectedListener, ExercisesAdapter.OnExerciseClickListener {
 
     private DrawerLayout drawerLayout;
@@ -123,6 +124,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         viewPager.setCurrentItem(0, true); // Cambiar a la posición del nuevo fragmento
     }
 
+
     @Override
     public void onNavigationItemSelected(int position) {
         viewPager.setCurrentItem(position);
@@ -146,6 +148,22 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
                 .replace(R.id.fragment_container, fragment)
                 .addToBackStack(null)
                 .commit();
+    }
+    public void switchToAssignLoadFragment(Bundle data) {
+        // Crear el nuevo fragmento y asignar los datos
+        AssignLoadFragment fragment = new AssignLoadFragment();
+        fragment.setArguments(data);
+
+        // 🔥 Asegurarse de que el adaptador no sea null
+        if (adapter != null) {
+            adapter.replaceFragment(0, fragment); // Reemplaza el fragmento en la posición correcta
+            adapter.notifyDataSetChanged(); // 🔥 Notifica que hay cambios en el adaptador
+        } else {
+            Log.e("ViewPagerActivity", "❌ Adaptador es null en switchToAssignLoadFragment");
+        }
+
+        // 🔥 Mover el `ViewPager2` a la posición del fragmento de carga de entrenamiento
+        viewPager.setCurrentItem(0, true);
     }
 
     @Override
@@ -177,15 +195,7 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
 
-    public void switchToAssignLoadFragment(Bundle data) {
-        // Crea el nuevo fragmento y actualiza el adaptador
-        AssignLoadFragment fragment = new AssignLoadFragment();
-        fragment.setArguments(data);
 
-        // Reemplazar el fragmento en la lista del adaptador
-        adapter.replaceFragment(0, fragment);
-        viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
-    }
 
     public void switchToDashboardWorkoutFragment(Bundle data) {
         DashboardWorkoutFragment fragment = new DashboardWorkoutFragment();

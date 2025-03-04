@@ -169,25 +169,10 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
             }
 
             BufferedReader reader = new BufferedReader(new FileReader(file));
-            StringBuilder jsonBuilder = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                jsonBuilder.append(line);
-            }
-            reader.close();
-
-            String jsonData = jsonBuilder.toString();
-            Log.d(TAG, "📥 JSON leído desde almacenamiento interno: " + jsonData);
-
-            // Validar si el JSON es un array
-            if (!jsonData.trim().startsWith("[")) {
-                Log.e(TAG, "⚠ JSON inválido: Se esperaba un array pero se encontró otra estructura.");
-                return;
-            }
-
             Gson gson = new Gson();
             Type listType = new TypeToken<List<Exercise>>() {}.getType();
-            List<Exercise> loadedExercises = gson.fromJson(jsonData, listType);
+            List<Exercise> loadedExercises = gson.fromJson(reader, listType);
+            reader.close();
 
             if (loadedExercises != null) {
                 exercises.clear();
@@ -198,21 +183,16 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
             }
 
             setupRecyclerView();
-
         } catch (Exception e) {
             Log.e(TAG, "❌ Error al cargar ejercicios desde almacenamiento interno", e);
         }
     }
+
     private void setupRecyclerView() {
         if (recyclerView != null) {
-            List<String> selectedExerciseNames = selectedExercises.stream()
-                    .map(Exercise::getName)
-                    .collect(Collectors.toList());
-
-            adapter = new ExercisesAdapter(exercises, selectedExerciseNames, exercise -> {
+            adapter = new ExercisesAdapter(exercises, new ArrayList<>(), exercise -> {
                 addExerciseToSelection(exercise);
                 Log.d(TAG, "onExerciseClick: Ejercicio seleccionado: " + exercise.getName());
-                showExerciseDetails(exercise); // Mostrar detalles del ejercicio
             }, this); // Pasar 'this' como OnExerciseSelectionChangedListener
 
             recyclerView.setAdapter(adapter);

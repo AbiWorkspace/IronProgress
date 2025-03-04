@@ -71,4 +71,19 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
     public int getItemCount() {
         return fragmentList.size();
     }
+    @Override
+    public long getItemId(int position) {
+        return fragmentList.get(position).hashCode(); // Genera un ID único para cada fragmento
+    }
+
+    @Override
+    public boolean containsItem(long itemId) {
+        for (Fragment fragment : fragmentList) {
+            if (fragment.hashCode() == itemId) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

@@ -30,6 +30,7 @@ import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.Muscle;
+import com.google.common.reflect.TypeToken;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -37,16 +38,22 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.gson.Gson;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class AddExerciseDialogFragment extends DialogFragment {
@@ -174,41 +181,33 @@ public class AddExerciseDialogFragment extends DialogFragment {
             dismiss();
         });
     }
-    private List<Exercise> loadExercisesFromInternalStorage() {
-        List<Exercise> exercises = new ArrayList<>();
-        try {
-            Log.d("AddExerciseDialogFragment", "loadExercisesFromInternalStorage: Cargando ejercicios desde el almacenamiento interno");
-            FileInputStream fis = getContext().openFileInput(FILE_NAME);
-            ObjectInputStream ois = new ObjectInputStream(fis);
-            exercises = (List<Exercise>) ois.readObject();
-            ois.close();
-            fis.close();
-            Log.d("AddExerciseDialogFragment", "loadExercisesFromInternalStorage: Ejercicios cargados exitosamente");
-        } catch (IOException | ClassNotFoundException e) {
-            Log.e("AddExerciseDialogFragment", "Error al cargar ejercicios", e);
-        }
-        return exercises;
-    }
+
     private void saveExerciseToInternalStorage(Exercise exercise) {
         Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: Guardando ejercicio en almacenamiento interno");
+
         try {
-            // Cargar ejercicios existentes
+            // Cargar ejercicios existentes desde JSON
             List<Exercise> exercises = loadExercisesFromInternalStorage();
 
-            // Añadir el nuevo ejercicio
+            // Añadir el nuevo ejercicio a la lista
             exercises.add(exercise);
 
-            // Guardar todos los ejercicios en un archivo JSON
-            FileOutputStream fos = getContext().openFileOutput(FILE_NAME, Context.MODE_PRIVATE);
-            ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(new ArrayList<>(exercises)); // Asegurarse de escribir una nueva lista
-            oos.close();
-            fos.close();
-            Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: Ejercicio guardado exitosamente");
+            // Guardar lista en formato JSON
+            File file = new File(getContext().getFilesDir(), FILE_NAME);
+            FileWriter writer = new FileWriter(file);
+            Gson gson = new Gson();
+            String json = gson.toJson(exercises);
+
+            writer.write(json);
+            writer.close();
+
+            Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: ✅ Ejercicio guardado correctamente.");
         } catch (IOException e) {
-            Log.e("AddExerciseDialogFragment", "Error al guardar ejercicio", e);
+            Log.e("AddExerciseDialogFragment", "❌ Error al guardar ejercicio", e);
         }
     }
+
+
     private void loadMusclesFromDatabase() {
         Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Cargando músculos desde la base de datos");
         DatabaseReference exercisesRef = FirebaseDatabase.getInstance().getReference().child("exercises");
@@ -218,30 +217,38 @@ public class AddExerciseDialogFragment extends DialogFragment {
                 musclesSet.clear();
                 if (snapshot.exists()) {
                     for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                        Exercise exercise = exerciseSnapshot.getValue(Exercise.class);
-                        if (exercise != null && exercise.getMusclesWorked() != null) {
-                            String[] musclesArray = exercise.getMusclesWorked().split(",");
+                        Object musclesData = exerciseSnapshot.child("musclesWorked").getValue();
+
+                        if (musclesData instanceof String) {
+                            String[] musclesArray = ((String) musclesData).split(",");
                             for (String muscle : musclesArray) {
                                 musclesSet.add(capitalizeFirstLetter(muscle.trim().toLowerCase()));
+                            }
+                        } else if (musclesData instanceof Map) {
+                            for (Object value : ((Map<?, ?>) musclesData).values()) {
+                                if (value instanceof String) {
+                                    musclesSet.add(capitalizeFirstLetter(((String) value).trim().toLowerCase()));
+                                }
                             }
                         }
                     }
                 }
-                // Configurar el adaptador del spinner de músculos
-                ArrayAdapter<String> musclesAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, new ArrayList<>(musclesSet));
+
+                ArrayAdapter<String> musclesAdapter = new ArrayAdapter<>(getContext(),
+                        android.R.layout.simple_spinner_item, new ArrayList<>(musclesSet));
                 musclesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 musclesWorkedSpinner.setAdapter(musclesAdapter);
-                Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Adaptador de músculos configurado con " + musclesSet.size() + " elementos");
 
-                loadMovementPatternsFromDatabase(); // Llamamos al método para cargar los patrones de movimiento después de cargar los músculos
+                Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Músculos cargados: " + musclesSet.size());
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e("AddExerciseDialogFragment", "Error al cargar músculos desde la base de datos", error.toException());
+                Log.e("AddExerciseDialogFragment", "Error al cargar músculos desde Firebase", error.toException());
             }
         });
     }
+
 
     private void loadMovementPatternsFromDatabase() {
         Log.d("AddExerciseDialogFragment", "loadMovementPatternsFromDatabase: Cargando patrones de movimiento desde la base de datos");
@@ -254,25 +261,35 @@ public class AddExerciseDialogFragment extends DialogFragment {
                     for (DataSnapshot distributionSnapshot : snapshot.getChildren()) {
                         for (DataSnapshot trainingDaySnapshot : distributionSnapshot.child("trainingDays").getChildren()) {
                             for (DataSnapshot patternSnapshot : trainingDaySnapshot.child("movementPatterns").getChildren()) {
-                                String patternName = patternSnapshot.child("name").getValue(String.class);
-                                if (patternName != null && !musclesSet.contains(capitalizeFirstLetter(patternName.trim().toLowerCase()))) {
-                                    movementPatternsSet.add(capitalizeFirstLetter(patternName.trim().toLowerCase()));
+                                Object patternData = patternSnapshot.child("name").getValue();
+
+                                if (patternData instanceof String) {
+                                    movementPatternsSet.add(capitalizeFirstLetter(((String) patternData).trim().toLowerCase()));
+                                } else if (patternData instanceof Map) {
+                                    for (Object value : ((Map<?, ?>) patternData).values()) {
+                                        if (value instanceof String) {
+                                            movementPatternsSet.add(capitalizeFirstLetter(((String) value).trim().toLowerCase()));
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                ArrayAdapter<String> patternsAdapter = new ArrayAdapter<>(getContext(), android.R.layout.simple_spinner_item, new ArrayList<>(movementPatternsSet));
+
+                ArrayAdapter<String> patternsAdapter = new ArrayAdapter<>(getContext(),
+                        android.R.layout.simple_spinner_item, new ArrayList<>(movementPatternsSet));
                 patternsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
                 movementPatternSpinner.setAdapter(patternsAdapter);
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e("AddExerciseDialogFragment", "Error al cargar patrones de movimiento desde la base de datos", error.toException());
+                Log.e("AddExerciseDialogFragment", "Error al cargar patrones de movimiento desde Firebase", error.toException());
             }
         });
     }
+
 
     private String capitalizeFirstLetter(String input) {
         if (input == null || input.isEmpty()) {
@@ -294,6 +311,34 @@ public class AddExerciseDialogFragment extends DialogFragment {
                 Log.e("AddExerciseDialogFragment", "Error al seleccionar la imagen", e);
             }
         }
+    }
+    private List<Exercise> loadExercisesFromInternalStorage() {
+        List<Exercise> exercises = new ArrayList<>();
+
+        try {
+            File file = new File(getContext().getFilesDir(), FILE_NAME);
+            if (!file.exists()) {
+                Log.e("AddExerciseDialogFragment", "❌ Archivo de ejercicios no encontrado.");
+                return exercises;
+            }
+
+            BufferedReader reader = new BufferedReader(new FileReader(file));
+            Gson gson = new Gson();
+            Type listType = new TypeToken<List<Exercise>>() {}.getType();
+
+            exercises = gson.fromJson(reader, listType);
+            reader.close();
+
+            if (exercises == null) {
+                exercises = new ArrayList<>();
+            }
+
+            Log.d("AddExerciseDialogFragment", "📥 Ejercicios cargados correctamente: " + exercises.size());
+        } catch (Exception e) {
+            Log.e("AddExerciseDialogFragment", "❌ Error al cargar ejercicios desde almacenamiento interno", e);
+        }
+
+        return exercises;
     }
 
     private String encodeImageToBase64(Bitmap bitmap) {

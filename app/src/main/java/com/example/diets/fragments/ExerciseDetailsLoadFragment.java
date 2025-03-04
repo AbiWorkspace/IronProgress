@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import androidx.fragment.app.DialogFragment;
 import androidx.lifecycle.ViewModelProvider;
+
 public class ExerciseDetailsLoadFragment extends DialogFragment {
     private static final String TAG = "ExerciseDetailsLoadFragment";
     private UserExercise userExercise;
@@ -52,74 +53,74 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         super.onViewCreated(view, savedInstanceState);
         Log.d(TAG, "ExerciseDetailsLoadFragment - onViewCreated: Vista creada para ExerciseDetailsLoadFragment");
 
-        // Inicializar el ViewModel compartido
         sharedViewModel = new ViewModelProvider(requireActivity()).get(SharedViewModel.class);
 
-        // Obtener los datos del Bundle
         Bundle data = getArguments();
         if (data != null) {
             userExercise = (UserExercise) data.getSerializable("userExercise");
-            Log.d(TAG, "ExerciseDetailsLoadFragment - onViewCreated: Datos de UserExercise recibidos - " + userExercise.toString());
+            Log.d(TAG, "Datos de UserExercise recibidos: " + userExercise.toString());
             loadExerciseDetails(view);
         }
 
-        // Configurar el botón de guardar
         Button saveButton = view.findViewById(R.id.saveButton);
         saveButton.setOnClickListener(v -> {
-            Log.d(TAG, "ExerciseDetailsLoadFragment - onViewCreated: Botón de guardar clicado");
+            Log.d(TAG, "Guardando detalles del ejercicio...");
             saveExerciseDetails();
-            dismiss(); // Cerrar el diálogo después de guardar
+            dismiss();
         });
 
-        // Configurar el botón de regresar
         Button backButton = view.findViewById(R.id.backButton);
         backButton.setOnClickListener(v -> {
-            Log.d(TAG, "ExerciseDetailsLoadFragment - onViewCreated: Botón de regresar clicado");
-            dismiss(); // Cerrar el diálogo
+            Log.d(TAG, "Regresando...");
+            dismiss();
         });
 
-        // Inicializar Firebase
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
             userId = currentUser.getUid();
             mDatabase = FirebaseDatabase.getInstance().getReference();
         } else {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - onViewCreated: Usuario no autenticado");
+            Log.e(TAG, "Usuario no autenticado");
         }
     }
 
     private void loadExerciseDetails(View view) {
-        Log.d(TAG, "ExerciseDetailsLoadFragment - loadExerciseDetails: Cargando detalles del ejercicio");
+        Log.d(TAG, "Cargando detalles del ejercicio...");
+
         TextView exerciseNameView = view.findViewById(R.id.exerciseName);
         TextInputEditText loadEditText = view.findViewById(R.id.loadEditText);
         Spinner repsSpinner = view.findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = view.findViewById(R.id.familiaritySpinner);
+        Spinner seriesSpinner = view.findViewById(R.id.seriesSpinner); // ✅ NUEVO SPINNER
 
         exerciseNameView.setText(userExercise.getName());
         loadEditText.setText(String.valueOf(userExercise.getCurrentLoad()));
 
-        // Configurar el Spinner de repeticiones
+        // Configurar Spinner de repeticiones
         ArrayAdapter<Integer> repsAdapter = new ArrayAdapter<>(getContext(),
                 android.R.layout.simple_spinner_item, getRepsOptions());
         repsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         repsSpinner.setAdapter(repsAdapter);
-        repsSpinner.setSelection(userExercise.getMaxReps()); // Ajustar según el valor de repeticiones
+        repsSpinner.setSelection(userExercise.getMaxReps());
 
-        // Configurar el Spinner de familiaridad
+        // Configurar Spinner de familiaridad
         ArrayAdapter<CharSequence> familiarityAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.familiarity_options, android.R.layout.simple_spinner_item);
         familiarityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         familiaritySpinner.setAdapter(familiarityAdapter);
+        familiaritySpinner.setSelection(userExercise.isCompleted() ? 3 : 0);
 
-        // Establecer la selección inicial basada en el estado del ejercicio
-        int familiarityPosition = userExercise.isCompleted() ? 3 : 0; // Ajusta según tus opciones
-        familiaritySpinner.setSelection(familiarityPosition);
+        // ✅ Configurar Spinner de Series
+        ArrayAdapter<Integer> seriesAdapter = new ArrayAdapter<>(getContext(),
+                android.R.layout.simple_spinner_item, getSeriesOptions());
+        seriesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        seriesSpinner.setAdapter(seriesAdapter);
+        seriesSpinner.setSelection(userExercise.getSeries() - 1); // Ajustar selección
 
-        Log.d(TAG, "ExerciseDetailsLoadFragment - loadExerciseDetails: Detalles del ejercicio cargados");
+        Log.d(TAG, "Detalles del ejercicio cargados correctamente.");
     }
 
     private List<Integer> getRepsOptions() {
-        Log.d(TAG, "ExerciseDetailsLoadFragment - getRepsOptions: Generando opciones de repeticiones del 0 al 15");
         List<Integer> options = new ArrayList<>();
         for (int i = 0; i <= 15; i++) {
             options.add(i);
@@ -127,76 +128,52 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         return options;
     }
 
-    private void saveExerciseDetails() {
-        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Guardando detalles del ejercicio");
+    // ✅ Método para obtener opciones de series (1 a 6)
+    private List<Integer> getSeriesOptions() {
+        List<Integer> options = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            options.add(i);
+        }
+        return options;
+    }
 
-        // Obtener los valores de los Spinners y EditText
+    private void saveExerciseDetails() {
+        Log.d(TAG, "Guardando detalles del ejercicio...");
+
         TextInputEditText loadEditText = getView().findViewById(R.id.loadEditText);
         Spinner repsSpinner = getView().findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = getView().findViewById(R.id.familiaritySpinner);
+        Spinner seriesSpinner = getView().findViewById(R.id.seriesSpinner); // ✅ NUEVO SPINNER
 
         int currentLoad = Integer.parseInt(loadEditText.getText().toString());
         int maxReps = repsSpinner.getSelectedItemPosition() + 1;
+        int series = seriesSpinner.getSelectedItemPosition() + 1; // ✅ Obtener series
         boolean isCompleted = familiaritySpinner.getSelectedItemPosition() == 3;
-        String familiarity = familiaritySpinner.getSelectedItem().toString(); // Obtener el valor de familiaridad
+        String familiarity = familiaritySpinner.getSelectedItem().toString();
 
-        // Actualizar el objeto UserExercise
         userExercise.setCurrentLoad(currentLoad);
         userExercise.setMaxReps(maxReps);
+        userExercise.setSeries(series); // ✅ Guardar series en `UserExercise`
         userExercise.setCompleted(isCompleted);
-        userExercise.setFamiliarity(familiarity); // Establecer familiaridad
+        userExercise.setFamiliarity(familiarity);
 
-        // Guardar en Firebase
         if (userId != null && mDatabase != null) {
             DatabaseReference exerciseRef = mDatabase.child("users").child(userId).child("userExercises").child(String.valueOf(userExercise.getId()));
 
-            // Verificar si el ejercicio ya existe
-            exerciseRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    if (snapshot.exists()) {
-                        // El ejercicio ya existe, actualizar los campos
-                        exerciseRef.child("currentLoad").setValue(currentLoad);
-                        exerciseRef.child("maxReps").setValue(maxReps);
-                        exerciseRef.child("isCompleted").setValue(isCompleted);
-                        exerciseRef.child("familiarity").setValue(familiarity)
-                                .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Detalles del ejercicio actualizados exitosamente");
-                                    // Actualizar el icono del botón de estado
-                                    if (userExercise.isCompleted()== false) {
-                                        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Estatus actualizado a: " + userExercise.isCompleted());
-                                        setIconCompleted(statusButton, userExercise);
-                                    }
-                                    // Actualizar el ViewModel compartido
-                                    sharedViewModel.selectExercise(userExercise);
-                                })
-                                .addOnFailureListener(e -> Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Error al actualizar los detalles del ejercicio", e));
-                    } else {
-                        // El ejercicio no existe, crear uno nuevo
-                        exerciseRef.setValue(userExercise)
-                                .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Detalles del ejercicio guardados exitosamente");
-                                    // Actualizar el icono del botón de estado
-                                    if (statusButton != null) {
-                                        updateStatusButtonIcon(statusButton, userExercise);
-                                    }
-                                    // Actualizar el ViewModel compartido
-                                    sharedViewModel.selectExercise(userExercise);
-                                })
-                                .addOnFailureListener(e -> Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Error al guardar los detalles del ejercicio", e));
-                    }
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Error al verificar la existencia del ejercicio", error.toException());
-                }
-            });
+            exerciseRef.child("currentLoad").setValue(currentLoad);
+            exerciseRef.child("maxReps").setValue(maxReps);
+            exerciseRef.child("series").setValue(series); // ✅ Guardar series en Firebase
+            exerciseRef.child("isCompleted").setValue(isCompleted);
+            exerciseRef.child("familiarity").setValue(familiarity)
+                    .addOnSuccessListener(aVoid -> {
+                        Log.d(TAG, "Detalles del ejercicio guardados correctamente.");
+                        sharedViewModel.selectExercise(userExercise);
+                    })
+                    .addOnFailureListener(e -> Log.e(TAG, "Error al guardar los detalles del ejercicio", e));
         } else {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Usuario no autenticado o referencia a la base de datos nula");
+            Log.e(TAG, "Error: Usuario no autenticado o referencia a Firebase nula");
         }
     }
-
 
     // Método para establecer el botón de estado desde AssignLoadFragment
     public void setStatusButton(ImageButton statusButton) {

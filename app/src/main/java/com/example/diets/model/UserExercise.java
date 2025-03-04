@@ -12,7 +12,7 @@ public class UserExercise extends Exercise {
     private int maxReps;
     private int currentLoad;
     private String familiarity; // Nuevo campo para familiaridad
-
+    private int series;
     // Campos específicos del usuario
     private double weight;
     private int reps;
@@ -40,6 +40,7 @@ public class UserExercise extends Exercise {
         this.maxReps = 0;
         this.currentLoad = 0;
         this.familiarity = "";
+        this.series = 3;
     }
 
     // Métodos getter y setter
@@ -108,22 +109,30 @@ public class UserExercise extends Exercise {
         return safeConvertToList(super.getSynergistMuscles());
     }
 
-    // ✅ Sobrecarga para manejar tanto `List<Muscle>` como `List<String>`
+    @Override
     public void setSynergistMuscles(List<String> synergistMuscles) {
-        super.setSynergistMuscles(safeConvertToList(synergistMuscles));
-    }
-
-    public void setSynergistMusclesFromMuscleList(List<Muscle> synergistMuscles) {
         if (synergistMuscles != null) {
             List<String> convertedList = new ArrayList<>();
-            for (Muscle muscle : synergistMuscles) {
-                convertedList.add(muscle.getName()); // Convierte Muscle a String
+
+            for (Object obj : synergistMuscles) {
+                if (obj instanceof String) {
+                    convertedList.add((String) obj);
+                } else if (obj instanceof Map) {
+                    // Si Firebase lo guarda como HashMap, extraemos el valor
+                    for (Object value : ((Map<?, ?>) obj).values()) {
+                        if (value instanceof String) {
+                            convertedList.add((String) value);
+                        }
+                    }
+                }
             }
+
             super.setSynergistMuscles(convertedList);
         } else {
             super.setSynergistMuscles(new ArrayList<>());
         }
     }
+
 
     // ✅ Método seguro para convertir `Object` en `List<String>`
     private static List<String> safeConvertToList(Object obj) {
@@ -160,5 +169,14 @@ public class UserExercise extends Exercise {
         MovementPattern pattern = new MovementPattern();
         pattern.setName((String) dataMap.getOrDefault("name", ""));
         return pattern;
+    }
+
+
+    public int getSeries() {
+        return series;
+    }
+
+    public void setSeries(int series) {
+        this.series = series;
     }
 }
