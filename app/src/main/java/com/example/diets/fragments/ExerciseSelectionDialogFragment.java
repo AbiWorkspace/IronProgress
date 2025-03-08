@@ -30,8 +30,10 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class ExerciseSelectionDialogFragment extends DialogFragment implements ExercisesAdapter.OnExerciseSelectionChangedListener {
@@ -90,27 +92,32 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 exercises.clear();
-                Log.d(TAG, "loadExercises: 📌 Número de ejercicios recuperados: " + snapshot.getChildrenCount());
+                Log.d(TAG, "📌 Número total de ejercicios en Firebase: " + snapshot.getChildrenCount());
 
                 if (!snapshot.exists()) {
-                    Log.e(TAG, "loadExercises: ❌ ERROR: No hay ejercicios en la base de datos.");
+                    Log.e(TAG, "❌ ERROR: No hay ejercicios en la base de datos.");
                     return;
                 }
 
                 for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
                     Object data = exerciseSnapshot.getValue();
-
                     if (data instanceof Map) {
                         Map<String, Object> dataMap = (Map<String, Object>) data;
                         Exercise exercise = mapToExercise(dataMap);
 
                         if (exercise != null) {
-                            // 🔥 Filtrar ejercicios que coincidan con los patrones de movimiento del `trainingDay`
-                            if (matchesMovementPattern(exercise, movementPatterns)) {
-                                Log.d(TAG, "loadExercises: ✅ Ejercicio ACEPTADO: " + exercise.getName());
-                                exercises.add(exercise);
-                            } else {
-                                Log.d(TAG, "loadExercises: ❌ Ejercicio DESCARTADO: " + exercise.getName());
+                            // 🔥 Evaluar el ejercicio para cada patrón de movimiento
+                            for (MovementPattern pattern : movementPatterns) {
+                                Log.d(TAG, "-----------------------------");
+                                Log.d(TAG, "🛠 Evaluando patrón de movimiento: " + pattern.getName());
+
+                                if (hasMatchingMuscles(exercise, pattern)) {
+                                    Log.d(TAG, "✅ Ejercicio ACEPTADO: " + exercise.getName() + " para el patrón " + pattern.getName());
+                                    exercises.add(exercise);
+                                    break; // Evita agregar duplicados si coincide con múltiples patrones
+                                } else {
+                                    Log.d(TAG, "❌ Ejercicio RECHAZADO: " + exercise.getName() + " para el patrón " + pattern.getName());
+                                }
                             }
                         }
                     }
@@ -121,25 +128,37 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "loadExercises: ❌ ERROR en Firebase: " + error.getMessage());
+                Log.e(TAG, "❌ ERROR en Firebase: " + error.getMessage());
             }
         });
     }
 
-    private boolean matchesMovementPattern(Exercise exercise, List<MovementPattern> movementPatterns) {
-        if (exercise.getMovementPatterns() == null || movementPatterns == null) {
+    private boolean hasMatchingMuscles(Exercise exercise, MovementPattern pattern) {
+        if (exercise.getSynergistMuscles() == null || pattern.getSynergistMuscles() == null) {
+            Log.w(TAG, "⚠ hasMatchingMuscles: Datos insuficientes para comparar.");
             return false;
         }
 
-        for (MovementPattern exercisePattern : exercise.getMovementPatterns()) {
-            for (MovementPattern trainingPattern : movementPatterns) {
-                if (exercisePattern.getName().equalsIgnoreCase(trainingPattern.getName())) {
-                    return true; // ✅ Coincidencia encontrada
-                }
+        Set<String> patternMuscles = new HashSet<>(pattern.getSynergistMuscles());
+
+        // 📌 Logs detallados de seguimiento
+        Log.d(TAG, "🔍 Evaluando patrón de movimiento: " + pattern.getName());
+        Log.d(TAG, "📌 Músculos del patrón: " + patternMuscles);
+        Log.d(TAG, "📌 Evaluando ejercicio: " + exercise.getName());
+        Log.d(TAG, "📌 Músculos trabajados en ejercicio: " + exercise.getMusclesWorked());
+        Log.d(TAG, "📌 Músculos sinérgicos del ejercicio: " + exercise.getSynergistMuscles());
+
+        for (String muscle : exercise.getSynergistMuscles()) {
+            if (patternMuscles.contains(muscle)) {
+                Log.d(TAG, "✅ Coincidencia encontrada para el músculo: " + muscle);
+                return true;
             }
         }
-        return false; // ❌ No coincide con ningún patrón de movimiento
+
+        Log.d(TAG, "❌ No se encontraron coincidencias para el ejercicio " + exercise.getName());
+        return false;
     }
+
 
     private Exercise mapToExercise(Map<String, Object> dataMap) {
         Exercise exercise = new Exercise();
@@ -152,21 +171,32 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
         exercise.setDescription((String) dataMap.getOrDefault("description", ""));
         exercise.setMovementType((String) dataMap.getOrDefault("movementType", ""));
 
-        // ✅ Conversión de listas
-        exercise.setSynergistMuscles(convertToStringList(dataMap.get("synergistMuscles")));
-        exercise.setGoals(convertToStringList(dataMap.get("goals")));
-        exercise.setMovementPatterns(convertToMovementPatternList(dataMap.get("movementPatterns")));
+        // ✅ Extraer lista de nombres de músculos correctamente
+        exercise.setSynergistMuscles(extractMuscleNames(dataMap.get("synergistMuscles")));
 
         return exercise;
     }
+    private List<String> extractMuscleNames(Object obj) {
+        List<String> muscleNames = new ArrayList<>();
 
-    // ✅ Convierte un objeto en List<String>
-    private List<String> convertToStringList(Object obj) {
         if (obj instanceof List) {
-            return (List<String>) obj;
+            List<?> muscleList = (List<?>) obj;
+            for (Object muscle : muscleList) {
+                if (muscle instanceof Map) {
+                    Map<String, Object> muscleMap = (Map<String, Object>) muscle;
+                    String muscleName = (String) muscleMap.get("name"); // ✅ Extraer el nombre del músculo
+                    if (muscleName != null) {
+                        muscleNames.add(muscleName);
+                    }
+                }
+            }
         }
-        return new ArrayList<>();
+
+        return muscleNames;
     }
+
+
+
 
     // ✅ Convierte un objeto en List<MovementPattern>
     private List<MovementPattern> convertToMovementPatternList(Object obj) {

@@ -46,19 +46,23 @@ public class MenuPopupFragment extends DialogFragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_menu_popup, container, false);
     }
-
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
         BottomNavigationView navigationView = view.findViewById(R.id.navigation);
+
+        // ✅ Obtener TrainingDay
+        Bundle args = getArguments();
+        if (args != null && args.containsKey("trainingDay")) {
+            trainingDay = (TrainingDay) args.getSerializable("trainingDay");
+            Log.d("MenuPopupFragment", "📌 TrainingDay recibido en MenuPopupFragment: " + trainingDay);
+        } else {
+            Log.e("MenuPopupFragment", "❌ ERROR: No se recibió TrainingDay.");
+        }
+
         navigationView.setOnItemSelectedListener(item -> {
             Fragment selectedFragment = null;
-            Bundle args = getArguments();
-
-            if (args != null) {
-                trainingDay = (TrainingDay) args.getSerializable("trainingDay");
-            }
 
             if (item.getItemId() == R.id.navigation_exercises) {
                 selectedFragment = new ExerciseSelectionDialogFragment();
@@ -67,11 +71,17 @@ public class MenuPopupFragment extends DialogFragment {
             }
 
             if (selectedFragment != null) {
-                if (args != null) {
-                    selectedFragment.setArguments(args);
+                Bundle fragmentArgs = new Bundle();
+                if (trainingDay != null) {
+                    fragmentArgs.putSerializable("trainingDay", trainingDay);
+                    Log.d("MenuPopupFragment", "✅ Pasando TrainingDay a " + selectedFragment.getClass().getSimpleName());
+                } else {
+                    Log.e("MenuPopupFragment", "⚠ TrainingDay es NULL al pasarlo al fragmento hijo.");
                 }
 
-                // ✅ Configurar el listener para devolver ejercicios seleccionados
+                selectedFragment.setArguments(fragmentArgs);
+
+                // ✅ NO SE TOCA EL CÓDIGO EXISTENTE, solo aseguramos el `trainingDay`
                 if (selectedFragment instanceof ExerciseSelectionDialogFragment) {
                     ((ExerciseSelectionDialogFragment) selectedFragment).setOnExercisesSelectedListener(
                             (selectedExercises, day) -> sendExercisesToParentFragment(selectedExercises, day)
@@ -93,6 +103,7 @@ public class MenuPopupFragment extends DialogFragment {
             navigationView.setSelectedItemId(R.id.navigation_exercises);
         }
     }
+
 
     public void sendExercisesToParentFragment(List<Exercise> selectedExercises, TrainingDay trainingDay) {
         FragmentManager fragmentManager = getParentFragmentManager();

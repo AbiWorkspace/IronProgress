@@ -354,11 +354,15 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
     private void showExerciseSelectionDialog(TrainingDay trainingDay, String userGoal) {
         MenuPopupFragment menuPopupFragment = new MenuPopupFragment();
 
-        // ✅ Pasar el TrainingDay al fragmento
+        if (trainingDay == null) {
+            Log.e(TAG, "❌ ERROR: TrainingDay es NULL antes de abrir MenuPopupFragment");
+        }
+
         Bundle args = new Bundle();
-        args.putSerializable("trainingDay", trainingDay);
+        args.putSerializable("trainingDay", trainingDay); // 📌 Asegurar que se pase correctamente
         args.putString("userGoal", userGoal);
         menuPopupFragment.setArguments(args);
+
 
         menuPopupFragment.show(getParentFragmentManager(), "MenuPopupFragment");
         Log.d(TAG, "showExerciseSelectionDialog: ✅ Abriendo MenuPopupFragment para seleccionar ejercicios.");
