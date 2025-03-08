@@ -115,15 +115,23 @@ public class ViewPagerActivity extends AppCompatActivity implements DashboardFra
         });
     }
 
-    // Método para cambiar al fragmento de detalles de entrenamiento
+
+
     public void switchToTrainingDetailFragment(Bundle data) {
         TrainingDetailFragment fragment = new TrainingDetailFragment();
         fragment.setArguments(data);
-        adapter.replaceFragment(0, fragment);
-        viewPager.setAdapter(adapter);
-        viewPager.setCurrentItem(0, true); // Cambiar a la posición del nuevo fragmento
-    }
 
+        // 🔥 Asegurarse de que el adaptador no sea null antes de actualizar
+        if (adapter != null) {
+            adapter.replaceFragment(0, fragment); // Reemplazar el fragmento en la posición de entrenamiento
+            adapter.notifyDataSetChanged(); // Notificar que hay cambios en el adaptador
+        } else {
+            Log.e("ViewPagerActivity", "❌ Adaptador es null en switchToTrainingDetailFragment");
+        }
+
+        // 🔥 Mover el `ViewPager2` a la posición del fragmento de entrenamiento
+        viewPager.setCurrentItem(0, true);
+    }
 
     @Override
     public void onNavigationItemSelected(int position) {

@@ -69,41 +69,99 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        Log.d(TAG, "[onViewCreated] 🔄 INICIALIZANDO SelectExercisesFragment");
+
+        // 📌 Inicializar el contenedor principal
         containerLayout = view.findViewById(R.id.containerLayout);
-        Log.d(TAG, "onViewCreated: containerLayout inicializado");
+        Log.d(TAG, "[onViewCreated] ✅ containerLayout inicializado");
+
+
+
+        // 🔥 Inicializar Firebase Database
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
-        // Obtener los datos del Bundle
+        // 📌 Obtener datos del Bundle
         Bundle data = getArguments();
         if (data != null) {
             String selectedDistribution = data.getString("selectedDistribution");
             trainingDays = (List<TrainingDay>) data.getSerializable("trainingDays");
-            userGoal = data.getString("userGoal"); // Obtener la meta del usuario
-            userId = data.getString("userId"); // Obtener el userId
+            userGoal = data.getString("userGoal");
+            userId = data.getString("userId");
+
+            Log.d(TAG, "[onViewCreated] 📌 Datos obtenidos del Bundle: userGoal=" + userGoal + ", userId=" + userId);
+
+            // 📌 Crear los contenedores de ejercicios para cada día
             createExerciseContainers(trainingDays);
+        } else {
+            Log.e(TAG, "[onViewCreated] ❌ ERROR: No se recibieron datos en el Bundle.");
         }
 
         Button saveButton = view.findViewById(R.id.saveButton);
-        saveButton.setOnClickListener(v -> {
-            Log.d(TAG, "Ejercicios seleccionados: " + selectedExercises);
-            saveSelectedExercises();
-        });
+        if (saveButton != null) {
+            saveButton.setOnClickListener(v -> {
+                Log.d(TAG, "[onViewCreated] 📌 Botón 'Guardar' presionado. Iniciando validación de ejercicios.");
+
+                // 🔍 Validar que cada día tenga al menos un ejercicio antes de guardar
+                boolean allContainersHaveExercises = true;
+
+                for (TrainingDay trainingDay : trainingDays) {
+                    if (trainingDay.getExercises().isEmpty()) { // ❌ Día sin ejercicios
+                        allContainersHaveExercises = false;
+                        Log.e(TAG, "❌ ERROR: El contenedor del día `" + trainingDay.getDayTitle() + "` está vacío.");
+                    }
+                }
+
+                if (!allContainersHaveExercises) {
+                    Toast.makeText(getContext(), "Cada día debe tener al menos un ejercicio.", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "[onViewCreated] ❌ ERROR: No se puede guardar, hay días sin ejercicios.");
+                    return; // ⛔ No continuar si hay días vacíos
+                }
+
+                Log.d(TAG, "[onViewCreated] ✅ Validación exitosa. Procediendo a guardar.");
+
+                saveSelectedExercises(); // 🔥 Guardar datos en Firebase
+
+                // ✅ Llamar a `switchToTrainingDetailFragment` en `ViewPagerActivity`
+                ViewPagerActivity activity = (ViewPagerActivity) getActivity();
+                if (activity != null) {
+                    Bundle traka = new Bundle();
+                    traka.putSerializable("trainingDays", (Serializable) trainingDays);
+                    traka.putString("userGoal", userGoal);
+                    traka.putString("userId", userId);
+                    activity.switchToDashboardWorkoutFragment(traka);
+                    Log.d(TAG, "[onViewCreated] ✅ Cambio a TrainingDetailFragment exitoso.");
+                } else {
+                    Log.e(TAG, "[onViewCreated] ❌ ERROR: No se pudo obtener ViewPagerActivity.");
+                }
+            });
+        } else {
+            Log.e(TAG, "[onViewCreated] ❌ ERROR: No se encontró el botón de guardar.");
+        }
+
+        Log.d(TAG, "[onViewCreated] ✅ MÉTODO FINALIZADO");
+
     }
+
     private void saveSelectedExercises() {
+        Log.d(TAG, "💾 Iniciando validación de contenedores de días.");
+        DatabaseReference userRef2 = FirebaseDatabase.getInstance().getReference()
+                .child("users").child(userId);
+
+        userRef2.child("trainingFormCompleted").setValue(true);
+        // 🔍 Validar que cada día tenga al menos un ejercicio
         boolean allContainersHaveExercises = true;
+
         for (TrainingDay trainingDay : trainingDays) {
-            if (trainingDay.getExercises().isEmpty()) {
+            if (trainingDay.getExercises().isEmpty()) { // ❌ Día sin ejercicios
                 allContainersHaveExercises = false;
-                Log.d(TAG, "saveSelectedExercises: ❌ El contenedor del día " + trainingDay.getDayIndex() + " está vacío.");
-                break;
+                Log.e(TAG, "❌ ERROR: El contenedor del día `" + trainingDay.getDayTitle() + "` está vacío.");
             }
         }
 
-        if (!allContainersHaveExercises) {
-            Toast.makeText(getContext(), "Cada contenedor debe tener al menos un ejercicio", Toast.LENGTH_SHORT).show();
-            return;
-        }
 
+        Log.d(TAG, "✅ Validación exitosa. Todos los días tienen al menos un ejercicio. Procediendo a guardar.");
+
+        // 🔥 Proceder a guardar en Firebase
         DatabaseReference userRef = mDatabase.child("users").child(userId);
         DatabaseReference userExercisesRef = userRef.child("userExercises");
         DatabaseReference userMovementPatternsRef = userRef.child("userMovementPatterns");
@@ -112,51 +170,67 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         List<Map<String, Object>> userMovementPatternsList = new ArrayList<>();
 
         for (TrainingDay trainingDay : trainingDays) {
-            for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
-                Map<String, Object> userMovementPattern = new HashMap<>();
-                userMovementPattern.put("name", pattern.getName());
-
-                List<Map<String, Object>> exerciseList = new ArrayList<>();
-                for (Exercise exercise : trainingDay.getExercises()) {
-                    exerciseList.add(convertExerciseToMap(exercise)); // ✅ Conversión a Map
-                }
-                userMovementPattern.put("exercises", exerciseList);
-
-                userMovementPatternsList.add(userMovementPattern);
-                userExercisesList.addAll(exerciseList);
+            if (trainingDay.getExercises().isEmpty()) {
+                Log.e(TAG, "❌ ERROR: Se detectó un día vacío durante la validación final.");
+                return; // ⛔ Bloquear el guardado si un día está vacío
             }
+
+            // 🔥 Guardar cada ejercicio con su respectivo `dayName`
+            for (UserExercise exercise : trainingDay.getExercises()) {
+                Map<String, Object> exerciseMap = convertExerciseToMap(exercise);
+                exerciseMap.put("dayName", trainingDay.getDayTitle()); // Asegurar que cada ejercicio tenga un día asignado
+                userExercisesList.add(exerciseMap);
+            }
+
+            // 🔥 Guardar la estructura de `userMovementPatterns`
+            Map<String, Object> userMovementPattern = new HashMap<>();
+            userMovementPattern.put("name", trainingDay.getDayTitle());
+
+            List<Map<String, Object>> exerciseList = new ArrayList<>();
+            for (UserExercise exercise : trainingDay.getExercises()) {
+                exerciseList.add(convertExerciseToMap(exercise));
+            }
+            userMovementPattern.put("exercises", exerciseList);
+            userMovementPatternsList.add(userMovementPattern);
         }
 
-        // ✅ Guardar ejercicios en Firebase
+        // 🔹 Guardar en Firebase los ejercicios
         userExercisesRef.setValue(userExercisesList)
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "✅ Ejercicios seleccionados guardados exitosamente en Firebase");
-                    Toast.makeText(getContext(), "Ejercicios guardados", Toast.LENGTH_SHORT).show();
-                    goToAssignLoadFragment(); // ✅ Llamar al método correcto
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "❌ Error al guardar los ejercicios en Firebase", e);
-                    Toast.makeText(getContext(), "Error al guardar los ejercicios", Toast.LENGTH_SHORT).show();
-                });
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Ejercicios guardados en Firebase"))
+                .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar ejercicios", e));
 
-        // ✅ Guardar patrones de movimiento en Firebase
+        // 🔹 Guardar los patrones de movimiento
         userMovementPatternsRef.setValue(userMovementPatternsList)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Patrones de movimiento guardados exitosamente"))
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Patrones de movimiento guardados"))
                 .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar patrones de movimiento", e));
     }
 
-    // ✅ Método para navegar a `AssignLoadFragment` en `ViewPagerActivity`
-    private void goToAssignLoadFragment() {
-        ViewPagerActivity activity = (ViewPagerActivity) getActivity();
-        if (activity != null) {
-            Bundle data = new Bundle();
-            data.putSerializable("trainingDays", (Serializable) trainingDays);
-            data.putString("userGoal", userGoal);
-            activity.switchToAssignLoadFragment(data); // ✅ Llamar método correctamente
-        } else {
-            Log.e(TAG, "❌ Error: No se pudo obtener ViewPagerActivity");
+
+    private Map<String, Object> convertExerciseToMap(Exercise exercise, String dayName) {
+        if (dayName == null || dayName.isEmpty()) {
+            Log.e(TAG, "❌ Error: Intentando guardar ejercicio '" + exercise.getName() + "' sin `dayName` válido.");
+            dayName = "Día Desconocido"; // 🔥 Fallback en caso de error
         }
+
+        Map<String, Object> exerciseMap = new HashMap<>();
+        exerciseMap.put("name", exercise.getName());
+        exerciseMap.put("equipmentType", exercise.getEquipmentType());
+        exerciseMap.put("exerciseType", exercise.getExerciseType());
+        exerciseMap.put("musclesWorked", exercise.getMusclesWorked());
+        exerciseMap.put("loadIntensity", exercise.getLoadIntensity());
+        exerciseMap.put("image", exercise.getImage());
+        exerciseMap.put("description", exercise.getDescription());
+        exerciseMap.put("movementType", exercise.getMovementType());
+        exerciseMap.put("synergistMuscles", exercise.getSynergistMuscles());
+        exerciseMap.put("goals", exercise.getGoals());
+        exerciseMap.put("movementPatterns", exercise.getMovementPatterns());
+        exerciseMap.put("dayName", dayName); // 🔥 Asegurar que siempre tenga un valor válido
+
+        return exerciseMap;
     }
+
+
+
 
     // ✅ Método para convertir `Exercise` a `Map<String, Object>`
     private Map<String, Object> convertExerciseToMap(Exercise exercise) {
@@ -292,47 +366,37 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
 
     private void loadExercises(MovementPattern pattern, TrainingDay trainingDay) {
+        Log.d(TAG, "[loadExercises] 🔄 MÉTODO INICIADO");
+
         DatabaseReference exercisesRef = mDatabase.child("exercises");
         exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 exercises.clear();
-                Log.d(TAG, "loadExercises: Número de ejercicios recuperados: " + snapshot.getChildrenCount());
+                Log.d(TAG, "[loadExercises] 📌 Número de ejercicios recuperados: " + snapshot.getChildrenCount());
 
                 for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
                     Object data = exerciseSnapshot.getValue();
 
                     if (data instanceof Map) {
-                        // Convertir el HashMap en un objeto Exercise
                         Map<String, Object> dataMap = (Map<String, Object>) data;
                         Exercise exercise = mapToExercise(dataMap);
 
                         if (exercise != null) {
-                            Log.d(TAG, "loadExercises: Ejercicio recuperado: " + exercise.getName());
+                            Log.d(TAG, "[loadExercises] ✅ Ejercicio recuperado: " + exercise.getName());
                             exercises.add(exercise);
                         }
                     } else {
-                        Log.e(TAG, "loadExercises: El tipo de datos no es un HashMap, tipo recibido: " + (data != null ? data.getClass().getSimpleName() : "null"));
+                        Log.e(TAG, "[loadExercises] ❌ ERROR: Tipo de datos inválido: " + (data != null ? data.getClass().getSimpleName() : "null"));
                     }
                 }
 
-                if (recyclerView != null) {
-                    ExercisesAdapter adapter = new ExercisesAdapter(exercises, selectedExercises.stream()
-                            .map(Exercise::getName)
-                            .collect(Collectors.toList()),
-                            exercise -> addExerciseToSelection(exercise, trainingDay),
-                            SelectExercisesFragment.this
-                    );
-                    recyclerView.setAdapter(adapter);
-                    adapter.notifyDataSetChanged();
-                } else {
-                    Log.e(TAG, "loadExercises: RecyclerView es nulo. Verifica que está bien referenciado en el XML.");
-                }
+
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.d(TAG, "loadExercises: Error de base de datos: " + error.getMessage());
+                Log.e(TAG, "[loadExercises] ❌ Error en Firebase: " + error.getMessage());
             }
         });
     }
@@ -354,120 +418,125 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
     }
 
     public void addSelectedExercise(Exercise exercise, TrainingDay trainingDay) {
+        Log.d(TAG, "[addSelectedExercise] 🔄 MÉTODO INICIADO para el ejercicio: " + exercise.getName());
+
         LinearLayout dayContainer = dayContainers.get(trainingDay);
         if (dayContainer == null) {
-            Log.e(TAG, "addSelectedExercise: ❌ dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
+            Log.e(TAG, "[addSelectedExercise] ❌ ERROR: `dayContainer` es NULL para trainingDay: " + trainingDay.getDayIndex());
             return;
         }
 
+        // Verificar si el ejercicio ya está en el contenedor
         for (int i = 0; i < dayContainer.getChildCount(); i++) {
             View child = dayContainer.getChildAt(i);
             TextView exerciseNameView = child.findViewById(R.id.exerciseName);
             if (exerciseNameView != null && exerciseNameView.getText().toString().equals(exercise.getName())) {
-                Log.d(TAG, "addSelectedExercise: ⚠ Ejercicio ya está en el contenedor del día " + trainingDay.getDayIndex());
+                Log.w(TAG, "[addSelectedExercise] ⚠ ADVERTENCIA: El ejercicio `" + exercise.getName() + "` ya está en el contenedor del día " + trainingDay.getDayIndex());
                 return;
             }
         }
 
+        // ✅ Agregar el ejercicio al contenedor
+        addExerciseToDayContainer(exercise, trainingDay);
+
+        Log.d(TAG, "[addSelectedExercise] ✅ MÉTODO FINALIZADO");
+    }
+
+    private void addExerciseToDayContainer(Exercise exercise, TrainingDay trainingDay) {
+        Log.d(TAG, "[addExerciseToDayContainer] 🔄 MÉTODO INICIADO para: " + exercise.getName());
+
+        LinearLayout dayContainer = dayContainers.get(trainingDay);
+        if (dayContainer == null) {
+            Log.e(TAG, "[addExerciseToDayContainer] ❌ ERROR: No se encontró `dayContainer` para el día " + trainingDay.getDayIndex());
+            return;
+        }
+
+        // Inflar el layout del ejercicio
         LayoutInflater inflater = LayoutInflater.from(getContext());
         View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
+
+        if (exerciseContainer == null) {
+            Log.e(TAG, "[addExerciseToDayContainer] ❌ ERROR: `exerciseContainer` es NULL después de inflar.");
+            return;
+        }
+
+        // Configurar el nombre del ejercicio
         TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
+        if (exerciseNameView == null) {
+            Log.e(TAG, "[addExerciseToDayContainer] ❌ ERROR: `exerciseNameView` es NULL.");
+            return;
+        }
         exerciseNameView.setText(exercise.getName());
 
+        // ✅ Agregar el ejercicio al objeto `trainingDay`
         UserExercise userExercise = new UserExercise(exercise);
         trainingDay.getExercises().add(userExercise);
 
+        // 🔥 Agregar el contenedor visualmente en la posición correcta
         int addButtonIndex = dayContainer.getChildCount() - 1;
         dayContainer.addView(exerciseContainer, addButtonIndex);
 
+        // 🚀 Actualizar la UI
         dayContainer.post(() -> {
             dayContainer.invalidate();
             dayContainer.requestLayout();
         });
 
-        Log.d(TAG, "addSelectedExercise: ✅ Ejercicio añadido visualmente al día " + trainingDay.getDayIndex());
+        // ✅ Configurar el menú de tres puntos (PopupMenu)
+        configurePopupMenu(exerciseContainer, exercise, trainingDay, dayContainer);
+
+        Log.d(TAG, "[addExerciseToDayContainer] ✅ Ejercicio agregado visualmente al día " + trainingDay.getDayIndex());
     }
 
+    private void configurePopupMenu(View exerciseContainer, Exercise exercise, TrainingDay trainingDay, LinearLayout dayContainer) {
+        ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
+        if (menuButton == null) {
+            Log.e(TAG, "[configurePopupMenu] ❌ ERROR: `menuButton` es NULL. Verifica el ID en el XML.");
+            return;
+        }
 
-    private void addExerciseToDayContainer(Exercise exercise, TrainingDay trainingDay) {
-        Log.d(TAG, "addExerciseToDayContainer: Iniciando proceso para añadir ejercicio al contenedor del día");
+        Log.d(TAG, "[configurePopupMenu] ✅ `menuButton` encontrado y configurado.");
 
-        // Obtener el contenedor específico del día
-        LinearLayout dayContainer = dayContainers.get(trainingDay);
-        if (dayContainer != null) {
-            Log.d(TAG, "addExerciseToDayContainer: dayContainer encontrado para trainingDay: " + trainingDay.getDayIndex());
+        menuButton.setClickable(true);
+        menuButton.setFocusable(true);
 
-            // Verificar si el ejercicio ya está en el contenedor específico
-            boolean exerciseAlreadyInContainer = false;
-            for (int i = 0; i < dayContainer.getChildCount(); i++) {
-                View child = dayContainer.getChildAt(i);
-                TextView exerciseNameView = child.findViewById(R.id.exerciseName);
-                if (exerciseNameView != null && exerciseNameView.getText().toString().equals(exercise.getName())) {
-                    exerciseAlreadyInContainer = true;
-                    break;
-                }
-            }
+        menuButton.setOnClickListener(v -> {
+            Log.d(TAG, "[configurePopupMenu] 📌 `menuButton` clickeado para `" + exercise.getName() + "`. Abriendo PopupMenu...");
 
-            if (!exerciseAlreadyInContainer) {
-                // Inflar el contenedor personalizado
-                LayoutInflater inflater = LayoutInflater.from(getContext());
-                View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
+            PopupMenu popupMenu = new PopupMenu(requireContext(), menuButton);
+            popupMenu.inflate(R.menu.exercise_item_menu);
 
-                // Configurar el nombre del ejercicio
-                TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
-                exerciseNameView.setText(exercise.getName());
+            popupMenu.setOnMenuItemClickListener(item -> {
+                int itemId = item.getItemId();
 
-                // Añadir el contenedor del ejercicio justo encima del botón "Agregar Ejercicios"
-                int addButtonIndex = dayContainer.getChildCount() - 1;
-                dayContainer.addView(exerciseContainer, addButtonIndex);
+                if (itemId == R.id.action_edit) {
+                    Log.d(TAG, "[configurePopupMenu] ✏ Editar ejercicio seleccionado: " + exercise.getName());
+                    return true;
+                } else if (itemId == R.id.action_delete) {
+                    Log.d(TAG, "[configurePopupMenu] 🗑 Eliminando ejercicio: " + exercise.getName());
 
-                Log.d(TAG, "addExerciseToDayContainer: Ejercicio añadido al contenedor del día: " + trainingDay.getDayIndex());
 
-                // ✅ Convertir Exercise a UserExercise antes de añadirlo a trainingDay
-                UserExercise userExercise = new UserExercise(exercise);
-                trainingDay.getExercises().add(userExercise);
+                    // 🔥 Remover visualmente el ejercicio del contenedor
+                    dayContainer.removeView(exerciseContainer);
+                    trainingDay.getExercises().removeIf(ex -> ex.getName().equals(exercise.getName()));
+                    Log.d(TAG, "[configurePopupMenu] ✅ Ejercicio eliminado correctamente.");
 
-                // Configurar el menú de tres puntos
-                ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
-                menuButton.setOnClickListener(v -> {
-                    PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
-                    popupMenu.inflate(R.menu.exercise_item_menu);
-                    popupMenu.setOnMenuItemClickListener(item -> {
-                        int itemId = item.getItemId();
-                        if (itemId == R.id.action_edit) {
-                            // Lógica para editar el ejercicio
-                            Log.d(TAG, "Editar ejercicio: " + exercise.getName());
-                            return true;
-                        } else if (itemId == R.id.action_delete) {
-                            // Lógica para eliminar el ejercicio
-                            Log.d(TAG, "Eliminar ejercicio: " + exercise.getName());
-                            dayContainer.removeView(exerciseContainer);
-                            selectedExercises.remove(exercise);
-                            trainingDay.getExercises().remove(userExercise); // ✅ Usar userExercise
-                            return true;
-                        } else {
-                            return false;
-                        }
+                    // 🔥 Refrescar la UI
+                    dayContainer.post(() -> {
+                        dayContainer.invalidate();
+                        dayContainer.requestLayout();
                     });
-                    popupMenu.show();
-                });
-            } else {
-                Log.d(TAG, "addExerciseToDayContainer: Ejercicio ya está en el contenedor del día: " + trainingDay.getDayIndex());
-            }
-        } else {
-            Log.d(TAG, "addExerciseToDayContainer: dayContainer es nulo para trainingDay: " + trainingDay.getDayIndex());
-        }
+
+                    Toast.makeText(getContext(), "✅ Ejercicio eliminado", Toast.LENGTH_SHORT).show();
+                    return true;
+                }
+                return false;
+            });
+
+            popupMenu.show();
+        });
     }
 
-    public void addExerciseToSelection(Exercise exercise, TrainingDay trainingDay) {
-        if (!selectedExercises.contains(exercise)) {
-            selectedExercises.add(exercise);
-            Log.d(TAG, "addExerciseToSelection: Ejercicio añadido: " + exercise.getName());
-            addExerciseToDayContainer(exercise, trainingDay);
-        } else {
-            Log.d(TAG, "addExerciseToSelection: Ejercicio ya estaba en la lista: " + exercise.getName());
-        }
-    }
     private Exercise mapToExercise(Map<String, Object> dataMap) {
         Exercise exercise = new Exercise();
         exercise.setName((String) dataMap.getOrDefault("name", ""));
@@ -519,5 +588,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
     public interface OnExercisesSelectedListener {
         void onExercisesSelected(List<Exercise> selectedExercises, TrainingDay trainingDay);
     }
+
 
 }

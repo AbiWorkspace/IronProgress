@@ -90,10 +90,10 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 exercises.clear();
-                Log.d(TAG, "loadExercises: Número de ejercicios recuperados: " + snapshot.getChildrenCount());
+                Log.d(TAG, "loadExercises: 📌 Número de ejercicios recuperados: " + snapshot.getChildrenCount());
 
                 if (!snapshot.exists()) {
-                    Log.e(TAG, "loadExercises: No hay ejercicios en la base de datos.");
+                    Log.e(TAG, "loadExercises: ❌ ERROR: No hay ejercicios en la base de datos.");
                     return;
                 }
 
@@ -101,16 +101,18 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
                     Object data = exerciseSnapshot.getValue();
 
                     if (data instanceof Map) {
-                        // Convertimos el HashMap en un objeto Exercise
                         Map<String, Object> dataMap = (Map<String, Object>) data;
                         Exercise exercise = mapToExercise(dataMap);
 
                         if (exercise != null) {
-                            Log.d(TAG, "loadExercises: ✅ Ejercicio recuperado: " + exercise.getName());
-                            exercises.add(exercise);
+                            // 🔥 Filtrar ejercicios que coincidan con los patrones de movimiento del `trainingDay`
+                            if (matchesMovementPattern(exercise, movementPatterns)) {
+                                Log.d(TAG, "loadExercises: ✅ Ejercicio ACEPTADO: " + exercise.getName());
+                                exercises.add(exercise);
+                            } else {
+                                Log.d(TAG, "loadExercises: ❌ Ejercicio DESCARTADO: " + exercise.getName());
+                            }
                         }
-                    } else {
-                        Log.e(TAG, "loadExercises: ❌ Tipo de datos incorrecto: " + (data != null ? data.getClass().getSimpleName() : "null"));
                     }
                 }
 
@@ -119,9 +121,24 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "loadExercises: Error de base de datos: " + error.getMessage());
+                Log.e(TAG, "loadExercises: ❌ ERROR en Firebase: " + error.getMessage());
             }
         });
+    }
+
+    private boolean matchesMovementPattern(Exercise exercise, List<MovementPattern> movementPatterns) {
+        if (exercise.getMovementPatterns() == null || movementPatterns == null) {
+            return false;
+        }
+
+        for (MovementPattern exercisePattern : exercise.getMovementPatterns()) {
+            for (MovementPattern trainingPattern : movementPatterns) {
+                if (exercisePattern.getName().equalsIgnoreCase(trainingPattern.getName())) {
+                    return true; // ✅ Coincidencia encontrada
+                }
+            }
+        }
+        return false; // ❌ No coincide con ningún patrón de movimiento
     }
 
     private Exercise mapToExercise(Map<String, Object> dataMap) {

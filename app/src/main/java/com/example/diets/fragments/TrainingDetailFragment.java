@@ -17,7 +17,6 @@ import com.example.diets.model.UserExercise;
 
 import java.util.ArrayList;
 import java.util.List;
-
 public class TrainingDetailFragment extends Fragment {
     private RecyclerView recyclerView;
     private TrainingDetailAdapter adapter;
@@ -35,7 +34,7 @@ public class TrainingDetailFragment extends Fragment {
             exercises = (List<UserExercise>) getArguments().getSerializable("exercises");
         }
 
-        // Asegurarse de que la lista de ejercicios no sea nula
+        // Asegurar que la lista de ejercicios no sea nula
         if (exercises == null) {
             exercises = new ArrayList<>();
         }

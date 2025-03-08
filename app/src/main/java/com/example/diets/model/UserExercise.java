@@ -1,11 +1,15 @@
 package com.example.diets.model;
 
+import com.google.firebase.database.Exclude;
+import com.google.firebase.database.PropertyName;
+
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-public class UserExercise extends Exercise {
+public class UserExercise extends Exercise implements Serializable {
     private static final long serialVersionUID = 1L; // Asegura compatibilidad de serialización
 
     private boolean isCompleted;
@@ -17,6 +21,8 @@ public class UserExercise extends Exercise {
     private double weight;
     private int reps;
     private double rpe;
+    @PropertyName("name")  // 🔥 Asegura que Firebase lo mapea correctamente
+    private String exerciseName;
 
     // Constructor sin argumentos requerido por Firebase
     public UserExercise() {
@@ -25,6 +31,7 @@ public class UserExercise extends Exercise {
         this.maxReps = 0;
         this.currentLoad = 0;
         this.familiarity = ""; // Inicializar familiaridad
+        this.exerciseName = "";
     }
 
     // ✅ Constructor corregido para manejar conversiones de listas
@@ -51,7 +58,14 @@ public class UserExercise extends Exercise {
     public void setCompleted(boolean completed) {
         isCompleted = completed;
     }
+    @Exclude  // 🔥 Evita duplicación con "name" en Firebase
+    public String getExerciseName() {
+        return super.getName();
+    }
 
+    public void setExerciseName(String exerciseName) {
+        super.setName(exerciseName);
+    }
     public int getMaxReps() {
         return maxReps;
     }
@@ -100,9 +114,6 @@ public class UserExercise extends Exercise {
         this.rpe = rpe;
     }
 
-    public String getExerciseName() {
-        return super.getName();
-    }
 
     // ✅ Método corregido para convertir `List<Muscle>` a `List<String>`
     public List<String> getSynergistMusclesAsString() {
@@ -179,4 +190,30 @@ public class UserExercise extends Exercise {
     public void setSeries(int series) {
         this.series = series;
     }
+    @Override
+    public String toString() {
+        return "UserExercise{" +
+                "id='" + getId() + '\'' +
+                ", name='" + getName() + '\'' +
+                ", equipmentType='" + getEquipmentType() + '\'' +
+                ", exerciseType='" + getExerciseType() + '\'' +
+                ", musclesWorked='" + getMusclesWorked() + '\'' +
+                ", loadIntensity='" + getLoadIntensity() + '\'' +
+                ", image='" + getImage() + '\'' +
+                ", description='" + getDescription() + '\'' +
+                ", movementType='" + getMovementType() + '\'' +
+                ", isCompleted=" + isCompleted +
+                ", maxReps=" + maxReps +
+                ", currentLoad=" + currentLoad +
+                ", familiarity='" + familiarity + '\'' +
+                ", series=" + series +
+                ", weight=" + weight +
+                ", reps=" + reps +
+                ", rpe=" + rpe +
+                ", synergistMuscles=" + getSynergistMusclesAsString() +
+                ", goals=" + getGoals() +
+                ", movementPatterns=" + getMovementPatterns() +
+                '}';
+    }
+
 }
