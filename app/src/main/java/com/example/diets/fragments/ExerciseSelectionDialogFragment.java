@@ -134,21 +134,30 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
     }
 
     private boolean hasMatchingMuscles(Exercise exercise, MovementPattern pattern) {
-        if (exercise.getSynergistMuscles() == null || pattern.getSynergistMuscles() == null) {
+        if ((exercise.getSynergistMuscles() == null || exercise.getSynergistMuscles().isEmpty()) &&
+                (exercise.getMusclesWorked() == null || exercise.getMusclesWorked().isEmpty()) ||
+                pattern.getSynergistMuscles() == null || pattern.getSynergistMuscles().isEmpty()) {
             Log.w(TAG, "⚠ hasMatchingMuscles: Datos insuficientes para comparar.");
             return false;
         }
 
-        Set<String> patternMuscles = new HashSet<>(pattern.getSynergistMuscles());
+        // 🔥 Normaliza todos los músculos en sets
+        Set<String> patternMuscles = new HashSet<>();
+        for (String muscle : pattern.getSynergistMuscles()) {
+            patternMuscles.add(normalizeMuscleName(muscle));
+        }
 
-        // 📌 Logs detallados de seguimiento
-        Log.d(TAG, "🔍 Evaluando patrón de movimiento: " + pattern.getName());
-        Log.d(TAG, "📌 Músculos del patrón: " + patternMuscles);
-        Log.d(TAG, "📌 Evaluando ejercicio: " + exercise.getName());
-        Log.d(TAG, "📌 Músculos trabajados en ejercicio: " + exercise.getMusclesWorked());
-        Log.d(TAG, "📌 Músculos sinérgicos del ejercicio: " + exercise.getSynergistMuscles());
+        Set<String> exerciseMuscles = new HashSet<>();
+        exerciseMuscles.addAll(exercise.getSynergistMuscles()); // Músculos sinérgicos
+        exerciseMuscles.addAll(extractMuscleList(String.join(",", exercise.getMusclesWorked()))); // Músculos trabajados
 
-        for (String muscle : exercise.getSynergistMuscles()) {
+        // 📌 Logs detallados para depuración
+        Log.d(TAG, "🔍 Evaluando ejercicio: " + exercise.getName());
+        Log.d(TAG, "📌 Músculos del patrón (normalizados): " + patternMuscles);
+        Log.d(TAG, "📌 Todos los músculos del ejercicio (normalizados): " + exerciseMuscles);
+
+        // 🔄 Verificar coincidencias en los músculos normalizados
+        for (String muscle : exerciseMuscles) {
             if (patternMuscles.contains(muscle)) {
                 Log.d(TAG, "✅ Coincidencia encontrada para el músculo: " + muscle);
                 return true;
@@ -160,22 +169,37 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
     }
 
 
+
+
+
+
     private Exercise mapToExercise(Map<String, Object> dataMap) {
         Exercise exercise = new Exercise();
         exercise.setName((String) dataMap.getOrDefault("name", ""));
         exercise.setEquipmentType((String) dataMap.getOrDefault("equipmentType", ""));
         exercise.setExerciseType((String) dataMap.getOrDefault("exerciseType", ""));
-        exercise.setMusclesWorked((String) dataMap.getOrDefault("musclesWorked", ""));
         exercise.setLoadIntensity((String) dataMap.getOrDefault("loadIntensity", ""));
         exercise.setImage((String) dataMap.getOrDefault("image", ""));
         exercise.setDescription((String) dataMap.getOrDefault("description", ""));
         exercise.setMovementType((String) dataMap.getOrDefault("movementType", ""));
 
-        // ✅ Extraer lista de nombres de músculos correctamente
+        // ✅ Convertimos "Espalda, Bíceps" en ["Espalda", "Bíceps"]
+        Object musclesWorkedData = dataMap.get("musclesWorked");
+        if (musclesWorkedData instanceof String) {
+            List<String> muscleList = extractMuscleList((String) musclesWorkedData);
+            exercise.setMusclesWorked(String.join(", ", muscleList)); // 🔥 Convierte la lista en String
+        } else {
+            exercise.setMusclesWorked(""); // Si es nulo, lo dejamos vacío
+        }
+
+        // ✅ Extraer músculos sinérgicos correctamente
         exercise.setSynergistMuscles(extractMuscleNames(dataMap.get("synergistMuscles")));
 
         return exercise;
     }
+
+
+
     private List<String> extractMuscleNames(Object obj) {
         List<String> muscleNames = new ArrayList<>();
 
@@ -195,7 +219,17 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
         return muscleNames;
     }
 
-
+    private List<String> extractMuscleList(String musclesWorked) {
+        List<String> muscleList = new ArrayList<>();
+        if (musclesWorked != null && !musclesWorked.isEmpty()) {
+            // 🔥 Divide la cadena por comas y limpia los espacios en blanco
+            String[] splitMuscles = musclesWorked.split(",");
+            for (String muscle : splitMuscles) {
+                muscleList.add(normalizeMuscleName(muscle.trim())); // 🔥 Normaliza nombres
+            }
+        }
+        return muscleList;
+    }
 
 
     // ✅ Convierte un objeto en List<MovementPattern>
@@ -217,6 +251,16 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
         MovementPattern pattern = new MovementPattern();
         pattern.setName((String) dataMap.getOrDefault("name", ""));
         return pattern;
+    }
+    private String normalizeMuscleName(String input) {
+        if (input == null) return "";
+        return input.trim().toLowerCase()
+                .replaceAll("[áÁ]", "a")
+                .replaceAll("[éÉ]", "e")
+                .replaceAll("[íÍ]", "i")
+                .replaceAll("[óÓ]", "o")
+                .replaceAll("[úÚüÜ]", "u")
+                .replaceAll("[^a-zñ]", ""); // Elimina caracteres no alfabéticos, espacios y símbolos raros
     }
 
     private void setupRecyclerView() {
