@@ -13,8 +13,8 @@ import com.example.diets.R;
 import com.example.diets.model.TrainingDay;
 import com.example.diets.model.UserExercise;
 
+import java.util.ArrayList;
 import java.util.List;
-
 public class TrainingDayAdapter extends RecyclerView.Adapter<TrainingDayAdapter.ViewHolder> {
     private List<TrainingDay> trainingDays;
     private OnItemClickListener listener;
@@ -64,25 +64,36 @@ public class TrainingDayAdapter extends RecyclerView.Adapter<TrainingDayAdapter.
         public void bind(final TrainingDay trainingDay, final OnItemClickListener listener) {
             Log.d(TAG, "📅 Vinculando datos de: " + trainingDay.getDayTitle());
 
-            // Verificar que hay ejercicios antes de intentar mostrarlos
+            // 🔹 Asegurar que la lista de ejercicios no sea NULL
             if (trainingDay.getExercises() == null) {
-                Log.e(TAG, "⚠️ La lista de ejercicios es NULL para " + trainingDay.getDayTitle());
-            } else {
-                Log.d(TAG, "✅ Se han cargado " + trainingDay.getExercises().size() + " ejercicios.");
-                for (UserExercise exercise : trainingDay.getExercises()) {
-                    Log.d(TAG, "🏋️‍♂️ Ejercicio: " + exercise.getName());
-                }
+                Log.w(TAG, "⚠️ La lista de ejercicios es NULL. Se inicializa vacía.");
+                trainingDay.setExercises(new ArrayList<>());
             }
 
-            dayIndexTextView.setText(trainingDay.getDayTitle());
+            Log.d(TAG, "✅ Total ejercicios: " + trainingDay.getExercises().size());
+            for (UserExercise exercise : trainingDay.getExercises()) {
+                Log.d(TAG, "🏋️‍♂️ Ejercicio: " + exercise.getName());
+            }
 
-            // Configurar RecyclerView interno para los ejercicios
+            // 🔥 Mostrar el título correcto del día
+            String originalTitle = trainingDay.getDayTitle();
+            if (originalTitle == null || originalTitle.isEmpty()) {
+                originalTitle = "Día " + trainingDay.getDayIndex();
+            }
+
+            dayIndexTextView.setText(originalTitle);
+            dayTitleTextView.setText(trainingDay.getDayTitle());
+
+            // 🔥 Configurar el RecyclerView interno con diseño HORIZONTAL para ejercicios
+            exercisesRecyclerView.setLayoutManager(new LinearLayoutManager(itemView.getContext(), LinearLayoutManager.HORIZONTAL, false));
+
+            // Asegurar que los ejercicios tengan un adaptador y actualizarlo
             ExerciseListAdapter exerciseAdapter = new ExerciseListAdapter(trainingDay.getExercises());
-            exercisesRecyclerView.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             exercisesRecyclerView.setAdapter(exerciseAdapter);
+            exerciseAdapter.notifyDataSetChanged();
 
+            // Acción al hacer clic en el botón
             startWorkoutButton.setOnClickListener(v -> listener.onItemClick(trainingDay));
         }
-
     }
 }

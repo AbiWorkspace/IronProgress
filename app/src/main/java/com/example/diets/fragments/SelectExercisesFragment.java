@@ -141,69 +141,72 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         Log.d(TAG, "[onViewCreated] ✅ MÉTODO FINALIZADO");
 
     }
-
     private void saveSelectedExercises() {
-        Log.d(TAG, "💾 Iniciando validación de contenedores de días.");
-        DatabaseReference userRef2 = FirebaseDatabase.getInstance().getReference()
+        Log.d(TAG, "💾 Iniciando validación y guardado en Firebase.");
+
+        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference()
                 .child("users").child(userId);
 
-        userRef2.child("trainingFormCompleted").setValue(true);
-        // 🔍 Validar que cada día tenga al menos un ejercicio
-        boolean allContainersHaveExercises = true;
+        userRef.child("trainingFormCompleted").setValue(true);
 
+        // 🔥 VALIDACIÓN: No permitir días vacíos
+        boolean allContainersHaveExercises = true;
         for (TrainingDay trainingDay : trainingDays) {
-            if (trainingDay.getExercises().isEmpty()) { // ❌ Día sin ejercicios
+            if (trainingDay.getExercises().isEmpty()) {
                 allContainersHaveExercises = false;
-                Log.e(TAG, "❌ ERROR: El contenedor del día `" + trainingDay.getDayTitle() + "` está vacío.");
+                Log.e(TAG, "❌ ERROR: El día `" + trainingDay.getDayTitle() + "` está vacío.");
             }
         }
 
+        if (!allContainersHaveExercises) {
+            Toast.makeText(getContext(), "Cada día debe tener al menos un ejercicio.", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "❌ ERROR: No se puede guardar, hay días sin ejercicios.");
+            return;
+        }
 
-        Log.d(TAG, "✅ Validación exitosa. Todos los días tienen al menos un ejercicio. Procediendo a guardar.");
+        Log.d(TAG, "✅ Validación exitosa. Procediendo a guardar en Firebase.");
 
-        // 🔥 Proceder a guardar en Firebase
-        DatabaseReference userRef = mDatabase.child("users").child(userId);
         DatabaseReference userExercisesRef = userRef.child("userExercises");
         DatabaseReference userMovementPatternsRef = userRef.child("userMovementPatterns");
 
-        List<Map<String, Object>> userExercisesList = new ArrayList<>();
-        List<Map<String, Object>> userMovementPatternsList = new ArrayList<>();
+        // 🔥 LIMPIAR datos previos para evitar duplicados
+        userExercisesRef.removeValue();
+        userMovementPatternsRef.removeValue();
 
-        for (TrainingDay trainingDay : trainingDays) {
-            if (trainingDay.getExercises().isEmpty()) {
-                Log.e(TAG, "❌ ERROR: Se detectó un día vacío durante la validación final.");
-                return; // ⛔ Bloquear el guardado si un día está vacío
+        // 🔥 GUARDAR CADA DÍA Y SUS EJERCICIOS CORRECTAMENTE
+        for (int i = 0; i < trainingDays.size(); i++) {
+            TrainingDay trainingDay = trainingDays.get(i);
+
+            // ✅ OBTENER EL NOMBRE DEL PATRÓN DE MOVIMIENTO
+            String movementPatternName = "Día " + (i + 1); // Nombre por defecto
+            if (trainingDay.getMovementPatterns() != null && !trainingDay.getMovementPatterns().isEmpty()) {
+                movementPatternName = trainingDay.getMovementPatterns().get(0).getName(); // 🔥 Obtener el nombre del patrón
             }
 
-            // 🔥 Guardar cada ejercicio con su respectivo `dayName`
-            for (UserExercise exercise : trainingDay.getExercises()) {
-                Map<String, Object> exerciseMap = convertExerciseToMap(exercise);
-                exerciseMap.put("dayName", trainingDay.getDayTitle()); // Asegurar que cada ejercicio tenga un día asignado
-                userExercisesList.add(exerciseMap);
-            }
+            Log.d(TAG, "📌 Guardando día de entrenamiento: " + movementPatternName);
 
-            // 🔥 Guardar la estructura de `userMovementPatterns`
-            Map<String, Object> userMovementPattern = new HashMap<>();
-            userMovementPattern.put("name", trainingDay.getDayTitle());
+            // ✅ CREAR EL NODO PARA `userMovementPatterns`
+            DatabaseReference dayRef = userMovementPatternsRef.child("Día " + (i + 1)); // 🔥 Mantiene el mismo orden
+            dayRef.child("name").setValue(movementPatternName); // Guardar el nombre real del patrón
 
+            // ✅ GUARDAR EJERCICIOS CORRECTAMENTE
             List<Map<String, Object>> exerciseList = new ArrayList<>();
             for (UserExercise exercise : trainingDay.getExercises()) {
-                exerciseList.add(convertExerciseToMap(exercise));
+                Map<String, Object> exerciseMap = convertExerciseToMap(exercise);
+                exerciseMap.put("dayName", movementPatternName); // 🔥 Asociar el ejercicio con su día real
+                exerciseList.add(exerciseMap);
+
+                // 🔥 GUARDAR CADA EJERCICIO INDIVIDUALMENTE EN `userExercises`
+                userExercisesRef.push().setValue(exerciseMap);
             }
-            userMovementPattern.put("exercises", exerciseList);
-            userMovementPatternsList.add(userMovementPattern);
+
+            // 🔥 GUARDAR LOS EJERCICIOS COMO LISTA DENTRO DE SU DÍA CORRESPONDIENTE
+            dayRef.child("userExercises").setValue(exerciseList);
         }
 
-        // 🔹 Guardar en Firebase los ejercicios
-        userExercisesRef.setValue(userExercisesList)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Ejercicios guardados en Firebase"))
-                .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar ejercicios", e));
-
-        // 🔹 Guardar los patrones de movimiento
-        userMovementPatternsRef.setValue(userMovementPatternsList)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Patrones de movimiento guardados"))
-                .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar patrones de movimiento", e));
+        Log.d(TAG, "✅ Datos guardados correctamente en Firebase.");
     }
+
 
 
     private Map<String, Object> convertExerciseToMap(Exercise exercise, String dayName) {
