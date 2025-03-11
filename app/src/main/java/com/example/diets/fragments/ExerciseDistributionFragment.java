@@ -88,56 +88,65 @@ public class ExerciseDistributionFragment extends Fragment {
     }
 
     private void loadExerciseDistributions(LinearLayout recommendedContainer, LinearLayout notRecommendedContainer, int selectedDays) {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Log.e(TAG, "❌ Usuario no autenticado. No se puede acceder a la base de datos.");
+            return;
+        }
+
         DatabaseReference exerciseDistRef = mDatabase.child("exerciseDistributions");
         exerciseDistRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    List<ExerciseDistribution> distributions = new ArrayList<>();
-                    for (DataSnapshot distributionSnapshot : snapshot.getChildren()) {
-                        ExerciseDistribution exerciseDistribution = distributionSnapshot.getValue(ExerciseDistribution.class);
-                        if (exerciseDistribution != null) {
-                            distributions.add(exerciseDistribution);
-                        } else {
-                            Log.d(TAG, "Distribución de ejercicios es nula");
-                        }
-                    }
-                    List<ExerciseDistribution> filteredDistributions = ExerciseDistribution.filterByNumberOfDays(distributions, selectedDays);
-                    if (filteredDistributions.isEmpty()) {
-                        displayNoDistributionsMessage(recommendedContainer);
-                        displayNoDistributionsMessage(notRecommendedContainer);
-                    } else {
-                        boolean hasRecommended = false;
-                        boolean hasNotRecommended = false;
-                        for (ExerciseDistribution distribution : filteredDistributions) {
-                            if (distribution.isRecomendado()) {
-                                displayDistributions(distribution, recommendedContainer);
-                                hasRecommended = true;
-                            } else {
-                                displayDistributions(distribution, notRecommendedContainer);
-                                hasNotRecommended = true;
-                            }
-                        }
-                        if (!hasRecommended) {
-                            displayNoDistributionsMessage(recommendedContainer);
-                        }
-                        if (!hasNotRecommended) {
-                            displayNoDistributionsMessage(notRecommendedContainer);
-                        }
-                    }
-                } else {
-                    Log.d(TAG, "No se encontraron distribuciones de ejercicios");
+                if (!snapshot.exists()) {
+                    Log.e(TAG, "❌ No se encontraron distribuciones de ejercicios en la base de datos.");
                     displayNoDistributionsMessage(recommendedContainer);
                     displayNoDistributionsMessage(notRecommendedContainer);
+                    return;
+                }
+
+                List<ExerciseDistribution> distributions = new ArrayList<>();
+                for (DataSnapshot distributionSnapshot : snapshot.getChildren()) {
+                    ExerciseDistribution exerciseDistribution = distributionSnapshot.getValue(ExerciseDistribution.class);
+                    if (exerciseDistribution != null) {
+                        distributions.add(exerciseDistribution);
+                    } else {
+                        Log.w(TAG, "⚠️ Distribución de ejercicios nula en la base de datos.");
+                    }
+                }
+
+                List<ExerciseDistribution> filteredDistributions = ExerciseDistribution.filterByNumberOfDays(distributions, selectedDays);
+                if (filteredDistributions.isEmpty()) {
+                    displayNoDistributionsMessage(recommendedContainer);
+                    displayNoDistributionsMessage(notRecommendedContainer);
+                } else {
+                    boolean hasRecommended = false;
+                    boolean hasNotRecommended = false;
+                    for (ExerciseDistribution distribution : filteredDistributions) {
+                        if (distribution.isRecomendado()) {
+                            displayDistributions(distribution, recommendedContainer);
+                            hasRecommended = true;
+                        } else {
+                            displayDistributions(distribution, notRecommendedContainer);
+                            hasNotRecommended = true;
+                        }
+                    }
+                    if (!hasRecommended) {
+                        displayNoDistributionsMessage(recommendedContainer);
+                    }
+                    if (!hasNotRecommended) {
+                        displayNoDistributionsMessage(notRecommendedContainer);
+                    }
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.d(TAG, "Error de base de datos: " + error.getMessage());
+                Log.e(TAG, "❌ Error de base de datos: " + error.getMessage());
             }
         });
     }
+
 
     private void displayNoDistributionsMessage(LinearLayout container) {
         TextView noDistributionsText = new TextView(getContext());

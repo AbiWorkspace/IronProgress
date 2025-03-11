@@ -363,27 +363,48 @@ public class User {
 
     public double calculateCalories(double weight, double height, int age, String gender, String activityLevel, String goal) {
         double bmr;
+
+        // 🔥 Cálculo mejorado del BMR
         if ("male".equalsIgnoreCase(gender)) {
             bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
         } else {
             bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
         }
 
+        // 📌 Ajuste con peso x 23 y suavizado del impacto
+        double adjustedBMR = (bmr + (weight * 23)) / 2;
+
+        // 🔥 Factor de actividad basado en nivel de actividad
         double activityFactor = switch (activityLevel != null ? activityLevel.toLowerCase() : "sedentary") {
-            case "light" -> 1.375;
-            case "moderate" -> 1.55;
-            case "high" -> 1.725;
-            case "very high" -> 1.9;
-            default -> 1.2;
+            case "sedentary" -> 1.2;       // Poco o nada de ejercicio
+            case "light" -> 1.375;         // Ejercicio ligero (1-3 días/semana)
+            case "moderate" -> 1.55;       // Ejercicio moderado (3-5 días/semana)
+            case "high" -> 1.725;          // Ejercicio intenso (6-7 días/semana)
+            case "very high" -> 1.9;       // Atletas o entrenamientos extremos
+            default -> 1.2;                // Sedentario por defecto
         };
 
-        double get = bmr * activityFactor;
-        return switch (goal != null ? goal.toLowerCase() : "maintain weight") {
-            case "lose weight" -> get * 0.75;
-            case "gain muscle.class" -> get * 1.15;
-            default -> get;
+        // 🔥 Cálculo del Gasto Energético Total (GET)
+        double get = adjustedBMR * activityFactor;
+
+        // 🔥 Ajuste según objetivo del usuario
+        double finalCalories = switch (goal != null ? goal.toLowerCase() : "maintain weight") {
+            case "lose weight" -> get * 0.75;       // 🔹 Deficit calórico (-25%)
+            case "gain muscle" -> get * 1.15;       // 🔹 Superávit calórico (+15%)
+            case "gain weight" -> get * 1.2;        // 🔹 Subida de peso más agresiva (+20%)
+            default -> get;                         // 🔹 Mantenimiento
         };
+
+        // 📌 Logs para depuración en Logcat
+        Log.d("CalculoCalorias", "📌 Peso: " + weight + " kg, Altura: " + height + " cm, Edad: " + age + " años, Género: " + gender);
+        Log.d("CalculoCalorias", "📌 Nivel de Actividad: " + activityLevel + " (Factor: " + activityFactor + ")");
+        Log.d("CalculoCalorias", "📌 BMR Original: " + bmr + ", BMR Ajustado: " + adjustedBMR);
+        Log.d("CalculoCalorias", "📌 Gasto Energético Total (GET): " + get);
+        Log.d("CalculoCalorias", "📌 Objetivo: " + goal + ", Calorías Finales: " + finalCalories);
+
+        return finalCalories;
     }
+
 
     public double calculateProtein() {
         // Ejemplo: 1.6 gramos de proteína por kilogramo de peso corporal

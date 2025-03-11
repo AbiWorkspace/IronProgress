@@ -128,7 +128,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
                     traka.putSerializable("trainingDays", (Serializable) trainingDays);
                     traka.putString("userGoal", userGoal);
                     traka.putString("userId", userId);
-                    activity.switchToDashboardWorkoutFragment(traka);
+                    activity.switchToAssignLoadFragment(traka);
                     Log.d(TAG, "[onViewCreated] ✅ Cambio a TrainingDetailFragment exitoso.");
                 } else {
                     Log.e(TAG, "[onViewCreated] ❌ ERROR: No se pudo obtener ViewPagerActivity.");

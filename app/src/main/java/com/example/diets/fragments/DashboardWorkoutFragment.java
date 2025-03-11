@@ -28,8 +28,10 @@ import com.google.firebase.database.ValueEventListener;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
 public class DashboardWorkoutFragment extends Fragment {
     private RecyclerView recyclerView;
     private TrainingDayAdapter adapter;
@@ -44,7 +46,7 @@ public class DashboardWorkoutFragment extends Fragment {
         recyclerView = view.findViewById(R.id.recyclerViewTrainingDays);
 
         // 🔥 Configurar RecyclerView para que los días se muestren HORIZONTALMENTE
-        LinearLayoutManager layoutManager = new LinearLayoutManager(getContext(), LinearLayoutManager.HORIZONTAL, false);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(getContext(), LinearLayoutManager.VERTICAL, false);
         recyclerView.setLayoutManager(layoutManager);
 
         getTrainingDaysAndExercisesFromUser();
@@ -69,63 +71,87 @@ public class DashboardWorkoutFragment extends Fragment {
                     trainingDays = new ArrayList<>();
 
                     if (!snapshot.exists()) {
-                        Log.e(TAG, "❌ No se encontraron userMovementPatterns en Firebase.");
+                        Log.e(TAG, "❌ No se encontraron `userMovementPatterns` en Firebase.");
                         return;
                     }
 
                     Log.d(TAG, "✅ Datos recibidos de Firebase. Procesando...");
 
-                    // 🔥 RECORRER userMovementPatterns (que es un HashMap)
+                    Map<String, TrainingDay> tempDays = new LinkedHashMap<>();
+                    int dayIndex = 1;
+
                     for (DataSnapshot daySnapshot : snapshot.getChildren()) {
+                        Log.d(TAG, "🔍 Procesando nodo: " + daySnapshot.getKey());
+
                         String dayName = daySnapshot.child("name").getValue(String.class);
                         if (dayName == null || dayName.isEmpty()) {
-                            Log.w(TAG, "⚠️ Día sin nombre en Firebase. Se asignará un nombre genérico.");
-                            dayName = "Día " + (trainingDays.size() + 1);
+                            Log.w(TAG, "⚠️ Día sin nombre en Firebase. Asignando nombre genérico.");
+                            dayName = "Día " + dayIndex;
                         }
 
-                        TrainingDay trainingDay = new TrainingDay();
-                        trainingDay.setDayTitle(dayName);
-                        trainingDay.setDayIndex(trainingDays.size() + 1);
+                        String uniqueKey = dayIndex + "_" + dayName;
+                        Log.d(TAG, "📅 Día detectado: " + dayName + " | Clave única: " + uniqueKey);
 
-                        // ✅ EXTRAER movementPatterns
-                        List<MovementPattern> movementPatterns = new ArrayList<>();
-                        DataSnapshot patternsSnapshot = daySnapshot.child("movementPatterns");
-                        if (patternsSnapshot.exists()) {
-                            for (DataSnapshot patternSnapshot : patternsSnapshot.getChildren()) {
-                                MovementPattern pattern = patternSnapshot.getValue(MovementPattern.class);
-                                if (pattern != null) {
-                                    movementPatterns.add(pattern);
-                                }
-                            }
+                        if (!tempDays.containsKey(uniqueKey)) {
+                            TrainingDay trainingDay = new TrainingDay();
+                            trainingDay.setDayTitle(dayName);
+                            trainingDay.setDayIndex(dayIndex);
+                            trainingDay.setExercises(new ArrayList<>());
+                            tempDays.put(uniqueKey, trainingDay);
+                            Log.d(TAG, "✅ Nuevo día creado: " + uniqueKey);
                         }
-                        trainingDay.setMovementPatterns(movementPatterns);
 
-                        // ✅ EXTRAER userExercises (SOLUCIÓN AL ERROR)
-                        List<UserExercise> userExercises = new ArrayList<>();
+                        TrainingDay currentDay = tempDays.get(uniqueKey);
+                        if (currentDay == null) {
+                            Log.e(TAG, "❌ ERROR: No se pudo recuperar el contenedor del día: " + uniqueKey);
+                            continue;
+                        }
+
                         DataSnapshot exercisesSnapshot = daySnapshot.child("userExercises");
-                        if (exercisesSnapshot.exists()) {
-                            for (DataSnapshot exerciseSnapshot : exercisesSnapshot.getChildren()) {
-                                UserExercise exercise = exerciseSnapshot.getValue(UserExercise.class);
-                                if (exercise != null) {
-                                    userExercises.add(exercise);
-                                }
-                            }
+                        if (!exercisesSnapshot.exists()) {
+                            Log.w(TAG, "⚠️ No hay ejercicios para el día: " + uniqueKey);
                         }
-                        trainingDay.setExercises(userExercises);
 
-                        Log.d(TAG, "📅 Día detectado: " + dayName + " con " + userExercises.size() + " ejercicios.");
-                        trainingDays.add(trainingDay);
+                        int exerciseCount = 0;
+                        for (DataSnapshot exerciseSnapshot : exercisesSnapshot.getChildren()) {
+                            Log.d(TAG, "🔍 Procesando ejercicio...");
+                            UserExercise exercise = exerciseSnapshot.getValue(UserExercise.class);
+                            if (exercise == null) {
+                                Log.e(TAG, "❌ ERROR: Ejercicio NULL encontrado. Omitiendo...");
+                                continue;
+                            }
+
+                            Log.d(TAG, "🏋️‍♂️ Ejercicio detectado: " + exercise.getName());
+                            exercise.setDayName(dayName);
+                            currentDay.getExercises().add(exercise);
+                            exerciseCount++;
+                        }
+
+                        Log.d(TAG, "📅 Día `" + uniqueKey + "` contiene " + exerciseCount + " ejercicios.");
+                        dayIndex++;
                     }
+
+                    trainingDays.clear();
+                    trainingDays.addAll(tempDays.values());
 
                     Log.d(TAG, "🔄 Total días de entrenamiento cargados: " + trainingDays.size());
 
-                    // 🔥 ACTUALIZAR ADAPTADOR
-                    adapter = new TrainingDayAdapter(trainingDays, trainingDay -> {
-                        switchToTrainingDetailFragment(trainingDay);
-                    });
+                    if (adapter == null) {
+                        adapter = new TrainingDayAdapter(trainingDays, trainingDay -> {
+                            switchToTrainingDetailFragment(trainingDay);
+                        });
+                        recyclerView.setAdapter(adapter);
+                    } else {
+                        adapter.notifyDataSetChanged(); // 🔥 Asegurar actualización
+                    }
 
-                    recyclerView.setAdapter(adapter);
-                    adapter.notifyDataSetChanged();
+                    // 🔍 DEPURACIÓN FINAL
+                    for (TrainingDay day : trainingDays) {
+                        Log.d(TAG, "📋 Día en RecyclerView: " + day.getDayTitle() + " | Ejercicios: " + day.getExercises().size());
+                        for (UserExercise exercise : day.getExercises()) {
+                            Log.d(TAG, "   🏋️‍♂️ Ejercicio: " + exercise.getName() + " | Día asignado: " + exercise.getDayName());
+                        }
+                    }
                 }
 
                 @Override
@@ -199,13 +225,16 @@ public class DashboardWorkoutFragment extends Fragment {
     }
 
     private void actualizarRecyclerView() {
-        // 🔥 Configurar y actualizar el adaptador con todos los días cargados
-        adapter = new TrainingDayAdapter(trainingDays, trainingDay -> {
-            switchToTrainingDetailFragment(trainingDay);
-        });
+        Log.d(TAG, "🔄 Actualizando RecyclerView con " + trainingDays.size() + " días.");
 
-        recyclerView.setAdapter(adapter);
-        adapter.notifyDataSetChanged();
+        if (adapter == null) {
+            adapter = new TrainingDayAdapter(trainingDays, trainingDay -> {
+                switchToTrainingDetailFragment(trainingDay);
+            });
+            recyclerView.setAdapter(adapter);
+        } else {
+            adapter.notifyDataSetChanged(); // 🔥 Asegurar actualización correcta
+        }
     }
 
     private void switchToTrainingDetailFragment(TrainingDay trainingDay) {

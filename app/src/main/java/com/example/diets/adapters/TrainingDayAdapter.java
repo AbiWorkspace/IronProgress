@@ -42,11 +42,12 @@ public class TrainingDayAdapter extends RecyclerView.Adapter<TrainingDayAdapter.
         TrainingDay trainingDay = trainingDays.get(position);
         holder.bind(trainingDay, listener);
     }
-
     @Override
     public int getItemCount() {
+        Log.d(TAG, "📏 Total de días en Adapter: " + trainingDays.size());  // 👀 Agrega esto
         return trainingDays.size();
     }
+
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         private TextView dayIndexTextView, dayTitleTextView;

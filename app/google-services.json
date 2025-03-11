@@ -1,8 +1,9 @@
 {
   "project_info": {
     "project_number": "270055120914",
+    "firebase_url": "https://diets-e9f65-default-rtdb.firebaseio.com",
     "project_id": "diets-e9f65",
-    "storage_bucket": "diets-e9f65.appspot.com"
+    "storage_bucket": "diets-e9f65.firebasestorage.app"
   },
   "client": [
     {

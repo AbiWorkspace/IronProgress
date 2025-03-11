@@ -3,12 +3,21 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.diets">
 
-    <!-- Permisos -->
+    <!-- ✅ Permisos necesarios -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.GET_ACCOUNTS"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+    <!-- ✅ Requerido en Android 11+ para acceder a Google Play Services -->
+    <queries>
+        <package android:name="com.google.android.gms" />
+        <package android:name="com.android.vending" />
+    </queries>
 
     <application
         android:enableOnBackInvokedCallback="true"
@@ -21,7 +30,20 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <!-- Actividades -->
+        <!-- ✅ Firebase y Google Play Services -->
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version"/>
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/default_notification_channel_id"/>
+
+        <meta-data
+            android:name="com.google.android.gms.auth.api.signin"
+            android:value="@string/default_web_client_id"/>
+
+        <!-- ✅ MainActivity con intent-filter correcto -->
         <activity
             android:name=".activitys.MainActivity"
             android:exported="true">
@@ -30,44 +52,23 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".activitys.RegisterActivity"
-            android:exported="true" />
-        <activity
-            android:name=".activitys.UserFormActivity"
-            android:exported="true" />
-        <activity
-            android:name=".activitys.AdminActivity"
-            android:exported="true" />
 
-        <activity
-            android:name=".activitys.ViewPagerActivity"
-            android:exported="true" />
-        <activity
-            android:name=".activitys.FoodActivity"
-            android:exported="true" />
-        <activity
-            android:name=".fragments.EntrenamientoFragment"
+        <!-- ✅ Otras actividades aseguradas con exported="true" -->
+        <activity android:name=".activitys.RegisterActivity" android:exported="true" />
+        <activity android:name=".activitys.UserFormActivity" android:exported="true" />
+        <activity android:name=".activitys.AdminActivity" android:exported="true" />
+        <activity android:name=".activitys.ViewPagerActivity" android:exported="true" />
+        <activity android:name=".activitys.FoodActivity" android:exported="true" />
+        <activity android:name=".fragments.EntrenamientoFragment"
             android:exported="true"
             tools:ignore="Instantiatable" />
-        <activity
-            android:name=".activitys.UserListActivity"
-            android:exported="true" />
-        <activity
-            android:name=".activitys.UserDetailsActivity"
-            android:exported="true" />
-        <activity
-            android:name=".activitys.RegisterUserByAdminActivity"
-            android:exported="true" />
-        <activity
-            android:name=".activitys.EditUserActivity"
+        <activity android:name=".activitys.UserListActivity" android:exported="true" />
+        <activity android:name=".activitys.UserDetailsActivity" android:exported="true" />
+        <activity android:name=".activitys.RegisterUserByAdminActivity" android:exported="true" />
+        <activity android:name=".activitys.EditUserActivity"
             android:exported="true"
             android:label="Editar Usuario" />
-        <activity
-            android:name=".activitys.WeightActivity"
-            android:exported="true" />
-
-
+        <activity android:name=".activitys.WeightActivity" android:exported="true" />
 
     </application>
 

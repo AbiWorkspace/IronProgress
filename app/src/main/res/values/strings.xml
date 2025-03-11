@@ -9,5 +9,7 @@
     <string name="add_food_item">Añadir alimento</string>
     <string name="training_icon">Icono de entrenamiento</string>
     <string name="status_button">Estado del ejercicio</string>
+    <string name="default_notification_channel_id">default_channel</string>
+    <string name="default_web_client_id">tu-cliente-web-id.apps.googleusercontent.com</string>
 
 </resources>

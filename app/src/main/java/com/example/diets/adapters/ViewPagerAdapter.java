@@ -5,9 +5,15 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
+
+
 import com.example.diets.fragments.DashboardFragment;
 import com.example.diets.fragments.DashboardWorkoutFragment;
+import com.example.diets.fragments.DashboardFragment;  // ✅ Asegurar que esta clase existe
+import com.example.diets.fragments.UserFormFragment;
 import com.example.diets.fragments.EntrenamientoFragment;
+import com.example.diets.fragments.UserFormFragment;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,17 +21,34 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
 
     private final List<Fragment> fragmentList = new ArrayList<>();
 
-    public ViewPagerAdapter(@NonNull FragmentActivity fragmentActivity, boolean trainingFormCompleted) {
+    public ViewPagerAdapter(@NonNull FragmentActivity fragmentActivity, boolean trainingFormCompleted, boolean firstTime) {
         super(fragmentActivity);
 
+        Log.d("ViewPagerAdapter", "📌 Constructor llamado");
+        Log.d("ViewPagerAdapter", "➡️ trainingFormCompleted: " + trainingFormCompleted);
+        Log.d("ViewPagerAdapter", "➡️ firstTime: " + firstTime);
+
+        // 🔥 Manejo del formulario de entrenamiento
         if (trainingFormCompleted) {
-            fragmentList.add(new DashboardWorkoutFragment());
+            Log.d("ViewPagerAdapter", "✅ Formulario de entrenamiento completado. Agregando DashboardWorkoutFragment.");
+            fragmentList.add(new DashboardWorkoutFragment());  // ✅ Muestra entrenamientos
         } else {
-            Log.d(TAG,"Entrenamiento"+"-Valor:"+trainingFormCompleted);
-            fragmentList.add(new EntrenamientoFragment());
+            Log.d("ViewPagerAdapter", "❌ Formulario de entrenamiento incompleto. Agregando EntrenamientoFragment.");
+            fragmentList.add(new EntrenamientoFragment());  // ✅ Muestra formulario de entrenamiento
         }
-        fragmentList.add(new DashboardFragment());
+
+        // 🔥 Manejo del `firstTime`
+        if (firstTime) {
+            Log.d("ViewPagerAdapter", "✅ Es la primera vez. Agregando UserFormFragment.");
+            fragmentList.add(new UserFormFragment());  // ✅ Muestra formulario de usuario
+        } else {
+            Log.d("ViewPagerAdapter", "❌ No es la primera vez. Agregando DashboardFragment.");
+            fragmentList.add(new DashboardFragment());  // ✅ Muestra el Dashboard normal
+        }
+
+        Log.d("ViewPagerAdapter", "📌 Fragmentos agregados: " + fragmentList.size());
     }
+
 
     /**
      * Reemplaza un fragmento en una posición específica.

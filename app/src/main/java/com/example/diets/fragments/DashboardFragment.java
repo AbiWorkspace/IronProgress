@@ -22,6 +22,7 @@ import java.util.Locale;
 import android.text.InputFilter;
 import android.content.SharedPreferences;
 import android.widget.ImageButton;
+
 public class DashboardFragment extends Fragment {
 
     private static final String TAG = "DashboardFragment";
@@ -82,27 +83,58 @@ public class DashboardFragment extends Fragment {
     }
 
     private void loadUserData(String userId) {
-        Log.d(TAG, "Loading user data for userId: " + userId);
+        Log.d(TAG, "📌 Cargando datos del usuario para userId: " + userId);
+
         mDatabase.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
-                    user = snapshot.getValue(User.class);
-                    if (user != null) {
-                        Log.d(TAG, "User data loaded successfully: " + user.toString());
-                        updateNutritionalValues(user);
-                    }
+                    Log.d(TAG, "🔥 Datos obtenidos: " + snapshot.getValue());
+
+                    // 🔥 Extraer datos manualmente (EVITANDO `getValue(User.class)`)
+                    String gender = snapshot.child("gender").getValue(String.class);
+                    int age = snapshot.child("age").getValue(Integer.class) != null ? snapshot.child("age").getValue(Integer.class) : 0;
+                    boolean firstTime = snapshot.child("firstTime").getValue(Boolean.class) != null ? snapshot.child("firstTime").getValue(Boolean.class) : false;
+                    String activityLevel = snapshot.child("activityLevel").getValue(String.class);
+                    String goal = snapshot.child("goal").getValue(String.class);
+                    double weight = snapshot.child("weight").getValue(Double.class) != null ? snapshot.child("weight").getValue(Double.class) : 0;
+                    double height = snapshot.child("height").getValue(Double.class) != null ? snapshot.child("height").getValue(Double.class) : 0;
+
+                    // 🔥 Crear instancia de User manualmente
+                    user = new User();
+                    user.setGender(gender);
+                    user.setAge(age);
+                    user.setFirstTime(firstTime);
+                    user.setActivityLevel(activityLevel);
+                    user.setGoal(goal);
+                    user.setWeight(weight);
+                    user.setHeight(height);
+
+                    Log.d(TAG, "✅ Usuario cargado manualmente: " + user.toString());
+
+                    // 🔥 Asegurar que los valores son correctos antes de llamar a `updateNutritionalValues()`
+                    Log.d(TAG, "📊 Datos del usuario:");
+                    Log.d(TAG, "➡️ Edad: " + user.getAge());
+                    Log.d(TAG, "➡️ Género: " + user.getGender());
+                    Log.d(TAG, "➡️ Nivel de actividad: " + user.getActivityLevel());
+                    Log.d(TAG, "➡️ Objetivo: " + user.getGoal());
+                    Log.d(TAG, "➡️ Peso: " + user.getWeight());
+                    Log.d(TAG, "➡️ Altura: " + user.getHeight());
+
+                    // 🔥 Actualizar la UI con la información obtenida
+                    updateNutritionalValues(user);
                 } else {
-                    Log.w(TAG, "No user data found for userId: " + userId);
+                    Log.w(TAG, "⚠ No se encontraron datos del usuario en la base de datos.");
                 }
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Error loading user data: " + error.getMessage(), error.toException());
+                Log.e(TAG, "❌ Error al cargar los datos del usuario: " + error.getMessage(), error.toException());
             }
         });
     }
+
 
     private void initializeUI(View view) {
         foodTextField = view.findViewById(R.id.foodTextField);

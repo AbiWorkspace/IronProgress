@@ -1,4 +1,4 @@
-package com.example.diets.activitys;
+package com.example.diets.fragments;
 
 import android.app.Dialog;
 import android.content.Intent;
@@ -6,14 +6,20 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 
 import com.example.diets.R;
+import com.example.diets.activitys.ViewPagerActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
@@ -24,42 +30,34 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
 import java.util.Map;
+public class UserFormFragment extends Fragment {
 
-public class UserFormActivity extends AppCompatActivity {
-
-    private Spinner genderSpinner;
-    private Spinner activityLevelSpinner;
-    private Spinner goalSpinner;
-    private Spinner weightSpinner;
-    private Spinner heightSpinner;
-    private Spinner ageSpinner;
-    private FloatingActionButton helpButton;
-    private FloatingActionButton goalHelpButton;
+    private Spinner genderSpinner, activityLevelSpinner, goalSpinner, weightSpinner, heightSpinner, ageSpinner;
+    private FloatingActionButton helpButton, goalHelpButton;
     private MaterialButton submitButton;
     private FirebaseAuth mAuth;
     private DatabaseReference mDatabase;
-    private FirebaseFirestore db;
+    private static final String TAG = "UserFormFragment";
 
+    @Nullable
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_user_form);
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.activity_user_form, container, false);
 
-        // Inicializar Firebase Auth, Database y Firestore
+        // Inicializar Firebase
         mAuth = FirebaseAuth.getInstance();
         mDatabase = FirebaseDatabase.getInstance().getReference();
-        db = FirebaseFirestore.getInstance();
 
         // Inicializar vistas
-        genderSpinner = findViewById(R.id.genderSpinner);
-        activityLevelSpinner = findViewById(R.id.activityLevelSpinner);
-        goalSpinner = findViewById(R.id.goalSpinner);
-        weightSpinner = findViewById(R.id.weightSpinner);
-        heightSpinner = findViewById(R.id.heightSpinner);
-        ageSpinner = findViewById(R.id.ageSpinner);
-        helpButton = findViewById(R.id.helpButton);
-        goalHelpButton = findViewById(R.id.goalHelpButton);
-        submitButton = findViewById(R.id.submitButton);
+        genderSpinner = view.findViewById(R.id.genderSpinner);
+        activityLevelSpinner = view.findViewById(R.id.activityLevelSpinner);
+        goalSpinner = view.findViewById(R.id.goalSpinner);
+        weightSpinner = view.findViewById(R.id.weightSpinner);
+        heightSpinner = view.findViewById(R.id.heightSpinner);
+        ageSpinner = view.findViewById(R.id.ageSpinner);
+        helpButton = view.findViewById(R.id.helpButton);
+        goalHelpButton = view.findViewById(R.id.goalHelpButton);
+        submitButton = view.findViewById(R.id.submitButton);
 
         configureSpinners();
 
@@ -72,6 +70,8 @@ public class UserFormActivity extends AppCompatActivity {
 
         // Configuración del botón Enviar
         submitButton.setOnClickListener(v -> handleSubmit());
+
+        return view;
     }
 
     private void configureSpinners() {
@@ -84,13 +84,13 @@ public class UserFormActivity extends AppCompatActivity {
     }
 
     private void setSpinnerAdapter(Spinner spinner, int arrayResId) {
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, arrayResId, android.R.layout.simple_spinner_item);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(requireContext(), arrayResId, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinner.setAdapter(adapter);
     }
 
     private void showFormPurposeDialog() {
-        Dialog dialog = new Dialog(this);
+        Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(R.layout.dialog_form_purpose);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         Button closeButton = dialog.findViewById(R.id.closePurposeButton);
@@ -99,7 +99,7 @@ public class UserFormActivity extends AppCompatActivity {
     }
 
     private void showActivityLevelInfoDialog() {
-        Dialog dialog = new Dialog(this);
+        Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(R.layout.dialog_activity_level_info);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         Button closeButton = dialog.findViewById(R.id.closeButton);
@@ -108,7 +108,7 @@ public class UserFormActivity extends AppCompatActivity {
     }
 
     private void showGoalInfoDialog() {
-        Dialog dialog = new Dialog(this);
+        Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(R.layout.dialog_goal_info);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         Button closeButton = dialog.findViewById(R.id.closeGoalButton);
@@ -117,13 +117,18 @@ public class UserFormActivity extends AppCompatActivity {
     }
 
     private void handleSubmit() {
+        Log.d(TAG, "🚀 handleSubmit() iniciado.");
+
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
+            Log.e(TAG, "❌ Usuario no autenticado.");
             showErrorDialog("Usuario no autenticado.");
             return;
         }
 
         String userId = currentUser.getUid();
+        Log.d(TAG, "📌 ID del usuario: " + userId);
+
         String gender = genderSpinner.getSelectedItem().toString();
         String activityLevel = activityLevelSpinner.getSelectedItem().toString();
         String goal = goalSpinner.getSelectedItem().toString();
@@ -131,7 +136,16 @@ public class UserFormActivity extends AppCompatActivity {
         String height = heightSpinner.getSelectedItem().toString();
         String age = ageSpinner.getSelectedItem().toString();
 
+        Log.d(TAG, "📌 Datos capturados:");
+        Log.d(TAG, "   ➡️ Género: " + gender);
+        Log.d(TAG, "   ➡️ Nivel de actividad: " + activityLevel);
+        Log.d(TAG, "   ➡️ Meta: " + goal);
+        Log.d(TAG, "   ➡️ Peso: " + weight);
+        Log.d(TAG, "   ➡️ Altura: " + height);
+        Log.d(TAG, "   ➡️ Edad: " + age);
+
         if (gender.isEmpty() || activityLevel.isEmpty() || goal.isEmpty() || weight.isEmpty() || height.isEmpty() || age.isEmpty()) {
+            Log.e(TAG, "❌ Campos vacíos detectados.");
             showErrorDialog("Por favor, completa todos los campos antes de enviar.");
             return;
         }
@@ -143,26 +157,40 @@ public class UserFormActivity extends AppCompatActivity {
         userData.put("gender", gender);
         userData.put("activityLevel", activityLevel);
         userData.put("goal", goal);
-        userData.put("firstTime", false);
+        userData.put("firstTime", false); // 🔹 Se guarda como false
 
-        // Actualizar en Firestore
-        db.collection("users").document(userId).set(userData)
-                .addOnSuccessListener(aVoid -> Log.d("UserFormActivity", "Datos enviados a Firestore"))
-                .addOnFailureListener(e -> Log.e("UserFormActivity", "Error al enviar datos a Firestore", e));
+        Log.d(TAG, "📌 Datos preparados para guardar en Firebase.");
 
-        // Actualizar en Realtime Database
-        mDatabase.child("users").child(userId).setValue(userData)
+        // 🔥 Guardar en Realtime Database
+        mDatabase.child("users").child(userId).updateChildren(userData)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
-                        showSuccessDialog("¡Formulario enviado exitosamente!");
+                        Log.d(TAG, "✅ Datos guardados correctamente en Realtime Database.");
+
+                        // 🔥 AHORA ACTUALIZAMOS `firstTime = false` DESPUÉS DE QUE SE GUARDEN LOS DATOS
+                        mDatabase.child("users").child(userId).child("firstTime").setValue(false)
+                                .addOnCompleteListener(updateTask -> {
+                                    if (updateTask.isSuccessful()) {
+                                        Log.d(TAG, "✅ `firstTime` actualizado a FALSE en Realtime Database.");
+                                        showSuccessDialog("¡Formulario enviado exitosamente!");
+                                    } else {
+                                        Log.e(TAG, "❌ Error al actualizar `firstTime`", updateTask.getException());
+                                        showErrorDialog("Error al actualizar la información.");
+                                    }
+                                });
+
                     } else {
+                        Log.e(TAG, "❌ Error al guardar en Realtime Database", task.getException());
                         showErrorDialog("Error al actualizar la información.");
                     }
                 });
+
+        Log.d(TAG, "🏁 handleSubmit() finalizado.");
     }
 
+
     private void showErrorDialog(String message) {
-        Dialog dialog = new Dialog(this);
+        Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(R.layout.dialog_error);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         TextView errorMessage = dialog.findViewById(R.id.errorMessage);
@@ -173,7 +201,7 @@ public class UserFormActivity extends AppCompatActivity {
     }
 
     private void showSuccessDialog(String message) {
-        Dialog dialog = new Dialog(this);
+        Dialog dialog = new Dialog(requireContext());
         dialog.setContentView(R.layout.dialog_success);
         dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
         TextView successMessage = dialog.findViewById(R.id.successMessage);
@@ -181,8 +209,8 @@ public class UserFormActivity extends AppCompatActivity {
         successMessage.setText(message);
         closeButton.setOnClickListener(v -> {
             dialog.dismiss();
-            startActivity(new Intent(UserFormActivity.this, ViewPagerActivity.class));
-            finish();
+            requireActivity().startActivity(new Intent(requireActivity(), ViewPagerActivity.class));
+            requireActivity().finish();
         });
         dialog.show();
     }
