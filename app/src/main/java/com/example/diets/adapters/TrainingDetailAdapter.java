@@ -15,6 +15,7 @@ import com.example.diets.model.UserExercise;
 
 import java.util.ArrayList;
 import java.util.List;
+
 public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAdapter.ExerciseViewHolder> {
     private static final String TAG = "TrainingDetailAdapter"; // 🔥 Nombre de la clase para logs
     private List<UserExercise> exercises;

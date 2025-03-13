@@ -6,6 +6,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.fragment.app.FragmentManager;
 import androidx.viewpager2.widget.ViewPager2;
 import com.example.diets.R;
 import com.example.diets.adapters.ExercisesAdapter;
@@ -152,6 +153,32 @@ public class ViewPagerActivity extends AppCompatActivity
                     Log.e("ViewPagerActivity", "❌ Error al cargar trainingFormCompleted", error.toException());
                 }
             });
+        }
+    }
+    @Override
+    public void onBackPressed() {
+        Log.d("ViewPagerActivity", "🔙 [onBackPressed] - Botón Back presionado");
+
+        if (viewPager.getCurrentItem() > 0) {
+            // 🔄 Si NO estamos en el primer fragmento, regresamos al anterior
+            int previousItem = viewPager.getCurrentItem() - 1;
+            Log.d("ViewPagerActivity", "⬅️ [onBackPressed] - Moviendo a fragmento anterior: " + previousItem);
+            viewPager.setCurrentItem(previousItem, true);
+        } else {
+            // 🔥 Si estamos en el primer fragmento, revisar BackStack
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            int backStackCount = fragmentManager.getBackStackEntryCount();
+            Log.d("ViewPagerActivity", "📌 [onBackPressed] - BackStack actual: " + backStackCount);
+
+            if (backStackCount > 0) {
+                // 🔄 Hay fragmentos en la pila de retroceso, regresamos al anterior
+                fragmentManager.popBackStack();
+                Log.d("ViewPagerActivity", "↩️ [onBackPressed] - Regresando al fragmento anterior en BackStack");
+            } else {
+                // 🚪 No hay más fragmentos, salir de la actividad
+                Log.d("ViewPagerActivity", "❌ [onBackPressed] - No hay más fragmentos. Saliendo de la actividad.");
+                super.onBackPressed();
+            }
         }
     }
 
