@@ -4,6 +4,8 @@ import android.content.ClipData;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.DragEvent;
 import android.view.LayoutInflater;
@@ -11,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -44,6 +47,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class SelectExercisesFragment extends Fragment implements ExercisesAdapter.OnExerciseSelectionChangedListener {
@@ -142,97 +146,44 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
     }
     private void saveSelectedExercises() {
-        Log.d(TAG, "💾 Iniciando validación y guardado en Firebase.");
+        Log.d(TAG, "💾 Iniciando guardado en Firebase.");
 
         DatabaseReference userRef = FirebaseDatabase.getInstance().getReference()
                 .child("users").child(userId);
 
-        userRef.child("trainingFormCompleted").setValue(true);
-
-        // 🔥 VALIDACIÓN: No permitir días vacíos
-        boolean allContainersHaveExercises = true;
-        for (TrainingDay trainingDay : trainingDays) {
-            if (trainingDay.getExercises().isEmpty()) {
-                allContainersHaveExercises = false;
-                Log.e(TAG, "❌ ERROR: El día `" + trainingDay.getDayTitle() + "` está vacío.");
-            }
-        }
-
-        if (!allContainersHaveExercises) {
-            Toast.makeText(getContext(), "Cada día debe tener al menos un ejercicio.", Toast.LENGTH_SHORT).show();
-            Log.e(TAG, "❌ ERROR: No se puede guardar, hay días sin ejercicios.");
-            return;
-        }
-
-        Log.d(TAG, "✅ Validación exitosa. Procediendo a guardar en Firebase.");
-
         DatabaseReference userExercisesRef = userRef.child("userExercises");
         DatabaseReference userMovementPatternsRef = userRef.child("userMovementPatterns");
 
-        // 🔥 LIMPIAR datos previos para evitar duplicados
+        // 🔥 LIMPIAR datos previos
         userExercisesRef.removeValue();
         userMovementPatternsRef.removeValue();
 
-        // 🔥 GUARDAR CADA DÍA Y SUS EJERCICIOS CORRECTAMENTE
         for (int i = 0; i < trainingDays.size(); i++) {
             TrainingDay trainingDay = trainingDays.get(i);
-
-            // ✅ OBTENER EL NOMBRE DEL PATRÓN DE MOVIMIENTO
-            String movementPatternName = "Día " + (i + 1); // Nombre por defecto
+            String movementPatternName = "Día " + (i + 1);
             if (trainingDay.getMovementPatterns() != null && !trainingDay.getMovementPatterns().isEmpty()) {
-                movementPatternName = trainingDay.getMovementPatterns().get(0).getName(); // 🔥 Obtener el nombre del patrón
+                movementPatternName = trainingDay.getMovementPatterns().get(0).getName();
             }
 
-            Log.d(TAG, "📌 Guardando día de entrenamiento: " + movementPatternName);
+            Log.d(TAG, "📌 Guardando entrenamiento: " + movementPatternName);
 
-            // ✅ CREAR EL NODO PARA `userMovementPatterns`
-            DatabaseReference dayRef = userMovementPatternsRef.child("Día " + (i + 1)); // 🔥 Mantiene el mismo orden
-            dayRef.child("name").setValue(movementPatternName); // Guardar el nombre real del patrón
+            DatabaseReference dayRef = userMovementPatternsRef.child("Día " + (i + 1));
+            dayRef.child("name").setValue(movementPatternName);
 
-            // ✅ GUARDAR EJERCICIOS CORRECTAMENTE
             List<Map<String, Object>> exerciseList = new ArrayList<>();
             for (UserExercise exercise : trainingDay.getExercises()) {
                 Map<String, Object> exerciseMap = convertExerciseToMap(exercise);
-                exerciseMap.put("dayName", movementPatternName); // 🔥 Asociar el ejercicio con su día real
+                exerciseMap.put("series", exercise.getSeries()); // 🔥 Guardar series
                 exerciseList.add(exerciseMap);
 
-                // 🔥 GUARDAR CADA EJERCICIO INDIVIDUALMENTE EN `userExercises`
                 userExercisesRef.push().setValue(exerciseMap);
             }
 
-            // 🔥 GUARDAR LOS EJERCICIOS COMO LISTA DENTRO DE SU DÍA CORRESPONDIENTE
             dayRef.child("userExercises").setValue(exerciseList);
         }
 
         Log.d(TAG, "✅ Datos guardados correctamente en Firebase.");
     }
-
-
-
-    private Map<String, Object> convertExerciseToMap(Exercise exercise, String dayName) {
-        if (dayName == null || dayName.isEmpty()) {
-            Log.e(TAG, "❌ Error: Intentando guardar ejercicio '" + exercise.getName() + "' sin `dayName` válido.");
-            dayName = "Día Desconocido"; // 🔥 Fallback en caso de error
-        }
-
-        Map<String, Object> exerciseMap = new HashMap<>();
-        exerciseMap.put("name", exercise.getName());
-        exerciseMap.put("equipmentType", exercise.getEquipmentType());
-        exerciseMap.put("exerciseType", exercise.getExerciseType());
-        exerciseMap.put("musclesWorked", exercise.getMusclesWorked());
-        exerciseMap.put("loadIntensity", exercise.getLoadIntensity());
-        exerciseMap.put("image", exercise.getImage());
-        exerciseMap.put("description", exercise.getDescription());
-        exerciseMap.put("movementType", exercise.getMovementType());
-        exerciseMap.put("synergistMuscles", exercise.getSynergistMuscles());
-        exerciseMap.put("goals", exercise.getGoals());
-        exerciseMap.put("movementPatterns", exercise.getMovementPatterns());
-        exerciseMap.put("dayName", dayName); // 🔥 Asegurar que siempre tenga un valor válido
-
-        return exerciseMap;
-    }
-
-
 
 
     // ✅ Método para convertir `Exercise` a `Map<String, Object>`
@@ -448,7 +399,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
         Log.d(TAG, "[addSelectedExercise] ✅ MÉTODO FINALIZADO");
     }
-
     private void addExerciseToDayContainer(Exercise exercise, TrainingDay trainingDay) {
         Log.d(TAG, "[addExerciseToDayContainer] 🔄 MÉTODO INICIADO para: " + exercise.getName());
 
@@ -469,15 +419,55 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
         // Configurar el nombre del ejercicio
         TextView exerciseNameView = exerciseContainer.findViewById(R.id.exerciseName);
-        if (exerciseNameView == null) {
-            Log.e(TAG, "[addExerciseToDayContainer] ❌ ERROR: `exerciseNameView` es NULL.");
+        EditText seriesInput = exerciseContainer.findViewById(R.id.seriesInput); // 🔥 Nuevo campo
+
+        if (exerciseNameView == null || seriesInput == null) {
+            Log.e(TAG, "[addExerciseToDayContainer] ❌ ERROR: `exerciseNameView` o `seriesInput` son NULL.");
             return;
         }
+
         exerciseNameView.setText(exercise.getName());
 
-        // ✅ Agregar el ejercicio al objeto `trainingDay`
-        UserExercise userExercise = new UserExercise(exercise);
-        trainingDay.getExercises().add(userExercise);
+        // ✅ Verificar si el ejercicio ya existe en el día
+        UserExercise userExercise = null;
+        for (UserExercise ue : trainingDay.getExercises()) {
+            if (ue.getName().equals(exercise.getName())) {
+                userExercise = ue;
+                break;
+            }
+        }
+
+        if (userExercise == null) {
+            userExercise = new UserExercise(exercise);
+            userExercise.setSeries(3); // 🔥 Valor por defecto
+            trainingDay.getExercises().add(userExercise);
+        }
+
+        // **🔥 Solución: Usar AtomicInteger para modificar en el TextWatcher**
+        AtomicInteger seriesValue = new AtomicInteger(userExercise.getSeries());
+        seriesInput.setText(String.valueOf(seriesValue.get()));
+
+        // 🔥 Guardar cambios cuando se editen las series
+        UserExercise finalUserExercise = userExercise; // **✅ Hacer una copia para usar dentro del TextWatcher**
+        seriesInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                try {
+                    int series = Integer.parseInt(s.toString());
+                    seriesValue.set(series);
+                    finalUserExercise.setSeries(series); // **✅ Modificar la copia final**
+                    Log.d(TAG, "[addExerciseToDayContainer] 📌 Número de series actualizado: " + series);
+                } catch (NumberFormatException e) {
+                    Log.e(TAG, "[addExerciseToDayContainer] ❌ ERROR: Valor no válido en seriesInput");
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
 
         // 🔥 Agregar el contenedor visualmente en la posición correcta
         int addButtonIndex = dayContainer.getChildCount() - 1;
@@ -494,6 +484,8 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
         Log.d(TAG, "[addExerciseToDayContainer] ✅ Ejercicio agregado visualmente al día " + trainingDay.getDayIndex());
     }
+
+
 
     private void configurePopupMenu(View exerciseContainer, Exercise exercise, TrainingDay trainingDay, LinearLayout dayContainer) {
         ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);

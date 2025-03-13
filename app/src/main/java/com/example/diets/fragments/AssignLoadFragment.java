@@ -97,13 +97,22 @@ public class AssignLoadFragment extends Fragment {
             Log.d(TAG, "AssignLoadFragment - onViewCreated: Botón de guardar clicado");
             saveAssignedLoads();
             // Mostrar mensaje al usuario
-            Toast.makeText(getContext(), "Formulario de entrenamiento completado", Toast.LENGTH_SHORT).show();
-            // Navegar al nuevo fragmento
-            if (getActivity() instanceof ViewPagerActivity) {
-                Bundle bundle = new Bundle();
-                bundle.putString("userId", userId);
-                ((ViewPagerActivity) getActivity()).switchToDashboardWorkoutFragment(bundle);
+
+            if (!areAllExercisesValid()) {
+                Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ No se pueden guardar los datos. Hay ejercicios con información incompleta.");
+                Toast.makeText(getContext(), "⚠️ Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
+                return;
+            }else{
+                Toast.makeText(getContext(), "Formulario de entrenamiento completado", Toast.LENGTH_SHORT).show();
+                // Navegar al nuevo fragmento
+                if (getActivity() instanceof ViewPagerActivity) {
+                    Bundle bundle = new Bundle();
+                    bundle.putString("userId", userId);
+
+                    ((ViewPagerActivity) getActivity()).switchToDashboardWorkoutFragment(bundle);
+                }
             }
+
         });
     }
 
@@ -336,32 +345,91 @@ public class AssignLoadFragment extends Fragment {
     }
 
     private void saveAssignedLoads() {
-        DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
-        userExercisesRef.setValue(userExercises)
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: Cargas asignadas guardadas exitosamente");
-                    if (getContext() != null) {
-                        Toast.makeText(getContext(), "Cargas asignadas guardadas exitosamente", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Log.e(TAG, "Contexto es nulo al intentar mostrar el Toast");
-                    }
-                    // Actualizar los iconos de los botones de estado
-                    updateAllStatusButtonIcons();
+        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: Iniciando validación de datos de todos los ejercicios...");
 
-                    // Actualizar el estado del formulario de entrenamiento
-                    DatabaseReference userRef = mDatabase.child("users").child(userId);
-                    userRef.child("trainingFormCompleted").setValue(true)
+        // ✅ Verificar que todos los ejercicios tengan datos completos antes de guardar
+        if (!areAllExercisesValid()) {
+            Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ No se pueden guardar los datos. Hay ejercicios con información incompleta.");
+            Toast.makeText(getContext(), "⚠️ Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
+            return;
+        }else{
+            Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Todos los ejercicios están completos. Procediendo a guardar...");
 
-                            .addOnSuccessListener(aVoid1 -> Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: Estado del formulario de entrenamiento actualizado"))
-                            .addOnFailureListener(e -> Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: Error al actualizar el estado del formulario de entrenamiento", e));
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: Error al guardar las cargas asignadas", e);
-                    if (getContext() != null) {
-                        Toast.makeText(getContext(), "Error al guardar las cargas asignadas", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Log.e(TAG, "Contexto es nulo al intentar mostrar el Toast");
-                    }
-                });
+            DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
+            userExercisesRef.setValue(userExercises)
+                    .addOnSuccessListener(aVoid -> {
+                        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Cargas asignadas guardadas exitosamente.");
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), "✅ Cargas asignadas guardadas exitosamente", Toast.LENGTH_SHORT).show();
+                        }
+
+                        // Actualizar iconos de estado
+                        updateAllStatusButtonIcons();
+
+                        // Actualizar el estado del formulario de entrenamiento
+                        DatabaseReference userRef = mDatabase.child("users").child(userId);
+                        userRef.child("trainingFormCompleted").setValue(true)
+                                .addOnSuccessListener(aVoid1 -> Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Estado del formulario actualizado."))
+                                .addOnFailureListener(e -> Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ Error al actualizar el estado del formulario.", e));
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ Error al guardar las cargas asignadas.", e);
+                        if (getContext() != null) {
+                            Toast.makeText(getContext(), "⚠️ Error al guardar las cargas asignadas.", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+            DatabaseReference userRef2 = FirebaseDatabase.getInstance().getReference()
+                    .child("users").child(userId);
+
+            userRef2.child("trainingFormCompleted").setValue(true);
+        }
     }
+
+    /**
+     * ✅ Valida que todos los ejercicios tengan los datos completos.
+     */
+    private boolean areAllExercisesValid() {
+        for (UserExercise exercise : userExercises) {
+            if (!isExerciseValid(exercise)) {
+                Log.e(TAG, "AssignLoadFragment - areAllExercisesValid: ❌ Ejercicio con datos incompletos: " + exercise.getName());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * ✅ Verifica si un solo ejercicio tiene todos los datos requeridos.
+     */
+    private boolean isExerciseValid(UserExercise exercise) {
+        if (exercise == null) {
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Ejercicio es nulo.");
+            return false;
+        }
+
+        if (exercise.getName() == null || exercise.getName().trim().isEmpty()) {
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta el nombre del ejercicio.");
+            return false;
+        }
+
+        if (exercise.getCurrentLoad() <= 0) {
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar peso en " + exercise.getName());
+            return false;
+        }
+
+        if (exercise.getMaxReps() <= 0) {
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar repeticiones en " + exercise.getName());
+            return false;
+        }
+
+
+        if (exercise.getFamiliarity() == null || exercise.getFamiliarity().trim().isEmpty()) {
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar familiaridad en " + exercise.getName());
+            return false;
+        }
+
+        Log.d(TAG, "AssignLoadFragment - isExerciseValid: ✅ Datos completos para " + exercise.getName());
+        return true;
+    }
+
 }

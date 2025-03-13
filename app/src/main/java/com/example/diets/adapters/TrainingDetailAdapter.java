@@ -1,34 +1,55 @@
 package com.example.diets.adapters;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
-import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.RecyclerView;
-import com.example.diets.R;
-import com.example.diets.model.UserExercise;
-import java.util.List;
 
-public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAdapter.ViewHolder> {
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.example.diets.R;
+import com.example.diets.model.ExerciseSeries;
+import com.example.diets.model.UserExercise;
+
+import java.util.ArrayList;
+import java.util.List;
+public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAdapter.ExerciseViewHolder> {
+    private static final String TAG = "TrainingDetailAdapter"; // 🔥 Nombre de la clase para logs
     private List<UserExercise> exercises;
 
     public TrainingDetailAdapter(List<UserExercise> exercises) {
+        Log.d(TAG, "🟢 Constructor → Recibiendo lista de ejercicios.");
         this.exercises = exercises;
+        Log.d(TAG, "✅ Se recibieron " + exercises.size() + " ejercicios.");
     }
 
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_exercise_detailss, parent, false);
-        return new ViewHolder(view);
+    public ExerciseViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        Log.d(TAG, "🟢 onCreateViewHolder() → Inflando layout para cada ejercicio.");
+
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_contenedor, parent, false);
+
+        if (view == null) {
+            Log.e(TAG, "❌ ERROR: No se pudo inflar item_contenedor.xml. Verifica el archivo XML.");
+        } else {
+            Log.d(TAG, "✅ Layout inflado correctamente.");
+        }
+
+        return new ExerciseViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull ExerciseViewHolder holder, int position) {
+        Log.d(TAG, "🟢 onBindViewHolder() → Vinculando vista en posición " + position);
+
         UserExercise exercise = exercises.get(position);
+        Log.d(TAG, "📌 Cargando ejercicio: " + exercise.getName());
+
         holder.bind(exercise);
+        Log.d(TAG, "✅ Ejercicio vinculado correctamente.");
     }
 
     @Override
@@ -36,35 +57,51 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         return exercises.size();
     }
 
-    public static class ViewHolder extends RecyclerView.ViewHolder {
-        private TextView exerciseNameTextView;
-        private EditText repsEditText;
-        private EditText weightEditText;
-        private EditText rpeEditText;
-        private Button saveButton;
+    static class ExerciseViewHolder extends RecyclerView.ViewHolder {
+        private static final String TAG = "ExerciseViewHolder"; // 🔥 Nombre de la clase
+        TextView exerciseName;
+        RecyclerView recyclerViewSeries;
+        SeriesAdapter seriesAdapter;
 
-        public ViewHolder(@NonNull View itemView) {
+        public ExerciseViewHolder(@NonNull View itemView) {
             super(itemView);
-            exerciseNameTextView = itemView.findViewById(R.id.exerciseNameTextView);
-            repsEditText = itemView.findViewById(R.id.repsEditText);
-            weightEditText = itemView.findViewById(R.id.weightEditText);
-            rpeEditText = itemView.findViewById(R.id.rpeEditText);
-            saveButton = itemView.findViewById(R.id.saveButton);
+            Log.d(TAG, "🟢 Constructor → Inicializando vistas.");
+
+            exerciseName = itemView.findViewById(R.id.exerciseName);
+            recyclerViewSeries = itemView.findViewById(R.id.recyclerViewSeries);
+
+            if (exerciseName == null || recyclerViewSeries == null) {
+                Log.e(TAG, "❌ ERROR: Alguna vista es NULL. Verifica los IDs en item_contenedor.xml.");
+            } else {
+                recyclerViewSeries.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+                Log.d(TAG, "✅ recyclerViewSeries inicializado con LinearLayoutManager.");
+            }
         }
 
         public void bind(UserExercise exercise) {
-            exerciseNameTextView.setText(exercise.getName());
-            repsEditText.setText(String.valueOf(exercise.getReps()));
-            weightEditText.setText(String.valueOf(exercise.getWeight()));
-            rpeEditText.setText(String.valueOf(exercise.getRpe()));
+            Log.d(TAG, "🟢 bind() → Vinculando ejercicio: " + exercise.getName());
+            exerciseName.setText(exercise.getName());
 
-            saveButton.setOnClickListener(v -> {
-                // Guardar los valores ingresados
-                exercise.setReps(Integer.parseInt(repsEditText.getText().toString()));
-                exercise.setWeight(Double.parseDouble(weightEditText.getText().toString()));
-                exercise.setRpe(Double.parseDouble(rpeEditText.getText().toString()));
-                // Aquí puedes agregar la lógica para guardar los datos en Firebase
-            });
+            // 🔥 Crear lista de series para este ejercicio
+            List<ExerciseSeries> seriesList = new ArrayList<>();
+            for (int i = 0; i < exercise.getSeries(); i++) {
+                seriesList.add(new ExerciseSeries(
+                        i + 1,                         // Número de serie
+                        exercise.getReps(),            // Repeticiones
+                        exercise.getWeight(),          // Peso (double)
+                        exercise.getRpe()              // RPE (double)
+                ));
+                Log.d(TAG, "📌 Serie " + (i + 1) + " → Reps: " + exercise.getReps() + ", Peso: " + exercise.getWeight() + ", RPE: " + exercise.getRpe());
+            }
+
+            // 🔥 Configurar adaptador de series
+            if (recyclerViewSeries != null) {
+                seriesAdapter = new SeriesAdapter(seriesList);
+                recyclerViewSeries.setAdapter(seriesAdapter);
+                Log.d(TAG, "✅ SeriesAdapter configurado con " + seriesList.size() + " series.");
+            } else {
+                Log.e(TAG, "❌ No se pudo configurar el adaptador porque recyclerViewSeries es NULL.");
+            }
         }
     }
 }

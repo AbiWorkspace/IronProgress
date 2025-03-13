@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
 public class UserExercise extends Exercise implements Serializable {
     private static final long serialVersionUID = 1L; // Asegura compatibilidad de serialización
 

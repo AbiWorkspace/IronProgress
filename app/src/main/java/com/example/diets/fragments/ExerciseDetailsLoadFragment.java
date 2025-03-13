@@ -1,6 +1,7 @@
 package com.example.diets.fragments;
 
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,6 +12,7 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -91,7 +93,7 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         TextInputEditText loadEditText = view.findViewById(R.id.loadEditText);
         Spinner repsSpinner = view.findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = view.findViewById(R.id.familiaritySpinner);
-        Spinner seriesSpinner = view.findViewById(R.id.seriesSpinner); // ✅ NUEVO SPINNER
+//        Spinner seriesSpinner = view.findViewById(R.id.seriesSpinner); // ✅ NUEVO SPINNER
 
         exerciseNameView.setText(userExercise.getName());
         loadEditText.setText(String.valueOf(userExercise.getCurrentLoad()));
@@ -114,8 +116,8 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         ArrayAdapter<Integer> seriesAdapter = new ArrayAdapter<>(getContext(),
                 android.R.layout.simple_spinner_item, getSeriesOptions());
         seriesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        seriesSpinner.setAdapter(seriesAdapter);
-        seriesSpinner.setSelection(userExercise.getSeries() - 1); // Ajustar selección
+//        seriesSpinner.setAdapter(seriesAdapter);
+//        seriesSpinner.setSelection(userExercise.getSeries() - 1); // Ajustar selección
 
         Log.d(TAG, "Detalles del ejercicio cargados correctamente.");
     }
@@ -138,41 +140,95 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
     }
 
     private void saveExerciseDetails() {
-        Log.d(TAG, "Guardando detalles del ejercicio...");
+        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Iniciando validación de datos del ejercicio...");
 
+        // Obtener referencias a los campos
         TextInputEditText loadEditText = getView().findViewById(R.id.loadEditText);
         Spinner repsSpinner = getView().findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = getView().findViewById(R.id.familiaritySpinner);
-        Spinner seriesSpinner = getView().findViewById(R.id.seriesSpinner); // ✅ NUEVO SPINNER
+//        Spinner seriesSpinner = getView().findViewById(R.id.seriesSpinner);
 
+        // Validar que los campos no estén vacíos
+        if (!isExerciseDataValid(loadEditText, repsSpinner,familiaritySpinner)) {
+            Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ❌ Datos incompletos. No se guardará la información.");
+            Toast.makeText(getContext(), "⚠️ Completa todos los campos antes de guardar.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Convertir valores ingresados
         int currentLoad = Integer.parseInt(loadEditText.getText().toString());
         int maxReps = repsSpinner.getSelectedItemPosition() + 1;
-        int series = seriesSpinner.getSelectedItemPosition() + 1; // ✅ Obtener series
+//        int series = seriesSpinner.getSelectedItemPosition() + 1;
         boolean isCompleted = familiaritySpinner.getSelectedItemPosition() == 3;
         String familiarity = familiaritySpinner.getSelectedItem().toString();
 
+        // Asignar valores a `userExercise`
         userExercise.setCurrentLoad(currentLoad);
         userExercise.setMaxReps(maxReps);
-        userExercise.setSeries(series); // ✅ Guardar series en `UserExercise`
+//        userExercise.setSeries(series);
         userExercise.setCompleted(isCompleted);
         userExercise.setFamiliarity(familiarity);
 
+        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ✅ Datos del ejercicio validados y asignados.");
+
+        // Guardar en Firebase
         if (userId != null && mDatabase != null) {
             DatabaseReference exerciseRef = mDatabase.child("users").child(userId).child("userExercises").child(String.valueOf(userExercise.getId()));
 
             exerciseRef.child("currentLoad").setValue(currentLoad);
             exerciseRef.child("maxReps").setValue(maxReps);
-            exerciseRef.child("series").setValue(series); // ✅ Guardar series en Firebase
+//            exerciseRef.child("series").setValue(series);
             exerciseRef.child("isCompleted").setValue(isCompleted);
             exerciseRef.child("familiarity").setValue(familiarity)
                     .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "Detalles del ejercicio guardados correctamente.");
+                        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ✅ Datos guardados correctamente en Firebase.");
                         sharedViewModel.selectExercise(userExercise);
                     })
-                    .addOnFailureListener(e -> Log.e(TAG, "Error al guardar los detalles del ejercicio", e));
+                    .addOnFailureListener(e -> Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ❌ Error al guardar en Firebase", e));
         } else {
-            Log.e(TAG, "Error: Usuario no autenticado o referencia a Firebase nula");
+            Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ❌ Error: Usuario no autenticado o referencia a Firebase nula.");
         }
+    }
+
+    /**
+     * Verifica si todos los datos del ejercicio están completos antes de guardarlos.
+     */
+    private boolean isExerciseDataValid(TextInputEditText loadEditText, Spinner repsSpinner,  Spinner familiaritySpinner) {
+        if (loadEditText == null || repsSpinner == null  || familiaritySpinner == null) {
+            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ Un spinner o campo de entrada es nulo.");
+            return false;
+        }
+
+        if (TextUtils.isEmpty(loadEditText.getText())) {
+            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ El campo de peso está vacío.");
+            return false;
+        }
+
+        try {
+            int loadValue = Integer.parseInt(loadEditText.getText().toString());
+            if (loadValue <= 0) {
+                Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ El peso debe ser mayor a 0.");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ Error al convertir el peso a número.", e);
+            return false;
+        }
+
+        if (repsSpinner.getSelectedItemPosition() == 0) {
+            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ No se ha seleccionado el número de repeticiones.");
+            return false;
+        }
+
+//        if (seriesSpinner.getSelectedItemPosition() == 0) {
+//            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ No se ha seleccionado el número de series.");
+//            return false;
+//        }
+
+
+
+        Log.d(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ✅ Todos los datos están completos.");
+        return true;
     }
 
     // Método para establecer el botón de estado desde AssignLoadFragment

@@ -16,7 +16,7 @@ import com.example.diets.fragments.DashboardWorkoutFragment;
 import com.example.diets.fragments.ExerciseDetailsLoadFragment;
 import com.example.diets.fragments.ExerciseDistributionFragment;
 import com.example.diets.fragments.MenuPopupFragment;
-import com.example.diets.fragments.TrainingDayDetailFragment2;
+
 import com.example.diets.fragments.TrainingDetailFragment;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.TrainingDay;
@@ -332,12 +332,7 @@ public class ViewPagerActivity extends AppCompatActivity
         viewPager.setAdapter(adapter); // Vuelve a configurar el adaptador si es necesario
     }
 
-    public void switchToTrainingDayDetailFragment(TrainingDay trainingDay) {
-        TrainingDayDetailFragment2 fragment = TrainingDayDetailFragment2.newInstance(trainingDay);
-        adapter.replaceFragment(0, fragment);
-        viewPager.setAdapter(adapter);
-        viewPager.setCurrentItem(0, true); // Mantiene el ViewPager en la posición de entrenamiento
-    }
+
 
     @Override
     public void onExerciseClick(Exercise exercise) {
