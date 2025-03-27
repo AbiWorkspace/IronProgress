@@ -1,5 +1,7 @@
 package com.example.diets.fragments;
 
+import android.app.AlertDialog;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -12,11 +14,9 @@ import android.widget.Button;
 import android.widget.Chronometer;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -29,13 +29,10 @@ import com.example.diets.model.ExerciseSeries;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.TrainingDay;
 import com.example.diets.model.UserExercise;
+import com.example.diets.fragments.SelectExercisesFragment.OnExercisesSelectedListener;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.database.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,7 +42,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class TrainingDetailFragment extends Fragment implements SelectExercisesFragment.OnExercisesSelectedListener {
+public class TrainingDetailFragment extends Fragment implements OnExercisesSelectedListener {
+
     private static final String TAG = "TrainingDetailFragment";
 
     private RecyclerView recyclerViewExercises;
@@ -58,15 +56,20 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
     private long pauseOffset = 0;
     private Button btnFinishWorkout;
     private String dayKey;
-    private boolean seriesSaved = false; // 🔐 Previene múltiples guardados
+    private boolean seriesSaved = false; // Previene múltiples guardados sucesivos
+
     private MovementPattern movementPatternDelDia;
     private List<String> musculosSinergicosDelDia;
+
+    // Si en algún momento quisieras almacenar un TrainingDay entero, lo puedes usar:
     private TrainingDay trainingDayDelDia;
-    private MovementPattern movementPattern; // 🔥
+    private MovementPattern movementPattern; // Se deja por si requieres más adelante
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         Log.d(TAG, "TrainingDetailFragment - onCreateView: Inicio de creación de la vista del fragmento.");
 
         View view = inflater.inflate(R.layout.fragment_training_detail, container, false);
@@ -80,14 +83,19 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         }
 
         Button btnAddExercise = view.findViewById(R.id.btnAddExercise);
-        btnAddExercise.setEnabled(false); // 🔒 Desactivado hasta que se cargue el patrón
+        btnAddExercise.setEnabled(false); // Se habilitará cuando cargue el MovementPattern
 
+        // ***********************************************************
+        // Recuperar argumentos (lista de ejercicios + dayKey = "Día X")
+        // ***********************************************************
         if (getArguments() != null) {
             Log.d(TAG, "TrainingDetailFragment - onCreateView: Recuperando argumentos desde el Bundle.");
             exercises = (List<UserExercise>) getArguments().getSerializable("exercises");
+
             dayKey = getArguments().getString("dayKey", "Día 1");
             Log.d(TAG, "TrainingDetailFragment - onCreateView: dayKey recibido → " + dayKey);
 
+            // 1) Cargar MovementPattern de Firebase según dayKey
             obtenerMovementPatternDelDia(dayKey, pattern -> {
                 if (pattern != null) {
                     movementPatternDelDia = pattern;
@@ -96,7 +104,7 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
                     Log.d(TAG, "📌 Nombre del patrón recuperado: " + movementPatternDelDia.getName());
                     Log.d(TAG, "💪 Músculos sinérgicos: " + musculosSinergicosDelDia);
 
-                    // ✅ Activar botón cuando el patrón esté cargado
+                    // ✅ Habilitar botón "Agregar Ejercicio" cuando se cargue el patrón
                     btnAddExercise.setEnabled(true);
                 } else {
                     Log.w(TAG, "⚠ No se encontró patrón de movimiento para el día: " + dayKey);
@@ -107,14 +115,18 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
             exercises = new ArrayList<>();
         }
 
+        // ************************************************************************
+        // Botón "Agregar Ejercicio" - Abre MenuPopupFragmentAlt con el dayKey actual
+        // ************************************************************************
         btnAddExercise.setOnClickListener(v -> {
             Log.d(TAG, "btnAddExercise: Mostrando MenuPopupFragmentAlt con día: " + dayKey);
 
             if (movementPatternDelDia != null) {
+                // Se crea un TrainingDay temporal con movementPatternDelDia
                 TrainingDay trainingDay = new TrainingDay();
                 trainingDay.setDayIndex(0);
                 trainingDay.setDayTitle(dayKey);
-                trainingDay.setMovementPatterns(Collections.singletonList(movementPatternDelDia)); // ✅ Aquí va el patrón REAL
+                trainingDay.setMovementPatterns(Collections.singletonList(movementPatternDelDia));
 
                 Bundle args = new Bundle();
                 args.putSerializable("trainingDay", trainingDay);
@@ -137,6 +149,7 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         btnFinishWorkout = view.findViewById(R.id.btnFinishWorkout);
         btnFinishWorkout.setOnClickListener(v -> finishWorkout());
 
+        // Configurar adapter con la lista de UserExercise
         adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises);
         if (recyclerViewExercises != null) {
             recyclerViewExercises.setAdapter(adapter);
@@ -146,23 +159,93 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
 
         return view;
     }
-    @Override
-    public void onExercisesSelected(List<Exercise> exercises, TrainingDay trainingDay) {
-        Log.d(TAG, "TrainingDetailFragment - onExercisesSelected: Recibidos " + exercises.size() + " ejercicios desde el selector.");
 
-        for (Exercise exercise : exercises) {
+    // ****************************************************************
+    // Implementación de la interfaz OnExercisesSelectedListener:
+    // Llamado cuando se agregan ejercicios en ExerciseSelectionDialog/CreatedExercisesFragment
+    // ****************************************************************
+    @Override
+    public void onExercisesSelected(List<Exercise> exercisesRecibidos, TrainingDay trainingDay) {
+        Log.d(TAG, "TrainingDetailFragment - onExercisesSelected: Recibidos "
+                + exercisesRecibidos.size() + " ejercicios desde el selector.");
+
+        // 1) Agregarlos a la lista local para mostrarlos en el RecyclerView
+        for (Exercise exercise : exercisesRecibidos) {
             Log.d(TAG, "➕ Añadiendo ejercicio: " + exercise.getName());
 
             UserExercise userExercise = new UserExercise(exercise);
-            userExercise.setSeries(3);
-            this.exercises.add(userExercise);
+            userExercise.setSeries(3); // Por defecto, si así lo deseas
+            exercises.add(userExercise);
 
-            adapter.notifyItemInserted(this.exercises.size() - 1);
-            recyclerViewExercises.smoothScrollToPosition(this.exercises.size() - 1);
+            adapter.notifyItemInserted(exercises.size() - 1);
+            recyclerViewExercises.smoothScrollToPosition(exercises.size() - 1);
         }
+
+        // 2) Guardarlos en Firebase con índice numérico en "userMovementPatterns/<dayKey>/userExercises/0,1,2..."
+        guardarEjerciciosEnFirebase(exercisesRecibidos, trainingDay.getDayTitle());
     }
 
+    // ****************************************************************
+    // Guarda una lista de nuevos ejercicios en "userMovementPatterns/<dayKey>/userExercises"
+    // usando índices incrementales en vez de push().
+    // ****************************************************************
+    private void guardarEjerciciosEnFirebase(List<Exercise> exercisesNuevos, String dayKey) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            Log.e(TAG, "❌ Usuario no autenticado. No se guardarán ejercicios en Firebase.");
+            return;
+        }
 
+        String userId = user.getUid();
+        DatabaseReference userExercisesRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(userId)
+                .child("userMovementPatterns")
+                .child(dayKey)
+                .child("userExercises");
+        // => userMovementPatterns/Día X/userExercises
+
+        // 1) Leer cuántos hijos (ejercicios) existen actualmente en "userExercises"
+        userExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                long existingCount = snapshot.getChildrenCount(); // cantidad de ejercicios existentes
+
+                // 2) Guardar cada ejercicio nuevo con la clave = existingCount, existingCount+1, etc.
+                for (Exercise ex : exercisesNuevos) {
+                    Map<String, Object> exerciseData = new HashMap<>();
+                    exerciseData.put("name", ex.getName());
+                    exerciseData.put("description", ex.getDescription());
+                    exerciseData.put("equipmentType", ex.getEquipmentType());
+                    exerciseData.put("exerciseType", ex.getExerciseType());
+                    exerciseData.put("loadIntensity", ex.getLoadIntensity());
+                    exerciseData.put("movementType", ex.getMovementType());
+                    exerciseData.put("image", (ex.getImage() != null ? ex.getImage() : ""));
+                    exerciseData.put("musclesWorked", ex.getMusclesWorked());
+                    exerciseData.put("synergistMuscles", ex.getSynergistMuscles());
+                    exerciseData.put("series", 3); // Si deseas manejarlo fijo
+
+                    // La key será: 0, 1, 2, 3, ... en orden
+                    String childKey = String.valueOf(existingCount);
+                    userExercisesRef.child(childKey).setValue(exerciseData)
+                            .addOnSuccessListener(aVoid ->
+                                    Log.d(TAG, "✅ Ejercicio guardado en " + dayKey + " con key=" + childKey + ": " + ex.getName()))
+                            .addOnFailureListener(e ->
+                                    Log.e(TAG, "❌ Error al guardar ejercicio en " + dayKey + " con key=" + childKey, e));
+
+                    existingCount++;
+                }
+            }
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "❌ Error al leer índice de userExercisesRef: " + error.getMessage());
+            }
+        });
+    }
+
+    // ****************************************************************
+    // Método legacy (por si se usa en otra parte)
+    // ****************************************************************
     public void addSelectedExercise(Exercise exercise, TrainingDay day) {
         Log.d(TAG, "addSelectedExercise: Recibido ejercicio → " + exercise.getName());
 
@@ -172,9 +255,14 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
 
         adapter.notifyItemInserted(exercises.size() - 1);
         recyclerViewExercises.smoothScrollToPosition(exercises.size() - 1);
+
+        // Si quisieras también guardarlo con índice incremental, puedes:
+        // guardarEjerciciosEnFirebase(Collections.singletonList(exercise), day.getDayTitle());
     }
 
-
+    // ****************************************************************
+    // Cargar el MovementPattern (músculos sinérgicos) según el dayKey
+    // ****************************************************************
     private void obtenerMovementPatternDelDia(String dayKey, MovementPatternCallback callback) {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) {
@@ -199,11 +287,11 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
                     return;
                 }
 
-                // ✅ Obtener nombre del patrón
+                // Nombre del patrón
                 String name = snapshot.child("name").getValue(String.class);
                 Log.d(TAG, "📌 Nombre del patrón recuperado: " + name);
 
-                // ✅ Recorrer userExercises para extraer músculos sinérgicos
+                // Recorrer "userExercises" y extraer "synergistMuscles" para formar la sinergia
                 Set<String> synergistMuscles = new HashSet<>();
                 DataSnapshot exercisesSnapshot = snapshot.child("userExercises");
 
@@ -218,7 +306,7 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
                     }
                 }
 
-                // ✅ Crear objeto MovementPattern completo
+                // Crear MovementPattern
                 MovementPattern pattern = new MovementPattern();
                 pattern.setName(name != null ? name : dayKey);
                 pattern.setSynergistMuscles(new ArrayList<>(synergistMuscles));
@@ -235,14 +323,13 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         });
     }
 
-
     public interface MovementPatternCallback {
         void onPatternLoaded(MovementPattern pattern);
     }
 
-
-
-
+    // ****************************************************************
+    // Cronómetro
+    // ****************************************************************
     private void startChronometer() {
         Log.d(TAG, "TrainingDetailFragment - startChronometer: Verificando si el cronómetro ya está corriendo.");
         if (!isChronometerRunning) {
@@ -255,18 +342,19 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         }
     }
 
-
-
-
+    // ************************************************************************
+    // Lógica para finalizar entrenamiento y guardar series completadas globalmente
+    // ************************************************************************
     private void finishWorkout() {
         Log.d(TAG, "TrainingDetailFragment - finishWorkout: Comenzando flujo de finalización del entrenamiento.");
 
-        // ⏱️ Detener cronómetro
+        // Detener cronómetro
         if (isChronometerRunning) {
             pauseOffset = SystemClock.elapsedRealtime() - chronometerTraining.getBase();
             chronometerTraining.stop();
             isChronometerRunning = false;
-            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Cronómetro detenido. Tiempo total: " + formatElapsedTime(pauseOffset));
+            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Cronómetro detenido. Tiempo total: "
+                    + formatElapsedTime(pauseOffset));
         }
 
         if (seriesSaved) {
@@ -277,7 +365,7 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         Map<String, List<ExerciseSeries>> seriesPorEjercicio = adapter.getAllCompletedSeriesGroupedByExercise();
         boolean haySeriesIncompletas = false;
 
-        // ✅ Verificar si hay series incompletas
+        // Verificar si hay series incompletas
         for (UserExercise ejercicio : exercises) {
             List<ExerciseSeries> listaTotal = adapter.getSeriesListForExercise(ejercicio.getName());
             List<ExerciseSeries> completadas = seriesPorEjercicio.get(ejercicio.getName());
@@ -296,7 +384,6 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
             guardarSeriesYFinalizar(seriesPorEjercicio);
         }
     }
-
 
     private void showIncompleteSeriesDialog(Map<String, List<ExerciseSeries>> seriesPorEjercicio) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -320,6 +407,11 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
 
         dialog.show();
     }
+
+    /**
+     * Guarda las series completadas globalmente (users/<uid>/userExercises)
+     * y finaliza el flujo de entrenamiento.
+     */
     private void guardarSeriesYFinalizar(Map<String, List<ExerciseSeries>> seriesPorEjercicio) {
         Log.d(TAG, "TrainingDetailFragment - guardarSeriesYFinalizar: Iniciando guardado de series...");
 
@@ -343,7 +435,7 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
                                 String key = snap.getKey();
                                 DatabaseReference seriesRef = baseRef.child(key).child("seriesData");
 
-                                // Acumular series previas + nuevas completadas
+                                // Añadir series completadas a la data existente
                                 seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
                                     @Override
                                     public void onDataChange(@NonNull DataSnapshot snapshotPrevias) {
@@ -367,8 +459,10 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
                                         }
 
                                         seriesRef.setValue(todasLasSeries)
-                                                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Series guardadas para " + nombreEjercicio))
-                                                .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar series", e));
+                                                .addOnSuccessListener(aVoid ->
+                                                        Log.d(TAG, "✅ Series guardadas para " + nombreEjercicio))
+                                                .addOnFailureListener(e ->
+                                                        Log.e(TAG, "❌ Error al guardar series", e));
                                     }
 
                                     @Override
@@ -386,16 +480,16 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
                     });
         }
 
-        // 🔁 Actualizar cantidad de series
+        // Actualizar campo "series" en userMovementPatterns/dayKey/userExercises/<exerciseKey>/series
         actualizarConteoSeriesEnFirebase();
         seriesSaved = true;
-// ✅ Mostrar diálogo personalizado de entrenamiento finalizado
+
+        // Mostrar diálogo final de entrenamiento completado
         View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_training_finished, null);
         AlertDialog dialog = new AlertDialog.Builder(requireContext())
                 .setView(dialogView)
                 .create();
 
-// Rellenar contenido dinámico
         TextView title = dialogView.findViewById(R.id.txtDialogTitle);
         TextView message = dialogView.findViewById(R.id.txtDialogMessage);
         Button btnAceptar = dialogView.findViewById(R.id.btnAceptarDialog);
@@ -406,11 +500,11 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         btnAceptar.setOnClickListener(v -> {
             dialog.dismiss();
 
-            // 🔄 Actualizar conteo de series
+            // Por si acaso, volver a actualizar
             actualizarConteoSeriesEnFirebase();
             seriesSaved = true;
 
-            // 🔁 Regresar al Dashboard tras 1 segundo
+            // Regresar al Dashboard tras 1 segundo
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 Log.d(TAG, "🏁 Redirigiendo al DashboardWorkoutFragment tras guardado.");
                 ViewPagerActivity activity = (ViewPagerActivity) requireActivity();
@@ -420,9 +514,12 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         });
 
         dialog.show();
-
     }
 
+    /**
+     * Actualiza el campo "series" de cada ejercicio en userMovementPatterns/<dayKey>/userExercises
+     * para reflejar cuántas series tiene localmente en `adapter.getSeriesListForExercise(...)`.
+     */
     private void actualizarConteoSeriesEnFirebase() {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
@@ -455,15 +552,17 @@ public class TrainingDetailFragment extends Fragment implements SelectExercisesF
         }
     }
 
-
+    // Formatea el tiempo en HH:MM:SS
     private String formatElapsedTime(long elapsedMillis) {
         int seconds = (int) (elapsedMillis / 1000) % 60;
         int minutes = (int) ((elapsedMillis / (1000 * 60)) % 60);
         int hours = (int) ((elapsedMillis / (1000 * 60 * 60)) % 24);
-        Log.d(TAG, "TrainingDetailFragment - formatElapsedTime: Tiempo formateado → " + String.format("%02d:%02d:%02d", hours, minutes, seconds));
+        Log.d(TAG, "TrainingDetailFragment - formatElapsedTime: Tiempo formateado → "
+                + String.format("%02d:%02d:%02d", hours, minutes, seconds));
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
+    // Regresa al Dashboard (tu actividad principal con ViewPager)
     private void switchToDashboardWorkout() {
         Log.d(TAG, "TrainingDetailFragment - switchToDashboardWorkout: Usuario presionó el botón de retroceso.");
         ViewPagerActivity activity = (ViewPagerActivity) requireActivity();

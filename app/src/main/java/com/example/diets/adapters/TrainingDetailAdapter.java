@@ -215,6 +215,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                 });
             });
         }
+
         private void showIncompleteSeriesDialog(UserExercise exercise, List<ExerciseSeries> updatedSeries) {
             AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
             View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_incomplete_series, null);
