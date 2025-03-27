@@ -16,6 +16,7 @@ import com.example.diets.model.UserExercise;
 import com.example.diets.R;
 
 import java.util.List;
+
 public class ExerciseAdapter extends RecyclerView.Adapter<ExerciseAdapter.ViewHolder> {
     private List<UserExercise> exercises;
     private TrainingDayDetailFragment fragment;

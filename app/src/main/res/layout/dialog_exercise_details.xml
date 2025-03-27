@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="true"
+    android:background="@drawable/rounded_corners"
+    android:padding="16dp"
+    android:layout_marginBottom="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/rounded_outer_corners"
+        android:padding="16dp"
+        android:divider="@android:color/darker_gray"
+        android:showDividers="none">
+
+        <!-- Contenedor superior: imagen + título del ejercicio -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="12dp">
+
+            <!-- Imagen del ejercicio -->
+            <ImageView
+                android:id="@+id/imageExercise"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:scaleType="centerCrop"
+                android:background="@drawable/rounded_corners"
+                android:src="@drawable/ic_placeholder"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <!-- Nombre del ejercicio -->
+            <TextView
+                android:id="@+id/textExerciseName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="Nombre del Ejercicio"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                app:layout_constraintStart_toEndOf="@id/imageExercise"
+                app:layout_constraintTop_toTopOf="@id/imageExercise"
+                app:layout_constraintEnd_toEndOf="parent" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- CardView para descripción y músculos -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#2F2F2F"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/textDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Descripción del ejercicio"
+                    android:textSize="18sp"
+                    android:textColor="#BBBBBB"
+                    android:padding="10dp"
+                    android:background="@drawable/rounded_corners" />
+
+                <TextView
+                    android:id="@+id/textMusclesWorked"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Músculos trabajados: ..."
+                    android:textSize="18sp"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginTop="12dp" />
+
+                <TextView
+                    android:id="@+id/textSynergistMuscles"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Músculos sinérgicos: ..."
+                    android:textSize="18sp"
+                    android:textColor="#FFFFFF"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- CardView para estadísticas del ejercicio -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardElevation="6dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="#2F2F2F"
+            android:padding="16dp"
+            android:layout_marginTop="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+
+
+                <TextView
+                    android:id="@+id/textRM"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="RM Estimado: 80 kg"
+                    android:textSize="20sp"
+                    android:textColor="#E63946"
+                    android:textStyle="bold"
+                    android:paddingBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/textPersonalRecord"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Personal Record: 100 kg"
+                    android:textSize="20sp"
+                    android:textColor="#FFD700"
+                    android:textStyle="bold"
+                    android:paddingBottom="8dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <com.github.mikephil.charting.charts.LineChart
+            android:id="@+id/chartExerciseProgress"
+            android:layout_width="match_parent"
+            android:layout_height="220dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/rounded_corners" />
+
+        <!-- Spinner para seleccionar RPE -->
+        <Spinner
+            android:id="@+id/spinnerRpeFilter"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:entries="@array/rpe_array"
+        android:layout_marginBottom="16dp"
+        android:layout_marginHorizontal="12dp"
+        android:spinnerMode="dropdown" />
+
+        <Button
+            android:id="@+id/btnClose"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="CERRAR"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#E63946"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"
+            android:layout_marginHorizontal="12dp"
+            android:padding="12dp" />
+
+
+
+
+
+
+    </LinearLayout>
+</ScrollView>

@@ -2,21 +2,40 @@ package com.example.diets.model;
 
 import android.util.Log;
 
+import java.util.List;
+
 public class ExerciseSeries {
     private static final String TAG = "ExerciseSeries"; // 🔥 Nombre de la clase para logs
     private int seriesNumber;
     private int reps;
     private double weight; // ✅ Debe ser double
     private double rpe;    // ✅ Debe ser double (no int)
+    private boolean isCompleted; // ✅ Nuevo atributo para indicar si la serie está completada
 
-    public ExerciseSeries(int seriesNumber, int reps, double weight, double rpe) {
+    // 🔥 Constructor vacío requerido por Firebase
+    public ExerciseSeries() {
+        this.seriesNumber = 0;
+        this.reps = 0;
+        this.weight = 0.0;
+        this.rpe = 0.0;
+        this.isCompleted = false;
+    }
+
+    // 🔥 Constructor principal con todos los atributos
+    public ExerciseSeries(int seriesNumber, int reps, double weight, double rpe, boolean isCompleted) {
         Log.d(TAG, "ExerciseSeries - Constructor: Creando nueva serie.");
         this.seriesNumber = seriesNumber;
-        this.reps = reps;
-        this.weight = weight;
-        this.rpe = rpe;
+        this.reps = validateReps(reps);
+        this.weight = validateWeight(weight);
+        this.rpe = validateRpe(rpe);
+        this.isCompleted = isCompleted;
 
-        Log.d(TAG, "✅ Serie creada: Número de serie: " + seriesNumber + ", Reps: " + reps + ", Peso: " + weight + ", RPE: " + rpe);
+        Log.d(TAG, "✅ Serie creada: Número de serie: " + seriesNumber + ", Reps: " + this.reps + ", Peso: " + this.weight + ", RPE: " + this.rpe + ", Completada: " + this.isCompleted);
+    }
+
+    // 🔥 Constructor alternativo para compatibilidad sin `isCompleted` (se inicializa en `false`)
+    public ExerciseSeries(int seriesNumber, int reps, double weight, double rpe) {
+        this(seriesNumber, reps, weight, rpe, false);
     }
 
     // 🔥 Getters y Setters con logs
@@ -36,12 +55,8 @@ public class ExerciseSeries {
     }
 
     public void setReps(int reps) {
-        if (reps < 0) {
-            Log.e(TAG, "❌ ERROR: Intento de asignar reps negativas. Valor inválido: " + reps);
-            return;
-        }
-        Log.d(TAG, "ExerciseSeries - setReps: Modificando reps a: " + reps);
-        this.reps = reps;
+        this.reps = validateReps(reps);
+        Log.d(TAG, "ExerciseSeries - setReps: Modificando reps a: " + this.reps);
     }
 
     public double getWeight() {
@@ -50,12 +65,8 @@ public class ExerciseSeries {
     }
 
     public void setWeight(double weight) {
-        if (weight < 0) {
-            Log.e(TAG, "❌ ERROR: Intento de asignar peso negativo. Valor inválido: " + weight);
-            return;
-        }
-        Log.d(TAG, "ExerciseSeries - setWeight: Modificando peso a: " + weight);
-        this.weight = weight;
+        this.weight = validateWeight(weight);
+        Log.d(TAG, "ExerciseSeries - setWeight: Modificando peso a: " + this.weight);
     }
 
     public double getRpe() {
@@ -64,18 +75,68 @@ public class ExerciseSeries {
     }
 
     public void setRpe(double rpe) {
-        if (rpe < 0 || rpe > 10) {
-            Log.e(TAG, "❌ ERROR: Intento de asignar RPE fuera de rango (0-10). Valor inválido: " + rpe);
-            return;
-        }
-        Log.d(TAG, "ExerciseSeries - setRpe: Modificando RPE a: " + rpe);
-        this.rpe = rpe;
+        this.rpe = validateRpe(rpe);
+        Log.d(TAG, "ExerciseSeries - setRpe: Modificando RPE a: " + this.rpe);
+    }
+
+    public boolean isCompleted() { // ✅ Getter para saber si la serie está marcada como completada
+        Log.d(TAG, "ExerciseSeries - isCompleted: Estado de completado: " + isCompleted);
+        return isCompleted;
+    }
+
+    public void setCompleted(boolean completed) { // ✅ Setter para actualizar el estado
+        Log.d(TAG, "ExerciseSeries - setCompleted: Modificando estado de completado a: " + completed);
+        this.isCompleted = completed;
     }
 
     @Override
     public String toString() {
-        String info = "Serie " + seriesNumber + " → Reps: " + reps + ", Peso: " + weight + " kg, RPE: " + rpe;
+        String info = "Serie " + seriesNumber + " → Reps: " + reps + ", Peso: " + weight + " kg, RPE: " + rpe + ", Completada: " + isCompleted;
         Log.d(TAG, "ExerciseSeries - toString: " + info);
         return info;
+    }
+
+    // 🔥 Métodos de validación para asegurar valores correctos
+    private int validateReps(int reps) {
+        if (reps < 1 || reps > 30) {
+            Log.e(TAG, "❌ ERROR: Reps fuera de rango (1-30). Asignando 1 por defecto.");
+            return 1;
+        }
+        return reps;
+    }
+
+    private double validateWeight(double weight) {
+        if (weight < 0 || weight > 500) {
+            Log.e(TAG, "❌ ERROR: Peso fuera de rango (0-500 kg). Asignando 0.0 kg por defecto.");
+            return 0.0;
+        }
+        return weight;
+    }
+
+    private double validateRpe(double rpe) {
+        if (rpe < 0 || rpe > 10) {
+            Log.e(TAG, "❌ ERROR: RPE fuera de rango (0-10). Asignando 0.0 por defecto.");
+            return 0.0;
+        }
+        return rpe;
+    }
+
+    // 🔥 Método para asegurar que se obtiene correctamente el RPE desde Firebase
+    public static double getRpeFromFirebase(Object rpeValue) {
+        if (rpeValue instanceof Long) {
+            return ((Long) rpeValue).doubleValue();
+        } else if (rpeValue instanceof Double) {
+            return (double) rpeValue;
+        } else if (rpeValue instanceof String) {
+            try {
+                return Double.parseDouble((String) rpeValue);
+            } catch (NumberFormatException e) {
+                Log.e(TAG, "❌ ERROR: RPE en Firebase no es un número válido. Asignando 0.0 por defecto.");
+                return 0.0;
+            }
+        } else {
+            Log.e(TAG, "❌ ERROR: Tipo de dato inesperado para RPE en Firebase. Asignando 0.0 por defecto.");
+            return 0.0;
+        }
     }
 }

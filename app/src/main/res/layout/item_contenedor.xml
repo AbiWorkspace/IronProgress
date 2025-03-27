@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -8,22 +9,157 @@
     android:background="@drawable/rounded_outer_corners"
     android:layout_marginBottom="16dp">
 
-    <TextView
-        android:id="@+id/exerciseName"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Nombre del Ejercicio"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:textColor="#FFFFFF"
-        android:paddingBottom="5dp"
-        android:layout_marginBottom="8dp"/>
-
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewSeries"
+    <!-- Contenedor para imagen, nombre del ejercicio e icono funcional -->
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:nestedScrollingEnabled="false"
-        android:background="@drawable/rounded_corners"
-        android:padding="8dp"/>
+        android:paddingBottom="8dp">
+
+        <!-- Imagen del ejercicio -->
+        <ImageView
+            android:id="@+id/exerciseImage"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:src="@drawable/ic_placeholder"
+            android:scaleType="centerCrop"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/rounded_corners"
+            android:layout_alignParentStart="true"/>
+
+        <!-- Nombre del ejercicio -->
+        <TextView
+            android:id="@+id/exerciseName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nombre del Ejercicio"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:layout_centerVertical="true"
+            android:layout_toEndOf="@id/exerciseImage"
+            android:layout_marginStart="12dp"/>
+
+        <!-- Icono funcional en la parte superior derecha -->
+        <ImageView
+            android:id="@+id/iconAction"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@drawable/more"
+            android:scaleType="centerInside"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:padding="4dp"
+            android:clickable="true"
+            android:focusable="true"/>
+    </RelativeLayout>
+
+    <!-- ScrollView para la lista de series -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="true"
+        android:scrollbars="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:background="@drawable/rounded_corners">
+
+            <!-- 🔥 Encabezado mejor alineado a la izquierda -->
+            <LinearLayout
+                android:layout_width="319dp"
+                android:layout_height="wrap_content"
+                android:background="@drawable/rounded_corners"
+                android:orientation="horizontal"
+                android:padding="4dp">
+
+                <!-- 🔹 Serie (mantiene alineación actual) -->
+                <TextView
+                    android:layout_width="40dp"
+                    android:layout_height="wrap_content"
+                    android:gravity="start"
+                    android:text="Serie"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <!-- 🔹 Carga Anterior más alineada a la izquierda -->
+
+                <!-- 🔹 Reps más a la izquierda -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:breakStrategy="simple"
+                    android:ellipsize="end"
+                    android:gravity="start"
+                    android:maxWidth="60dp"
+                    android:maxLines="2"
+                    android:minWidth="50dp"
+                    android:text="Carga Anterior"
+                    android:textAlignment="viewStart"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="67dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.2"
+                    android:gravity="start"
+                    android:text="Reps"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <!-- 🔹 Peso más a la izquierda -->
+                <TextView
+                    android:layout_width="50dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.2"
+                    android:gravity="start"
+                    android:text="Peso"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <!-- 🔹 RPE más a la izquierda -->
+                <TextView
+                    android:layout_width="79dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="start"
+                    android:text="RPE"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- RecyclerView para listar las series -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerViewSeries"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:background="@drawable/rounded_corners"
+                android:padding="8dp"/>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Botón para añadir una nueva serie -->
+    <Button
+        android:id="@+id/btnAddSeries"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Añadir Serie"
+        android:textSize="18sp"
+        android:padding="10dp"
+        android:backgroundTint="#E63946"
+    android:textColor="#FFFFFF"
+    android:layout_marginTop="10dp"/>
+
+
 </LinearLayout>

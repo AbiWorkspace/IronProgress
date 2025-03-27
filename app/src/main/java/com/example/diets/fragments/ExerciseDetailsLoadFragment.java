@@ -31,7 +31,10 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import androidx.fragment.app.DialogFragment;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -146,49 +149,71 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         TextInputEditText loadEditText = getView().findViewById(R.id.loadEditText);
         Spinner repsSpinner = getView().findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = getView().findViewById(R.id.familiaritySpinner);
-//        Spinner seriesSpinner = getView().findViewById(R.id.seriesSpinner);
 
-        // Validar que los campos no estén vacíos
-        if (!isExerciseDataValid(loadEditText, repsSpinner,familiaritySpinner)) {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ❌ Datos incompletos. No se guardará la información.");
-            Toast.makeText(getContext(), "⚠️ Completa todos los campos antes de guardar.", Toast.LENGTH_SHORT).show();
+        if (!isExerciseDataValid(loadEditText, repsSpinner, familiaritySpinner)) {
+            Log.e(TAG, "❌ Datos incompletos. No se guardará la información.");
+            showToast("⚠️ Completa todos los campos antes de guardar.");
             return;
         }
 
-        // Convertir valores ingresados
         int currentLoad = Integer.parseInt(loadEditText.getText().toString());
         int maxReps = repsSpinner.getSelectedItemPosition() + 1;
-//        int series = seriesSpinner.getSelectedItemPosition() + 1;
         boolean isCompleted = familiaritySpinner.getSelectedItemPosition() == 3;
         String familiarity = familiaritySpinner.getSelectedItem().toString();
 
-        // Asignar valores a `userExercise`
         userExercise.setCurrentLoad(currentLoad);
         userExercise.setMaxReps(maxReps);
-//        userExercise.setSeries(series);
         userExercise.setCompleted(isCompleted);
         userExercise.setFamiliarity(familiarity);
 
-        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ✅ Datos del ejercicio validados y asignados.");
+        Log.d(TAG, "✅ Datos validados y asignados al objeto local.");
 
-        // Guardar en Firebase
-        if (userId != null && mDatabase != null) {
-            DatabaseReference exerciseRef = mDatabase.child("users").child(userId).child("userExercises").child(String.valueOf(userExercise.getId()));
-
-            exerciseRef.child("currentLoad").setValue(currentLoad);
-            exerciseRef.child("maxReps").setValue(maxReps);
-//            exerciseRef.child("series").setValue(series);
-            exerciseRef.child("isCompleted").setValue(isCompleted);
-            exerciseRef.child("familiarity").setValue(familiarity)
-                    .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ✅ Datos guardados correctamente en Firebase.");
-                        sharedViewModel.selectExercise(userExercise);
-                    })
-                    .addOnFailureListener(e -> Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ❌ Error al guardar en Firebase", e));
-        } else {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: ❌ Error: Usuario no autenticado o referencia a Firebase nula.");
+        if (userId == null || mDatabase == null) {
+            Log.e(TAG, "❌ Error: Usuario no autenticado o referencia a Firebase nula.");
+            return;
         }
+
+        DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
+
+        userExercisesRef.orderByChild("name").equalTo(userExercise.getName()).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                        String exerciseKey = childSnapshot.getKey();
+
+                        if (exerciseKey != null) {
+                            Map<String, Object> exerciseUpdates = new HashMap<>();
+                            exerciseUpdates.put("currentLoad", currentLoad);
+                            exerciseUpdates.put("maxReps", maxReps);
+                            exerciseUpdates.put("isCompleted", isCompleted);
+                            exerciseUpdates.put("familiarity", familiarity);
+
+                            userExercisesRef.child(exerciseKey).updateChildren(exerciseUpdates)
+                                    .addOnSuccessListener(aVoid -> {
+                                        Log.d(TAG, "✅ Datos actualizados correctamente para: " + userExercise.getName());
+                                        sharedViewModel.selectExercise(userExercise);
+                                        showToast("✅ Datos guardados correctamente");
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "❌ Error al actualizar el ejercicio en Firebase: " + userExercise.getName(), e);
+                                        showToast("❌ Error al guardar los datos.");
+                                    });
+                        }
+                    }
+                } else {
+                    Log.e(TAG, "❌ No se encontró el ejercicio en Firebase: " + userExercise.getName());
+                    showToast("❌ No se encontró el ejercicio en la base de datos.");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "❌ Error al buscar el ejercicio en Firebase: " + error.getMessage());
+            }
+        });
     }
+
 
     /**
      * Verifica si todos los datos del ejercicio están completos antes de guardarlos.
@@ -229,6 +254,13 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
 
         Log.d(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ✅ Todos los datos están completos.");
         return true;
+    }
+    private void showToast(String message) {
+        if (getActivity() != null) {
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+        } else {
+            Log.e(TAG, "❌ No se puede mostrar el Toast: El fragmento no está adjunto.");
+        }
     }
 
     // Método para establecer el botón de estado desde AssignLoadFragment

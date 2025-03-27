@@ -20,6 +20,7 @@ import com.example.diets.R;
 import com.example.diets.activitys.SharedViewModel;
 import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.model.Exercise;
+import com.example.diets.model.ExerciseSeries;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.Muscle;
 import com.example.diets.model.TrainingDay;
@@ -33,6 +34,7 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -347,43 +349,78 @@ public class AssignLoadFragment extends Fragment {
     private void saveAssignedLoads() {
         Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: Iniciando validación de datos de todos los ejercicios...");
 
-        // ✅ Verificar que todos los ejercicios tengan datos completos antes de guardar
         if (!areAllExercisesValid()) {
             Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ No se pueden guardar los datos. Hay ejercicios con información incompleta.");
             Toast.makeText(getContext(), "⚠️ Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
             return;
-        }else{
-            Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Todos los ejercicios están completos. Procediendo a guardar...");
-
-            DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
-            userExercisesRef.setValue(userExercises)
-                    .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Cargas asignadas guardadas exitosamente.");
-                        if (getContext() != null) {
-                            Toast.makeText(getContext(), "✅ Cargas asignadas guardadas exitosamente", Toast.LENGTH_SHORT).show();
-                        }
-
-                        // Actualizar iconos de estado
-                        updateAllStatusButtonIcons();
-
-                        // Actualizar el estado del formulario de entrenamiento
-                        DatabaseReference userRef = mDatabase.child("users").child(userId);
-                        userRef.child("trainingFormCompleted").setValue(true)
-                                .addOnSuccessListener(aVoid1 -> Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Estado del formulario actualizado."))
-                                .addOnFailureListener(e -> Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ Error al actualizar el estado del formulario.", e));
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ Error al guardar las cargas asignadas.", e);
-                        if (getContext() != null) {
-                            Toast.makeText(getContext(), "⚠️ Error al guardar las cargas asignadas.", Toast.LENGTH_SHORT).show();
-                        }
-                    });
-            DatabaseReference userRef2 = FirebaseDatabase.getInstance().getReference()
-                    .child("users").child(userId);
-
-            userRef2.child("trainingFormCompleted").setValue(true);
         }
+
+        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Todos los ejercicios están completos. Procediendo a guardar...");
+
+        DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
+
+        for (UserExercise exercise : userExercises) {
+            // 🔹 Buscar el ID del ejercicio en Firebase
+            userExercisesRef.orderByChild("name").equalTo(exercise.getName()).addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (snapshot.exists()) {
+                        for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                            String exerciseKey = childSnapshot.getKey(); // 🔥 Obtiene el ID único en Firebase
+
+                            if (exerciseKey != null) {
+                                Map<String, Object> exerciseUpdates = new HashMap<>();
+
+                                // 🔥 Agregar solo los nuevos datos sin eliminar los existentes
+                                exerciseUpdates.put("currentLoad", exercise.getCurrentLoad());
+                                exerciseUpdates.put("maxReps", exercise.getMaxReps());
+                                exerciseUpdates.put("familiarity", exercise.getFamiliarity());
+                                exerciseUpdates.put("completed", exercise.isCompleted());
+
+                                // 🔥 Agregar o actualizar series de ejercicios sin eliminar el ejercicio completo
+                                List<Map<String, Object>> seriesList = new ArrayList<>();
+                                for (ExerciseSeries series : exercise.getExerciseSeriesList()) {
+                                    Map<String, Object> seriesData = new HashMap<>();
+                                    seriesData.put("seriesNumber", series.getSeriesNumber());
+                                    seriesData.put("reps", series.getReps());
+                                    seriesData.put("weight", series.getWeight());
+                                    seriesData.put("rpe", series.getRpe());
+                                    seriesList.add(seriesData);
+                                }
+                                exerciseUpdates.put("exerciseSeriesList", seriesList);
+
+                                // 🔥 Usamos updateChildren para NO sobrescribir el ejercicio existente
+                                userExercisesRef.child(exerciseKey).updateChildren(exerciseUpdates)
+                                        .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Datos actualizados para el ejercicio: " + exercise.getName()))
+                                        .addOnFailureListener(e -> Log.e(TAG, "❌ Error al actualizar el ejercicio: " + exercise.getName(), e));
+                            }
+                        }
+                    } else {
+                        Log.e(TAG, "❌ No se encontró el ejercicio en Firebase: " + exercise.getName());
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Log.e(TAG, "❌ Error al buscar el ejercicio en Firebase: " + error.getMessage());
+                }
+            });
+        }
+
+        // 🔥 Actualizar el estado del formulario de entrenamiento
+        DatabaseReference userRef = mDatabase.child("users").child(userId);
+        userRef.child("trainingFormCompleted").setValue(true)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Estado del formulario actualizado"))
+                .addOnFailureListener(e -> Log.e(TAG, "❌ Error al actualizar el estado del formulario.", e));
+
+        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Todos los ejercicios han sido guardados correctamente.");
+        Toast.makeText(getContext(), "✅ Cargas asignadas guardadas exitosamente", Toast.LENGTH_SHORT).show();
+
+        // 🔥 Actualizar los iconos de estado
+        updateAllStatusButtonIcons();
     }
+
+
 
     /**
      * ✅ Valida que todos los ejercicios tengan los datos completos.

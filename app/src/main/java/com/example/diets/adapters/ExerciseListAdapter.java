@@ -9,6 +9,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
 import com.example.diets.model.UserExercise;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class ExerciseListAdapter extends RecyclerView.Adapter<ExerciseListAdapter.ViewHolder> {
@@ -16,7 +18,7 @@ public class ExerciseListAdapter extends RecyclerView.Adapter<ExerciseListAdapte
     private static final String TAG = "ExerciseListAdapter";
 
     public ExerciseListAdapter(List<UserExercise> exercises) {
-        this.exercises = exercises;
+        this.exercises = new ArrayList<>(exercises); // 🔥 Asegurar que se crea una copia de la lista
     }
 
     @NonNull
@@ -27,15 +29,27 @@ public class ExerciseListAdapter extends RecyclerView.Adapter<ExerciseListAdapte
         return new ViewHolder(view);
     }
 
+    public void updateExercises(List<UserExercise> newExercises) {
+        Log.d(TAG, "🔄 Actualizando lista de ejercicios en adaptador.");
+        this.exercises.clear();
+        this.exercises.addAll(newExercises);
+
+        Log.d(TAG, "📏 Total ejercicios en adaptador ahora: " + exercises.size());
+
+        notifyDataSetChanged(); // 🔥 Notificar que los datos cambiaron
+    }
+
+
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         UserExercise exercise = exercises.get(position);
+        Log.d(TAG, "🏋️‍♂️ Mostrando ejercicio: " + exercise.getName() + " en posición: " + position);
         holder.bind(exercise);
     }
 
     @Override
     public int getItemCount() {
-        return exercises.size();
+        return exercises.size(); // 🔥 Asegurar que siempre devuelve la cantidad real de ejercicios
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {

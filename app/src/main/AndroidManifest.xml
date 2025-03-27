@@ -55,13 +55,9 @@
 
         <!-- ✅ Otras actividades aseguradas con exported="true" -->
         <activity android:name=".activitys.RegisterActivity" android:exported="true" />
-        <activity android:name=".activitys.UserFormActivity" android:exported="true" />
         <activity android:name=".activitys.AdminActivity" android:exported="true" />
         <activity android:name=".activitys.ViewPagerActivity" android:exported="true" />
         <activity android:name=".activitys.FoodActivity" android:exported="true" />
-        <activity android:name=".fragments.EntrenamientoFragment"
-            android:exported="true"
-            tools:ignore="Instantiatable" />
         <activity android:name=".activitys.UserListActivity" android:exported="true" />
         <activity android:name=".activitys.UserDetailsActivity" android:exported="true" />
         <activity android:name=".activitys.RegisterUserByAdminActivity" android:exported="true" />

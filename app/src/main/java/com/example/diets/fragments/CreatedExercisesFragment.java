@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
 public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener,
         ExercisesAdapter.OnExerciseClickListener, ExercisesAdapter.OnExerciseSelectionChangedListener {
 

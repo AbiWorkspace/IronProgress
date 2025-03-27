@@ -79,11 +79,20 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
 
         doneButton.setOnClickListener(v -> {
             Log.d(TAG, "onViewCreated: Botón doneButton presionado");
+
             if (listener != null && trainingDay != null) {
-                listener.onExercisesSelected(new ArrayList<>(selectedExercises), trainingDay);
+                for (Exercise exercise : selectedExercises) {
+                    listener.onExercisesSelected(selectedExercises, trainingDay);
+
+                    Log.d(TAG, "✅ Enviado ejercicio seleccionado: " + exercise.getName());
+                }
+            } else {
+                Log.w(TAG, "⚠ Listener o TrainingDay es nulo al intentar enviar ejercicios.");
             }
+
             dismiss();
         });
+
     }
 
     private void loadExercises(List<MovementPattern> movementPatterns) {

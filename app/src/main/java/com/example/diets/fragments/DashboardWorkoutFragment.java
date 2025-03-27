@@ -122,7 +122,8 @@ public class DashboardWorkoutFragment extends Fragment {
                             }
 
                             Log.d(TAG, "🏋️‍♂️ Ejercicio detectado: " + exercise.getName());
-                            exercise.setDayName(dayName);
+                            exercise.setDayName(dayName);  // 🔥 Se usa `setDayName()` en vez de `setDayAssigned()`
+
                             currentDay.getExercises().add(exercise);
                             exerciseCount++;
                         }
@@ -244,9 +245,16 @@ public class DashboardWorkoutFragment extends Fragment {
         if (activity != null) {
             Bundle data = new Bundle();
             data.putSerializable("exercises", (Serializable) trainingDay.getExercises());
+
+            // 🔥 NUEVO: Pasamos la clave del día, como "Día 1"
+            String dayKey = "Día " + trainingDay.getDayIndex();
+            data.putString("dayKey", dayKey);
+            Log.d(TAG, "📦 Agregando dayKey al Bundle → " + dayKey);
+
             activity.switchToTrainingDetailFragment(data);
         } else {
             Log.e(TAG, "❌ No se pudo obtener la referencia a ViewPagerActivity");
         }
     }
+
 }
