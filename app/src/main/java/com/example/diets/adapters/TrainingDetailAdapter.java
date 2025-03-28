@@ -5,6 +5,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,12 +32,14 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
     private RecyclerView recyclerView;
     private final List<ExerciseViewHolder> viewHolders = new ArrayList<>();
     private final Map<String, Integer> exerciseSeriesCountMap = new HashMap<>();
-    private boolean seriesSaved = false; // 🔐 Previene múltiples guardados
-
-    public TrainingDetailAdapter(List<UserExercise> exercises, RecyclerView recyclerView) {
+    private boolean seriesSaved = false;
+    private String dayKey; // día actual
+    ImageView iconAction;
+    public TrainingDetailAdapter(List<UserExercise> exercises, RecyclerView recyclerView, String dayKey) {
         Log.d(TAG, "TrainingDetailAdapter - Constructor: Inicializando adaptador con lista de ejercicios.");
         this.exercises = exercises;
         this.recyclerView = recyclerView;
+        this.dayKey = dayKey;
     }
 
     @NonNull
@@ -87,13 +91,21 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         Log.w(TAG, "TrainingDetailAdapter - getSeriesListForExercise: ⚠️ No se encontró el ejercicio: " + exerciseName);
         return null;
     }
+
     public void addExercise(UserExercise exercise) {
+        // Verificar si ya existe un ejercicio con el mismo nombre
+        for (UserExercise e : exercises) {
+            if (e.getName().equalsIgnoreCase(exercise.getName())) {
+                Log.w(TAG, "addExercise: ⚠️ El ejercicio '" + exercise.getName() + "' ya está en la lista. No se añadirá duplicado.");
+                Toast.makeText(recyclerView.getContext(), "Este ejercicio ya está agregado.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+        }
         this.exercises.add(exercise);
         notifyItemInserted(exercises.size() - 1);
         Log.d("TrainingDetailAdapter", "addExercise: Se añadió el ejercicio: " + exercise.getName());
     }
 
-    // 🔧 NUEVO MÉTODO actualizado como pediste
     public int getVisibleSeriesCountForExercise(String exerciseName) {
         for (int i = 0; i < getItemCount(); i++) {
             UserExercise exercise = exercises.get(i);
@@ -113,10 +125,116 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         return 0;
     }
 
-    public int getTotalSeriesForExercise(String exerciseName) {
-        Integer count = exerciseSeriesCountMap.get(exerciseName);
-        Log.d(TAG, "TrainingDetailAdapter - getTotalSeriesForExercise: " + exerciseName + " => " + (count != null ? count : 0));
-        return count != null ? count : 0;
+    class ExerciseViewHolder extends RecyclerView.ViewHolder {
+        TextView exerciseName;
+        RecyclerView recyclerViewSeries;
+        Button btnAddSeries;
+        SeriesAdapter seriesAdapter;
+        List<ExerciseSeries> seriesList;
+
+        public ExerciseViewHolder(@NonNull View itemView) {
+            super(itemView);
+            exerciseName = itemView.findViewById(R.id.exerciseName);
+            recyclerViewSeries = itemView.findViewById(R.id.recyclerViewSeries);
+            btnAddSeries = itemView.findViewById(R.id.btnAddSeries);
+            iconAction = itemView.findViewById(R.id.iconAction);
+        }
+
+        public void bind(UserExercise exercise) {
+            exerciseName.setText(exercise.getName());
+
+            seriesList = new ArrayList<>();
+            for (int i = 0; i < exercise.getSeries(); i++) {
+                seriesList.add(new ExerciseSeries(i + 1, exercise.getReps(), exercise.getWeight(), exercise.getRpe()));
+            }
+
+            seriesAdapter = new SeriesAdapter(seriesList);
+            recyclerViewSeries.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
+            recyclerViewSeries.setAdapter(seriesAdapter);
+
+            exerciseSeriesCountMap.put(exercise.getName(), seriesList.size());
+
+            btnAddSeries.setOnClickListener(v -> {
+                int newSeriesNumber = seriesList.size() + 1;
+                seriesList.add(new ExerciseSeries(newSeriesNumber, 1, 0.0, 0.0));
+                seriesAdapter.notifyItemInserted(seriesList.size() - 1);
+                exerciseSeriesCountMap.put(exercise.getName(), seriesList.size());
+            });
+            iconAction.setOnClickListener(v -> {
+                PopupMenu popup = new PopupMenu(itemView.getContext(), iconAction);
+                popup.inflate(R.menu.menu_exercise_actions);
+
+                popup.setOnMenuItemClickListener(item -> {
+                    int position = getAdapterPosition();
+                    if (position != RecyclerView.NO_POSITION) {
+                        if (item.getItemId() == R.id.action_edit) {
+                            Toast.makeText(itemView.getContext(), "Editar " + exercise.getName(), Toast.LENGTH_SHORT).show();
+                            Log.d(TAG, "PopupMenu - Editar: " + exercise.getName());
+                            // Aquí podrías reiniciar seriesSaved o implementar un diálogo de edición
+                            return true;
+
+                        } else if (item.getItemId() == R.id.action_delete) {
+                            Log.d(TAG, "PopupMenu - Eliminar: " + exercise.getName());
+
+                            new AlertDialog.Builder(itemView.getContext())
+                                    .setTitle("Eliminar ejercicio")
+                                    .setMessage("¿Estás seguro de que deseas eliminar " + exercise.getName() + "?")
+                                    .setPositiveButton("Eliminar", (dialog, which) -> {
+                                        exercises.remove(position);
+                                        notifyItemRemoved(position);
+                                        notifyItemRangeChanged(position, exercises.size());
+                                        Log.d(TAG, "PopupMenu - Ejercicio eliminado: " + exercise.getName());
+                                    })
+                                    .setNegativeButton("Cancelar", null)
+                                    .show();
+
+                            return true;
+                        }
+
+                    }
+                    return false;
+                });
+
+                popup.show();
+            });
+            exerciseName.setOnClickListener(v -> {
+                Log.d(TAG, "ExerciseViewHolder - exerciseName Click: 📄 Solicitando detalles para " + exercise.getName());
+
+
+                DatabaseReference dayExercisesRef = FirebaseDatabase.getInstance()
+                        .getReference("users")
+                        .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
+                        .child("userMovementPatterns")
+                        .child(dayKey)
+                        .child("userExercises");
+
+                dayExercisesRef.orderByChild("name").equalTo(exercise.getName())
+                        .addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                                if (snapshot.exists()) {
+                                    for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
+                                        String exerciseKey = exerciseSnapshot.getKey();
+                                        ExerciseDetailsDialogFragment dialog = ExerciseDetailsDialogFragment.newInstance(exerciseKey, dayKey);
+
+
+                                        FragmentActivity activity = (FragmentActivity) itemView.getContext();
+                                        dialog.show(activity.getSupportFragmentManager(), "ExerciseDetailsDialog");
+
+                                        break;
+                                    }
+                                } else {
+                                    Log.e(TAG, "ExerciseViewHolder - onDataChange: ❌ No se encontró el ejercicio en Firebase.");
+                                }
+                            }
+
+                            @Override
+                            public void onCancelled(@NonNull DatabaseError error) {
+                                Log.e(TAG, "ExerciseViewHolder - onCancelled: ❌ Error al acceder a Firebase.", error.toException());
+                            }
+                        });
+            });
+        }
     }
     public Map<String, List<ExerciseSeries>> getAllCompletedSeriesGroupedByExercise() {
         Map<String, List<ExerciseSeries>> seriesMap = new HashMap<>();
@@ -138,185 +256,4 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         return seriesMap;
     }
 
-
-    class ExerciseViewHolder extends RecyclerView.ViewHolder {
-        TextView exerciseName;
-        RecyclerView recyclerViewSeries;
-        Button btnSaveAllSeries, btnAddSeries;
-        SeriesAdapter seriesAdapter;
-        List<ExerciseSeries> seriesList;
-
-        public ExerciseViewHolder(@NonNull View itemView) {
-            super(itemView);
-            Log.d(TAG, "ExerciseViewHolder - Constructor: Inicializando vistas del ViewHolder.");
-            exerciseName = itemView.findViewById(R.id.exerciseName);
-            recyclerViewSeries = itemView.findViewById(R.id.recyclerViewSeries);
-
-            btnAddSeries = itemView.findViewById(R.id.btnAddSeries);
-        }
-
-        public void bind(UserExercise exercise) {
-            Log.d(TAG, "ExerciseViewHolder - bind: Enlazando datos del ejercicio → " + exercise.getName());
-            exerciseName.setText(exercise.getName());
-
-            seriesList = new ArrayList<>();
-            for (int i = 0; i < exercise.getSeries(); i++) {
-                seriesList.add(new ExerciseSeries(i + 1, exercise.getReps(), exercise.getWeight(), exercise.getRpe()));
-            }
-
-            Log.d(TAG, "ExerciseViewHolder - bind: Inicializando SeriesAdapter con " + seriesList.size() + " series.");
-            seriesAdapter = new SeriesAdapter(seriesList);
-            recyclerViewSeries.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
-            recyclerViewSeries.setAdapter(seriesAdapter);
-
-            // 🔄 Inicializar contador
-            exerciseSeriesCountMap.put(exercise.getName(), seriesList.size());
-
-            btnAddSeries.setOnClickListener(v -> {
-                int newSeriesNumber = seriesList.size() + 1;
-                seriesList.add(new ExerciseSeries(newSeriesNumber, 1, 0.0, 0.0));
-                seriesAdapter.notifyItemInserted(seriesList.size() - 1);
-                Log.d(TAG, "ExerciseViewHolder - btnAddSeries: ➕ Añadida nueva serie #" + newSeriesNumber);
-                exerciseSeriesCountMap.put(exercise.getName(), seriesList.size());
-            });
-
-
-
-
-
-            exerciseName.setOnClickListener(v -> {
-                Log.d(TAG, "ExerciseViewHolder - exerciseName Click: 📄 Solicitando detalles para " + exercise.getName());
-                DatabaseReference userExercisesRef = FirebaseDatabase.getInstance()
-                        .getReference("users")
-                        .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
-                        .child("userExercises");
-
-                userExercisesRef.orderByChild("name").equalTo(exercise.getName()).addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        if (snapshot.exists()) {
-                            for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                                String exerciseKey = exerciseSnapshot.getKey();
-                                Log.d(TAG, "ExerciseViewHolder - onDataChange: 🔍 Clave encontrada en Firebase → " + exerciseKey);
-                                ExerciseDetailsDialogFragment dialog = ExerciseDetailsDialogFragment.newInstance(exerciseKey);
-                                FragmentActivity activity = (FragmentActivity) itemView.getContext();
-                                dialog.show(activity.getSupportFragmentManager(), "ExerciseDetailsDialog");
-                                break;
-                            }
-                        } else {
-                            Log.e(TAG, "ExerciseViewHolder - onDataChange: ❌ No se encontró el ejercicio en Firebase.");
-                        }
-                    }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e(TAG, "ExerciseViewHolder - onCancelled: ❌ Error al acceder a Firebase.", error.toException());
-                    }
-                });
-            });
-        }
-
-        private void showIncompleteSeriesDialog(UserExercise exercise, List<ExerciseSeries> updatedSeries) {
-            AlertDialog.Builder builder = new AlertDialog.Builder(itemView.getContext());
-            View dialogView = LayoutInflater.from(itemView.getContext()).inflate(R.layout.dialog_incomplete_series, null);
-
-            builder.setView(dialogView);
-            AlertDialog dialog = builder.create();
-
-            Button btnCancelar = dialogView.findViewById(R.id.btnCancelar);
-            Button btnGuardar = dialogView.findViewById(R.id.btnGuardarDeTodosModos);
-
-            btnCancelar.setOnClickListener(v -> dialog.dismiss());
-
-            btnGuardar.setOnClickListener(v -> {
-                saveSelectedSeriesToDatabase(exercise, updatedSeries);
-                seriesSaved = true; // ✅ Se marca como guardado desde aquí también
-                dialog.dismiss();
-            });
-
-            dialog.show();
-        }
-
-
-        private void saveSelectedSeriesToDatabase(UserExercise exercise, List<ExerciseSeries> updatedSeries) {
-            Log.d(TAG, "ExerciseViewHolder - saveSelectedSeriesToDatabase: Guardando series para " + exercise.getName());
-
-            DatabaseReference userExercisesRef = FirebaseDatabase.getInstance()
-                    .getReference("users")
-                    .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
-                    .child("userExercises");
-
-            userExercisesRef.orderByChild("name").equalTo(exercise.getName()).addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    if (snapshot.exists()) {
-                        Log.d(TAG, "ExerciseViewHolder - saveSelectedSeriesToDatabase/onDataChange: Ejercicio existente. Actualizando series...");
-                        for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                            String key = exerciseSnapshot.getKey();
-                            DatabaseReference seriesRef = userExercisesRef.child(key).child("seriesData");
-
-                            List<Map<String, Object>> allSeriesList = new ArrayList<>();
-                            if (exerciseSnapshot.child("seriesData").exists()) {
-                                for (DataSnapshot ds : exerciseSnapshot.child("seriesData").getChildren()) {
-                                    allSeriesList.add((Map<String, Object>) ds.getValue());
-                                }
-                            }
-
-                            for (ExerciseSeries series : updatedSeries) {
-                                if (series.isCompleted()) {
-                                    Map<String, Object> newSeriesData = new HashMap<>();
-                                    newSeriesData.put("seriesNumber", allSeriesList.size() + 1);
-                                    newSeriesData.put("reps", series.getReps());
-                                    newSeriesData.put("weight", series.getWeight());
-                                    newSeriesData.put("rpe", series.getRpe());
-                                    allSeriesList.add(newSeriesData);
-                                }
-                            }
-
-                            seriesRef.setValue(allSeriesList)
-                                    .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Series actualizadas correctamente en Firebase"))
-                                    .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar series", e));
-                        }
-                    } else {
-                        Log.d(TAG, "ExerciseViewHolder - saveSelectedSeriesToDatabase: Ejercicio nuevo. Guardando en Firebase.");
-                        String newKey = userExercisesRef.push().getKey();
-                        if (newKey != null) {
-                            DatabaseReference newRef = userExercisesRef.child(newKey);
-                            Map<String, Object> newExerciseData = new HashMap<>();
-                            newExerciseData.put("name", exercise.getName());
-                            newExerciseData.put("series", exercise.getSeries());
-                            newExerciseData.put("reps", exercise.getReps());
-                            newExerciseData.put("weight", exercise.getWeight());
-                            newExerciseData.put("rpe", exercise.getRpe());
-
-                            newRef.setValue(newExerciseData).addOnSuccessListener(aVoid -> {
-                                Log.d(TAG, "✅ Nuevo ejercicio guardado en Firebase.");
-                                DatabaseReference newSeriesRef = newRef.child("seriesData");
-                                List<Map<String, Object>> newSeriesList = new ArrayList<>();
-                                for (ExerciseSeries series : updatedSeries) {
-                                    if (series.isCompleted()) {
-                                        Map<String, Object> data = new HashMap<>();
-                                        data.put("seriesNumber", newSeriesList.size() + 1);
-                                        data.put("reps", series.getReps());
-                                        data.put("weight", series.getWeight());
-                                        data.put("rpe", series.getRpe());
-                                        newSeriesList.add(data);
-                                    }
-                                }
-                                newSeriesRef.setValue(newSeriesList)
-                                        .addOnSuccessListener(aVoid1 -> Log.d(TAG, "✅ Series nuevas guardadas correctamente."))
-                                        .addOnFailureListener(e -> Log.e(TAG, "❌ Error al guardar nuevas series", e));
-                            });
-                        }
-                    }
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    Log.e(TAG, "ExerciseViewHolder - saveSelectedSeriesToDatabase/onCancelled: ❌ Error de Firebase", error.toException());
-                }
-            });
-        }
-
-    }
 }

@@ -14,6 +14,7 @@ import android.widget.Button;
 import android.widget.Chronometer;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -150,7 +151,8 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         btnFinishWorkout.setOnClickListener(v -> finishWorkout());
 
         // Configurar adapter con la lista de UserExercise
-        adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises);
+        adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises, dayKey);
+
         if (recyclerViewExercises != null) {
             recyclerViewExercises.setAdapter(adapter);
         } else {
@@ -169,19 +171,33 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         Log.d(TAG, "TrainingDetailFragment - onExercisesSelected: Recibidos "
                 + exercisesRecibidos.size() + " ejercicios desde el selector.");
 
-        // 1) Agregarlos a la lista local para mostrarlos en el RecyclerView
         for (Exercise exercise : exercisesRecibidos) {
-            Log.d(TAG, "➕ Añadiendo ejercicio: " + exercise.getName());
+            Log.d(TAG, "➕ Intentando añadir ejercicio: " + exercise.getName());
 
+            // ✅ Validación de duplicado
+            boolean yaExiste = false;
+            for (UserExercise existente : exercises) {
+                if (existente.getName().equalsIgnoreCase(exercise.getName())) {
+                    yaExiste = true;
+                    break;
+                }
+            }
+
+            if (yaExiste) {
+                Log.w(TAG, "⚠️ El ejercicio '" + exercise.getName() + "' ya está en la lista. No se añadirá duplicado.");
+                Toast.makeText(getContext(), "Este ejercicio ya está agregado: " + exercise.getName(), Toast.LENGTH_SHORT).show();
+                continue;
+            }
+
+            // Si no existe, lo añadimos normalmente
             UserExercise userExercise = new UserExercise(exercise);
-            userExercise.setSeries(3); // Por defecto, si así lo deseas
+            userExercise.setSeries(3);
             exercises.add(userExercise);
 
             adapter.notifyItemInserted(exercises.size() - 1);
             recyclerViewExercises.smoothScrollToPosition(exercises.size() - 1);
         }
 
-        // 2) Guardarlos en Firebase con índice numérico en "userMovementPatterns/<dayKey>/userExercises/0,1,2..."
         guardarEjerciciosEnFirebase(exercisesRecibidos, trainingDay.getDayTitle());
     }
 

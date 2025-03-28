@@ -50,23 +50,35 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private DatabaseReference databaseReference;
     private Spinner spinnerRpeFilter;
     private List<ExerciseSeries> allSeriesData;
+    private String exerciseKey;
+    private String dayKey;
+    private String exerciseIndex;  // 👉 ¡ESTA ES LA QUE FALTABA!
 
     /**
      * Método estático para crear una nueva instancia del fragmento, recibiendo el ID del ejercicio.
      */
-    public static ExerciseDetailsDialogFragment newInstance(String exerciseId) {
-        Log.d(TAG + " - newInstance", "Creando una nueva instancia del fragmento con el ID del ejercicio: " + exerciseId);
-
+    public static ExerciseDetailsDialogFragment newInstance(String exerciseIndex, String dayKey) {
         ExerciseDetailsDialogFragment fragment = new ExerciseDetailsDialogFragment();
         Bundle args = new Bundle();
-        args.putString(ARG_EXERCISE, exerciseId);
+        args.putString("exerciseIndex", exerciseIndex);  // ahora es el índice, no name
+        args.putString("dayKey", dayKey);
         fragment.setArguments(args);
         return fragment;
     }
 
+
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+
+        if (getArguments() != null) {
+            exerciseIndex = getArguments().getString("exerciseIndex"); // nuevo nombre
+            dayKey = getArguments().getString("dayKey");
+            Log.d("ExerciseDetailsDialog", "✅ Claves recibidas: " + dayKey + " | " + exerciseIndex);
+        } else {
+            Log.e("ExerciseDetailsDialog", "❌ getArguments() es null");
+        }
         Log.d(TAG + " - onCreate", "Inicializando el fragmento y configurando el estilo del diálogo.");
         setStyle(DialogFragment.STYLE_NORMAL, R.style.CustomDialogTheme);
 
@@ -109,21 +121,25 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         Log.d(TAG, "Usuario autenticado con UID: " + userId);
 
         // Obtener ID del ejercicio desde argumentos
-        String exerciseId = (getArguments() != null) ? getArguments().getString(ARG_EXERCISE) : null;
+        String exerciseId = exerciseIndex;  // Ya lo habías extraído correctamente en onCreate()
+
         if (exerciseId == null || exerciseId.isEmpty()) {
             Log.e(TAG, "⚠️ Error: ID del ejercicio no válido.");
             return view;
         }
         Log.d(TAG, "Obteniendo datos del ejercicio con ID: " + exerciseId);
 
-        // Referencia al ejercicio en Firebase
-        DatabaseReference exerciseRef = databaseReference
-                .child("users")
+        DatabaseReference ref = FirebaseDatabase.getInstance()
+                .getReference("users")
                 .child(userId)
+                .child("userMovementPatterns")
+                .child(dayKey)
                 .child("userExercises")
-                .child(exerciseId);
+                .child(exerciseIndex); // este es el número: "0", "1", "2", etc.
 
-        exerciseRef.addListenerForSingleValueEvent(new ValueEventListener() {
+
+
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!snapshot.exists()) {
