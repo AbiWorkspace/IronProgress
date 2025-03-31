@@ -362,6 +362,42 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
     // Lógica para finalizar entrenamiento y guardar series completadas globalmente
     // ************************************************************************
     private void finishWorkout() {
+        // ================================================================================
+        // = INICIO MOD NUEVA FUNCIONALIDAD: Confirmar borrado en Firebase si hay borrados =
+        // ================================================================================
+        if (!adapter.getPendingDeletionExercises().isEmpty()) {
+            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Existen ejercicios pendientes de borrar en Firebase.");
+
+            new AlertDialog.Builder(requireContext())
+                    .setTitle("Eliminar ejercicios permanentemente")
+                    .setMessage("¿Deseas eliminar de tu rutina en Firebase los ejercicios que marcaste para borrar?")
+                    .setPositiveButton("Sí, eliminar", (dialog, which) -> {
+                        Log.d(TAG, "TrainingDetailFragment - finishWorkout: Usuario confirmó eliminación en Firebase.");
+                        borrarYReindexarEjerciciosEnFirebase(adapter.getPendingDeletionExercises(), () -> {
+                            // Después de reindexar, continuamos con el flujo normal
+                            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Reindexación completada. Continuando.");
+                            // Llamamos de nuevo para entrar al flujo original (pero ya sin la alerta)
+                            finishWorkout(true);
+                        });
+                    })
+                    .setNegativeButton("No, mantener", (dialog, which) -> {
+                        Log.d(TAG, "TrainingDetailFragment - finishWorkout: Usuario eligió NO eliminar en Firebase.");
+                        // Continuamos el flujo original de finishWorkout
+                        finishWorkout(true);
+                    })
+                    .show();
+
+            // Salimos para no ejecutar dos veces el mismo flujo
+            return;
+        }
+        // ================================================================================
+        // = FIN MOD NUEVA FUNCIONALIDAD                                                   =
+        // ================================================================================
+
+        // ----------------------------------------------------------------------------
+        // Las líneas que ya estaban en este método se ejecutan si NO hay ejercicios
+        // pendientes, O si ya pasamos por la confirmación y volvimos con finishWorkout(true).
+        // ----------------------------------------------------------------------------
         Log.d(TAG, "TrainingDetailFragment - finishWorkout: Comenzando flujo de finalización del entrenamiento.");
 
         // Detener cronómetro
@@ -400,6 +436,59 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
             guardarSeriesYFinalizar(seriesPorEjercicio);
         }
     }
+
+    // ===========================================================================
+    // = INICIO MOD NUEVA FUNCIONALIDAD: Sobrecarga para continuar el flujo     =
+    // = después de la confirmación de borrado (NO se elimina ninguna línea)     =
+    // ===========================================================================
+    private void finishWorkout(boolean skipDeletionCheck) {
+        // Este método se llama cuando YA se manejó la confirmación de borrado,
+        // para que no volvamos a mostrar el diálogo ni hagamos return.
+        Log.d(TAG, "TrainingDetailFragment - finishWorkout(boolean): Re-entrando al flujo sin verificar borrados.");
+
+        // Se mantiene exactamente el mismo bloque de código que tu método original
+        // a partir de aquí (copiado tal cual). No eliminamos nada:
+        Log.d(TAG, "TrainingDetailFragment - finishWorkout: Comenzando flujo de finalización del entrenamiento.");
+
+        // Detener cronómetro
+        if (isChronometerRunning) {
+            pauseOffset = SystemClock.elapsedRealtime() - chronometerTraining.getBase();
+            chronometerTraining.stop();
+            isChronometerRunning = false;
+            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Cronómetro detenido. Tiempo total: "
+                    + formatElapsedTime(pauseOffset));
+        }
+
+        if (seriesSaved) {
+            Log.w(TAG, "⚠️ Las series ya fueron guardadas previamente. Se omite guardado.");
+            return;
+        }
+
+        Map<String, List<ExerciseSeries>> seriesPorEjercicio = adapter.getAllCompletedSeriesGroupedByExercise();
+        boolean haySeriesIncompletas = false;
+
+        // Verificar si hay series incompletas
+        for (UserExercise ejercicio : exercises) {
+            List<ExerciseSeries> listaTotal = adapter.getSeriesListForExercise(ejercicio.getName());
+            List<ExerciseSeries> completadas = seriesPorEjercicio.get(ejercicio.getName());
+
+            if (listaTotal != null && completadas != null && completadas.size() < listaTotal.size()) {
+                Log.w(TAG, "⚠️ El ejercicio " + ejercicio.getName() + " tiene series incompletas.");
+                haySeriesIncompletas = true;
+                break;
+            }
+        }
+
+        if (haySeriesIncompletas) {
+            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Mostrando diálogo por series incompletas.");
+            showIncompleteSeriesDialog(seriesPorEjercicio);
+        } else {
+            guardarSeriesYFinalizar(seriesPorEjercicio);
+        }
+    }
+    // ===========================================================================
+    // = FIN MOD NUEVA FUNCIONALIDAD ==============================================
+    // ===========================================================================
 
     private void showIncompleteSeriesDialog(Map<String, List<ExerciseSeries>> seriesPorEjercicio) {
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
@@ -586,4 +675,73 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         activity.switchToDashboardWorkoutFragment(data);
         Log.d(TAG, "TrainingDetailFragment - switchToDashboardWorkout: Navegación a DashboardWorkoutFragment realizada.");
     }
+
+    // ===============================================================================================
+    // == INICIO MOD NUEVA FUNCIONALIDAD: método para borrar y reindexar ejercicios en Firebase  ===
+    // ===============================================================================================
+    /**
+     * Elimina de Firebase los ejercicios marcados como borrados localmente y luego reindexa
+     * los ejercicios restantes (0, 1, 2, ...). Al finalizar, ejecuta el callback onComplete.
+     */
+    private void borrarYReindexarEjerciciosEnFirebase(List<UserExercise> exercisesToDelete, Runnable onComplete) {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Log.e(TAG, "borrarYReindexarEjerciciosEnFirebase: Usuario no autenticado, no se puede reindexar.");
+            if (onComplete != null) onComplete.run();
+            return;
+        }
+
+        String userId = currentUser.getUid();
+        DatabaseReference userExercisesRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(userId)
+                .child("userMovementPatterns")
+                .child(dayKey)
+                .child("userExercises");
+
+        // 1) Borrar por completo la rama userExercises del día actual
+        userExercisesRef.removeValue().addOnCompleteListener(task -> {
+            if (!task.isSuccessful()) {
+                Log.e(TAG, "❌ Error al eliminar ejercicios en Firebase: " + task.getException());
+                if (onComplete != null) onComplete.run();
+                return;
+            }
+
+            // 2) Reindexar subiendo únicamente los ejercicios "exercises" que queden vivos en el adapter
+            List<UserExercise> remainingExercises = adapter.getExercises();
+            // => estos ya no incluyen los localmente borrados (que están en pendingDeletion)
+
+            for (int i = 0; i < remainingExercises.size(); i++) {
+                UserExercise ex = remainingExercises.get(i);
+
+                Map<String, Object> exerciseData = new HashMap<>();
+                exerciseData.put("name", ex.getName());
+                exerciseData.put("description", ex.getDescription());
+                exerciseData.put("equipmentType", ex.getEquipmentType());
+                exerciseData.put("exerciseType", ex.getExerciseType());
+                exerciseData.put("loadIntensity", ex.getLoadIntensity());
+                exerciseData.put("movementType", ex.getMovementType());
+                exerciseData.put("image", (ex.getImage() != null ? ex.getImage() : ""));
+                exerciseData.put("musclesWorked", ex.getMusclesWorked());
+                exerciseData.put("synergistMuscles", ex.getSynergistMuscles());
+                exerciseData.put("series", ex.getSeries());
+                exerciseData.put("weight", ex.getWeight());
+                exerciseData.put("reps", ex.getReps());
+                exerciseData.put("rpe", ex.getRpe());
+
+                String newIndexKey = String.valueOf(i);
+                userExercisesRef.child(newIndexKey).setValue(exerciseData)
+                        .addOnSuccessListener(aVoid ->
+                                Log.d(TAG, "✅ Reindex: agregado " + ex.getName() + " con key=" + newIndexKey))
+                        .addOnFailureListener(e ->
+                                Log.e(TAG, "❌ Error al reindexar " + ex.getName() + " con key=" + newIndexKey, e));
+            }
+
+            Log.d(TAG, "borrarYReindexarEjerciciosEnFirebase: Reindexación finalizada con éxito.");
+            if (onComplete != null) onComplete.run();
+        });
+    }
+    // ===============================================================================================
+    // == FIN MOD NUEVA FUNCIONALIDAD ================================================================
+    // ===============================================================================================
 }

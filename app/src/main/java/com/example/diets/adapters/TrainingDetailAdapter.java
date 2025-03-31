@@ -35,6 +35,26 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
     private boolean seriesSaved = false;
     private String dayKey; // día actual
     ImageView iconAction;
+
+    // ===================================================================================
+    // === INICIO MOD NUEVA FUNCIONALIDAD: Lista auxiliar para "pendientes de eliminar" ===
+    // ===================================================================================
+    /**
+     * Mantendrá los ejercicios que se eliminan localmente del RecyclerView,
+     * pero aún no eliminados permanentemente de Firebase.
+     */
+    private final List<UserExercise> pendingDeletionExercises = new ArrayList<>();
+
+    /**
+     * Método público para obtener la lista de ejercicios marcados para eliminar.
+     */
+    public List<UserExercise> getPendingDeletionExercises() {
+        return pendingDeletionExercises;
+    }
+    // ===================================================================================
+    // === FIN MOD NUEVA FUNCIONALIDAD ===================================================
+    // ===================================================================================
+
     public TrainingDetailAdapter(List<UserExercise> exercises, RecyclerView recyclerView, String dayKey) {
         Log.d(TAG, "TrainingDetailAdapter - Constructor: Inicializando adaptador con lista de ejercicios.");
         this.exercises = exercises;
@@ -106,6 +126,20 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         Log.d("TrainingDetailAdapter", "addExercise: Se añadió el ejercicio: " + exercise.getName());
     }
 
+    // ===================================================================================
+    // === INICIO MOD NUEVA FUNCIONALIDAD: Getter opcional para obtener "exercises"   ===
+    // ===================================================================================
+    /**
+     * Retorna la lista completa de ejercicios que el adapter está mostrando
+     * (ya sin los que se hayan eliminado localmente).
+     */
+    public List<UserExercise> getExercises() {
+        return exercises;
+    }
+    // ===================================================================================
+    // === FIN MOD NUEVA FUNCIONALIDAD ===================================================
+    // ===================================================================================
+
     public int getVisibleSeriesCountForExercise(String exerciseName) {
         for (int i = 0; i < getItemCount(); i++) {
             UserExercise exercise = exercises.get(i);
@@ -160,6 +194,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                 seriesAdapter.notifyItemInserted(seriesList.size() - 1);
                 exerciseSeriesCountMap.put(exercise.getName(), seriesList.size());
             });
+
             iconAction.setOnClickListener(v -> {
                 PopupMenu popup = new PopupMenu(itemView.getContext(), iconAction);
                 popup.inflate(R.menu.menu_exercise_actions);
@@ -180,10 +215,27 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                                     .setTitle("Eliminar ejercicio")
                                     .setMessage("¿Estás seguro de que deseas eliminar " + exercise.getName() + "?")
                                     .setPositiveButton("Eliminar", (dialog, which) -> {
+                                        // ==========================================================================
+                                        // == INICIO MOD NUEVA FUNCIONALIDAD: marcar en "pendingDeletionExercises" ==
+                                        // ==========================================================================
+                                        UserExercise exerciseToDelete = exercises.get(position);
+                                        // ==========================================================================
+                                        // == FIN MOD NUEVA FUNCIONALIDAD ===========================================
+                                        // ==========================================================================
+
                                         exercises.remove(position);
                                         notifyItemRemoved(position);
                                         notifyItemRangeChanged(position, exercises.size());
-                                        Log.d(TAG, "PopupMenu - Ejercicio eliminado: " + exercise.getName());
+                                        Log.d(TAG, "PopupMenu - Ejercicio eliminado localmente del RecyclerView: " + exercise.getName());
+
+                                        // ==========================================================================
+                                        // == INICIO MOD NUEVA FUNCIONALIDAD: almacenar en lista de pendientes    ==
+                                        // ==========================================================================
+                                        pendingDeletionExercises.add(exerciseToDelete);
+                                        Log.d(TAG, "PopupMenu - Se agregó a la lista de pendientes: " + exerciseToDelete.getName());
+                                        // ==========================================================================
+                                        // == FIN MOD NUEVA FUNCIONALIDAD ===========================================
+                                        // ==========================================================================
                                     })
                                     .setNegativeButton("Cancelar", null)
                                     .show();
@@ -197,16 +249,14 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
 
                 popup.show();
             });
+
             exerciseName.setOnClickListener(v -> {
                 Log.d(TAG, "ExerciseViewHolder - exerciseName Click: 📄 Solicitando detalles para " + exercise.getName());
-
 
                 DatabaseReference dayExercisesRef = FirebaseDatabase.getInstance()
                         .getReference("users")
                         .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
-                        .child("userMovementPatterns")
-                        .child(dayKey)
-                        .child("userExercises");
+                        .child("userExercises"); // ⚠️ Cambiado a userExercises global
 
                 dayExercisesRef.orderByChild("name").equalTo(exercise.getName())
                         .addListenerForSingleValueEvent(new ValueEventListener() {
@@ -214,28 +264,32 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                             public void onDataChange(@NonNull DataSnapshot snapshot) {
                                 if (snapshot.exists()) {
                                     for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                                        String exerciseKey = exerciseSnapshot.getKey();
-                                        ExerciseDetailsDialogFragment dialog = ExerciseDetailsDialogFragment.newInstance(exerciseKey, dayKey);
+                                        String firebaseKey = exerciseSnapshot.getKey(); // Esta es la que quieres
 
+                                        Log.d(TAG, "✅ Clave real de Firebase: " + firebaseKey);
+
+                                        ExerciseDetailsDialogFragment dialog =
+                                                ExerciseDetailsDialogFragment.newInstance(firebaseKey, dayKey); // ← Aquí
 
                                         FragmentActivity activity = (FragmentActivity) itemView.getContext();
                                         dialog.show(activity.getSupportFragmentManager(), "ExerciseDetailsDialog");
-
                                         break;
                                     }
                                 } else {
-                                    Log.e(TAG, "ExerciseViewHolder - onDataChange: ❌ No se encontró el ejercicio en Firebase.");
+                                    Log.e(TAG, "❌ No se encontró el ejercicio en /userExercises.");
                                 }
                             }
 
                             @Override
                             public void onCancelled(@NonNull DatabaseError error) {
-                                Log.e(TAG, "ExerciseViewHolder - onCancelled: ❌ Error al acceder a Firebase.", error.toException());
+                                Log.e(TAG, "❌ Error al acceder a /userExercises", error.toException());
                             }
                         });
             });
+
         }
     }
+
     public Map<String, List<ExerciseSeries>> getAllCompletedSeriesGroupedByExercise() {
         Map<String, List<ExerciseSeries>> seriesMap = new HashMap<>();
 

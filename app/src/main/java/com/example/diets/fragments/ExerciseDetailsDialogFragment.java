@@ -52,7 +52,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private List<ExerciseSeries> allSeriesData;
     private String exerciseKey;
     private String dayKey;
-    private String exerciseIndex;  // 👉 ¡ESTA ES LA QUE FALTABA!
+    private String exerciseIndex;
 
     /**
      * Método estático para crear una nueva instancia del fragmento, recibiendo el ID del ejercicio.
@@ -132,10 +132,10 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         DatabaseReference ref = FirebaseDatabase.getInstance()
                 .getReference("users")
                 .child(userId)
-                .child("userMovementPatterns")
-                .child(dayKey)
                 .child("userExercises")
-                .child(exerciseIndex); // este es el número: "0", "1", "2", etc.
+                .child(exerciseIndex); // Aquí exerciseIndex es en realidad el exerciseId
+
+
 
 
 
@@ -281,10 +281,11 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     }
 
     /**
-     * Descarga todas las series y las almacena en allSeriesData. Luego dibuja la gráfica con todas.
+     * Descarga todas las series desde users > UID > userExercises > exerciseId > seriesData
+     * y actualiza la gráfica y estadísticas.
      */
     private void fetchSeriesData(String exerciseId, TextView textPersonalRecord) {
-        Log.d(TAG + " - fetchSeriesData", "Iniciando descarga de series para el ejercicio con ID: " + exerciseId);
+        Log.d(TAG + " - fetchSeriesData", "📥 Iniciando descarga de series desde ruta global: users > UID > userExercises > " + exerciseId);
 
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
@@ -293,8 +294,9 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         }
 
         String userId = user.getUid();
-        DatabaseReference seriesRef = databaseReference
-                .child("users")
+
+        DatabaseReference seriesRef = FirebaseDatabase.getInstance()
+                .getReference("users")
                 .child(userId)
                 .child("userExercises")
                 .child(exerciseId)
@@ -305,31 +307,39 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
             public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                 double personalRecord = 0;
                 allSeriesData.clear();
-                Log.d(TAG + " - fetchSeriesData", "Descargando datos de series...");
+                Log.d(TAG + " - fetchSeriesData", "📊 Descargando datos de series...");
 
                 for (DataSnapshot seriesSnapshot : dataSnapshot.getChildren()) {
                     Integer seriesNumber = seriesSnapshot.child("seriesNumber").getValue(Integer.class);
-                    Integer reps        = seriesSnapshot.child("reps").getValue(Integer.class);
-                    Double weight       = seriesSnapshot.child("weight").getValue(Double.class);
-                    Double rpe          = seriesSnapshot.child("rpe").getValue(Double.class);
+                    Integer reps         = seriesSnapshot.child("reps").getValue(Integer.class);
+                    Double weight        = seriesSnapshot.child("weight").getValue(Double.class);
+                    Double rpe           = seriesSnapshot.child("rpe").getValue(Double.class);
 
                     if (seriesNumber != null && reps != null && weight != null && rpe != null) {
                         ExerciseSeries newSeries = new ExerciseSeries(seriesNumber, reps, weight, rpe);
                         allSeriesData.add(newSeries);
 
+                        // Actualizar PR
                         personalRecord = Math.max(personalRecord, weight);
-                        Log.d(TAG + " - fetchSeriesData",
-                                "Serie cargada - Num:" + seriesNumber +
-                                        ", Reps:" + reps + ", Peso:" + weight + ", RPE:" + rpe);
+                        Log.d(TAG + " - fetchSeriesData", "✅ Serie: #"
+                                + seriesNumber + " | Reps: " + reps + " | Peso: " + weight + " | RPE: " + rpe);
                     } else {
-                        Log.w(TAG + " - fetchSeriesData", "Datos de serie incompletos, se omite este nodo.");
+                        Log.w(TAG + " - fetchSeriesData", "⚠️ Datos incompletos en una serie, se omite.");
                     }
                 }
 
-                Log.d(TAG + " - fetchSeriesData", "Se descargaron " + allSeriesData.size() + " series en total.");
+                Log.d(TAG + " - fetchSeriesData", "✅ Total series descargadas: " + allSeriesData.size());
                 textPersonalRecord.setText("Personal Record: " + String.format("%.2f", personalRecord) + " kg");
 
-                // Dibujar con TODAS las series inicialmente
+                // Volumen total
+                double totalVolume = 0.0;
+                for (ExerciseSeries s : allSeriesData) {
+                    totalVolume += s.getWeight() * s.getReps();
+                }
+
+                TextView textVolume = getView().findViewById(R.id.textVolume);
+                textVolume.setText("Volumen total: " + String.format("%.2f", totalVolume));
+
                 drawProgressChart(allSeriesData);
             }
 
@@ -339,6 +349,8 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
             }
         });
     }
+
+
 
     /**
      * Filtra la lista 'allSeriesData' por el RPE especificado y llama a 'drawProgressChart'.
@@ -433,3 +445,4 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         return capitalizedText.toString().trim();
     }
 }
+
