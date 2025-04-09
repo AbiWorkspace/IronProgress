@@ -43,89 +43,88 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
     private UserExercise userExercise;
     private DatabaseReference mDatabase;
     private String userId;
-    private ImageButton statusButton; // Añadir campo para el botón de estado
+    private ImageButton statusButton;
     private SharedViewModel sharedViewModel;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        Log.d(TAG, "ExerciseDetailsLoadFragment - onCreateView: Inflando el diseño para ExerciseDetailsLoadFragment");
+        Log.d(TAG, "onCreateView: Inflando el diseño para ExerciseDetailsLoadFragment");
         return inflater.inflate(R.layout.fragment_exercise_details_load, container, false);
     }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        Log.d(TAG, "onViewCreated: Iniciando configuración de vista y lógica del fragmento");
         super.onViewCreated(view, savedInstanceState);
-        Log.d(TAG, "ExerciseDetailsLoadFragment - onViewCreated: Vista creada para ExerciseDetailsLoadFragment");
 
         sharedViewModel = new ViewModelProvider(requireActivity()).get(SharedViewModel.class);
+        Log.d(TAG, "onViewCreated: ViewModel compartido obtenido");
 
         Bundle data = getArguments();
         if (data != null) {
+            Log.d(TAG, "onViewCreated: Bundle recibido con datos");
             userExercise = (UserExercise) data.getSerializable("userExercise");
-            Log.d(TAG, "Datos de UserExercise recibidos: " + userExercise.toString());
+            Log.d(TAG, "onViewCreated: userExercise obtenido: " + userExercise);
             loadExerciseDetails(view);
+        } else {
+            Log.w(TAG, "onViewCreated: No se recibió bundle con datos");
         }
 
         Button saveButton = view.findViewById(R.id.saveButton);
         saveButton.setOnClickListener(v -> {
-            Log.d(TAG, "Guardando detalles del ejercicio...");
+            Log.d(TAG, "onViewCreated - saveButton: Clic en botón Guardar");
             saveExerciseDetails();
             dismiss();
         });
 
         Button backButton = view.findViewById(R.id.backButton);
         backButton.setOnClickListener(v -> {
-            Log.d(TAG, "Regresando...");
+            Log.d(TAG, "onViewCreated - backButton: Clic en botón Volver");
             dismiss();
         });
 
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
+            Log.d(TAG, "onViewCreated: Usuario autenticado con UID: " + currentUser.getUid());
             userId = currentUser.getUid();
             mDatabase = FirebaseDatabase.getInstance().getReference();
         } else {
-            Log.e(TAG, "Usuario no autenticado");
+            Log.e(TAG, "onViewCreated: Usuario no autenticado");
         }
     }
 
     private void loadExerciseDetails(View view) {
-        Log.d(TAG, "Cargando detalles del ejercicio...");
+        Log.d(TAG, "loadExerciseDetails: Cargando y mostrando los detalles del ejercicio");
 
         TextView exerciseNameView = view.findViewById(R.id.exerciseName);
         TextInputEditText loadEditText = view.findViewById(R.id.loadEditText);
         Spinner repsSpinner = view.findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = view.findViewById(R.id.familiaritySpinner);
-//        Spinner seriesSpinner = view.findViewById(R.id.seriesSpinner); // ✅ NUEVO SPINNER
 
         exerciseNameView.setText(userExercise.getName());
         loadEditText.setText(String.valueOf(userExercise.getCurrentLoad()));
+        Log.d(TAG, "loadExerciseDetails: Nombre y carga actual asignados");
 
-        // Configurar Spinner de repeticiones
         ArrayAdapter<Integer> repsAdapter = new ArrayAdapter<>(getContext(),
                 android.R.layout.simple_spinner_item, getRepsOptions());
         repsAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         repsSpinner.setAdapter(repsAdapter);
         repsSpinner.setSelection(userExercise.getMaxReps());
+        Log.d(TAG, "loadExerciseDetails: Spinner de repeticiones configurado");
 
-        // Configurar Spinner de familiaridad
         ArrayAdapter<CharSequence> familiarityAdapter = ArrayAdapter.createFromResource(getContext(),
                 R.array.familiarity_options, android.R.layout.simple_spinner_item);
         familiarityAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         familiaritySpinner.setAdapter(familiarityAdapter);
         familiaritySpinner.setSelection(userExercise.isCompleted() ? 3 : 0);
+        Log.d(TAG, "loadExerciseDetails: Spinner de familiaridad configurado");
 
-        // ✅ Configurar Spinner de Series
-        ArrayAdapter<Integer> seriesAdapter = new ArrayAdapter<>(getContext(),
-                android.R.layout.simple_spinner_item, getSeriesOptions());
-        seriesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-//        seriesSpinner.setAdapter(seriesAdapter);
-//        seriesSpinner.setSelection(userExercise.getSeries() - 1); // Ajustar selección
-
-        Log.d(TAG, "Detalles del ejercicio cargados correctamente.");
+        Log.d(TAG, "loadExerciseDetails: Detalles del ejercicio cargados correctamente");
     }
 
     private List<Integer> getRepsOptions() {
+        Log.d(TAG, "getRepsOptions: Generando lista de repeticiones");
         List<Integer> options = new ArrayList<>();
         for (int i = 0; i <= 15; i++) {
             options.add(i);
@@ -133,8 +132,8 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         return options;
     }
 
-    // ✅ Método para obtener opciones de series (1 a 6)
     private List<Integer> getSeriesOptions() {
+        Log.d(TAG, "getSeriesOptions: Generando lista de series");
         List<Integer> options = new ArrayList<>();
         for (int i = 1; i <= 6; i++) {
             options.add(i);
@@ -143,15 +142,14 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
     }
 
     private void saveExerciseDetails() {
-        Log.d(TAG, "ExerciseDetailsLoadFragment - saveExerciseDetails: Iniciando validación de datos del ejercicio...");
+        Log.d(TAG, "saveExerciseDetails: 🚀 Iniciando guardado de datos del ejercicio");
 
-        // Obtener referencias a los campos
         TextInputEditText loadEditText = getView().findViewById(R.id.loadEditText);
         Spinner repsSpinner = getView().findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = getView().findViewById(R.id.familiaritySpinner);
 
         if (!isExerciseDataValid(loadEditText, repsSpinner, familiaritySpinner)) {
-            Log.e(TAG, "❌ Datos incompletos. No se guardará la información.");
+            Log.w(TAG, "saveExerciseDetails: ❌ Validación fallida - campos incompletos");
             showToast("⚠️ Completa todos los campos antes de guardar.");
             return;
         }
@@ -161,130 +159,119 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         boolean isCompleted = familiaritySpinner.getSelectedItemPosition() == 3;
         String familiarity = familiaritySpinner.getSelectedItem().toString();
 
+        Log.d(TAG, "saveExerciseDetails: 📥 Valores del formulario:");
+        Log.d(TAG, "    ➤ currentLoad: " + currentLoad);
+        Log.d(TAG, "    ➤ maxReps: " + maxReps);
+        Log.d(TAG, "    ➤ isCompleted: " + isCompleted);
+        Log.d(TAG, "    ➤ familiarity: " + familiarity);
+
         userExercise.setCurrentLoad(currentLoad);
         userExercise.setMaxReps(maxReps);
         userExercise.setCompleted(isCompleted);
         userExercise.setFamiliarity(familiarity);
 
-        Log.d(TAG, "✅ Datos validados y asignados al objeto local.");
+        Log.d(TAG, "saveExerciseDetails: ✅ Datos asignados a userExercise: " + userExercise.getName());
 
         if (userId == null || mDatabase == null) {
-            Log.e(TAG, "❌ Error: Usuario no autenticado o referencia a Firebase nula.");
+            Log.e(TAG, "saveExerciseDetails: ❌ UID o referencia Firebase no disponible");
             return;
         }
 
         DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
+        Log.d(TAG, "saveExerciseDetails: 🔍 Consultando ejercicio por nombre en Firebase (name=" + userExercise.getName() + ")");
 
-        userExercisesRef.orderByChild("name").equalTo(userExercise.getName()).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    for (DataSnapshot childSnapshot : snapshot.getChildren()) {
-                        String exerciseKey = childSnapshot.getKey();
+        userExercisesRef.orderByChild("name").equalTo(userExercise.getName())
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        Log.d(TAG, "saveExerciseDetails - onDataChange: 📦 Datos recibidos desde Firebase");
 
-                        if (exerciseKey != null) {
-                            Map<String, Object> exerciseUpdates = new HashMap<>();
-                            exerciseUpdates.put("currentLoad", currentLoad);
-                            exerciseUpdates.put("maxReps", maxReps);
-                            exerciseUpdates.put("isCompleted", isCompleted);
-                            exerciseUpdates.put("familiarity", familiarity);
+                        if (snapshot.exists()) {
+                            Log.d(TAG, "saveExerciseDetails - onDataChange: ✅ Ejercicio encontrado en Firebase");
+                            for (DataSnapshot childSnapshot : snapshot.getChildren()) {
+                                String exerciseKey = childSnapshot.getKey();
+                                Log.d(TAG, "saveExerciseDetails - onDataChange: ➤ Firebase Key del ejercicio: " + exerciseKey);
 
-                            userExercisesRef.child(exerciseKey).updateChildren(exerciseUpdates)
-                                    .addOnSuccessListener(aVoid -> {
-                                        Log.d(TAG, "✅ Datos actualizados correctamente para: " + userExercise.getName());
-                                        sharedViewModel.selectExercise(userExercise);
-                                        showToast("✅ Datos guardados correctamente");
-                                    })
-                                    .addOnFailureListener(e -> {
-                                        Log.e(TAG, "❌ Error al actualizar el ejercicio en Firebase: " + userExercise.getName(), e);
-                                        showToast("❌ Error al guardar los datos.");
-                                    });
+                                if (exerciseKey != null) {
+                                    Map<String, Object> updates = new HashMap<>();
+                                    updates.put("currentLoad", currentLoad);
+                                    updates.put("maxReps", maxReps);
+                                    updates.put("isCompleted", isCompleted);
+                                    updates.put("familiarity", familiarity);
+
+                                    Log.d(TAG, "saveExerciseDetails - onDataChange: 🔧 Datos a guardar: " + updates.toString());
+
+                                    userExercisesRef.child(exerciseKey).updateChildren(updates)
+                                            .addOnSuccessListener(aVoid -> {
+                                                Log.d(TAG, "saveExerciseDetails - onSuccess: ✅ Datos guardados exitosamente para " + userExercise.getName());
+                                                sharedViewModel.selectExercise(userExercise);
+                                                showToast("✅ Datos guardados correctamente");
+                                            })
+                                            .addOnFailureListener(e -> {
+                                                Log.e(TAG, "saveExerciseDetails - onFailure: ❌ Error al guardar en Firebase", e);
+                                                showToast("❌ Error al guardar los datos.");
+                                            });
+                                } else {
+                                    Log.e(TAG, "saveExerciseDetails - onDataChange: ❌ Firebase Key nula para el ejercicio");
+                                }
+                            }
+                        } else {
+                            Log.w(TAG, "saveExerciseDetails - onDataChange: ⚠️ No se encontró el ejercicio con nombre: " + userExercise.getName());
+                            showToast("❌ No se encontró el ejercicio en la base de datos.");
                         }
                     }
-                } else {
-                    Log.e(TAG, "❌ No se encontró el ejercicio en Firebase: " + userExercise.getName());
-                    showToast("❌ No se encontró el ejercicio en la base de datos.");
-                }
-            }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "❌ Error al buscar el ejercicio en Firebase: " + error.getMessage());
-            }
-        });
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Log.e(TAG, "saveExerciseDetails - onCancelled: ❌ Error de Firebase - " + error.getMessage());
+                    }
+                });
     }
 
 
-    /**
-     * Verifica si todos los datos del ejercicio están completos antes de guardarlos.
-     */
-    private boolean isExerciseDataValid(TextInputEditText loadEditText, Spinner repsSpinner,  Spinner familiaritySpinner) {
-        if (loadEditText == null || repsSpinner == null  || familiaritySpinner == null) {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ Un spinner o campo de entrada es nulo.");
+    private boolean isExerciseDataValid(TextInputEditText loadEditText, Spinner repsSpinner, Spinner familiaritySpinner) {
+        Log.d(TAG, "isExerciseDataValid: Validando campos del formulario");
+
+        if (loadEditText == null || repsSpinner == null || familiaritySpinner == null) {
+            Log.e(TAG, "isExerciseDataValid: ❌ Un campo es nulo");
             return false;
         }
 
         if (TextUtils.isEmpty(loadEditText.getText())) {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ El campo de peso está vacío.");
+            Log.e(TAG, "isExerciseDataValid: ❌ El campo de carga está vacío");
             return false;
         }
 
         try {
-            int loadValue = Integer.parseInt(loadEditText.getText().toString());
-            if (loadValue <= 0) {
-                Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ El peso debe ser mayor a 0.");
+            int load = Integer.parseInt(loadEditText.getText().toString());
+            if (load <= 0) {
+                Log.e(TAG, "isExerciseDataValid: ❌ El peso debe ser mayor que 0");
                 return false;
             }
         } catch (NumberFormatException e) {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ Error al convertir el peso a número.", e);
+            Log.e(TAG, "isExerciseDataValid: ❌ Error al convertir la carga", e);
             return false;
         }
 
         if (repsSpinner.getSelectedItemPosition() == 0) {
-            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ No se ha seleccionado el número de repeticiones.");
+            Log.e(TAG, "isExerciseDataValid: ❌ Repeticiones no seleccionadas");
             return false;
         }
 
-//        if (seriesSpinner.getSelectedItemPosition() == 0) {
-//            Log.e(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ❌ No se ha seleccionado el número de series.");
-//            return false;
-//        }
-
-
-
-        Log.d(TAG, "ExerciseDetailsLoadFragment - isExerciseDataValid: ✅ Todos los datos están completos.");
+        Log.d(TAG, "isExerciseDataValid: ✅ Validación completada correctamente");
         return true;
     }
+
     private void showToast(String message) {
         if (getActivity() != null) {
             Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
         } else {
-            Log.e(TAG, "❌ No se puede mostrar el Toast: El fragmento no está adjunto.");
+            Log.e(TAG, "showToast: ❌ No se puede mostrar el toast, fragmento no adjunto");
         }
     }
 
-    // Método para establecer el botón de estado desde AssignLoadFragment
     public void setStatusButton(ImageButton statusButton) {
+        Log.d(TAG, "setStatusButton: Botón de estado asignado desde fragmento externo");
         this.statusButton = statusButton;
-    }
-    // Método para actualizar el icono del botón de estado
-    private void updateStatusButtonIcon(ImageButton button, UserExercise userExercise) {
-        if (userExercise.isCompleted()) {
-            button.setImageResource(R.drawable.ic_completed_status);
-            Log.d(TAG, "COMPLETED ExerciseDetailsLoadFragment - updateStatusButtonIcon: Icono actualizado para " + userExercise.getName());
-        } else {
-            button.setImageResource(R.drawable.ic_default_status);
-            Log.d(TAG, "DEFAULT ExerciseDetailsLoadFragment - updateStatusButtonIcon: Icono actualizado para " + userExercise.getName());
-        }
-        button.invalidate(); // Forzar la actualización de la vista
-    }
-
-    private void setIconCompleted(ImageButton button, UserExercise userExercise) {
-
-            button.setImageResource(R.drawable.ic_completed_status);
-            Log.d(TAG, "COMPLETED ExerciseDetailsLoadFragment - updateStatusButtonIcon: Icono actualizado para " + userExercise.getName());
-
-
-        button.invalidate(); // Forzar la actualización de la vista
     }
 }

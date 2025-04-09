@@ -37,7 +37,8 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
             fragmentList.add(new EntrenamientoFragment());  // ✅ Muestra formulario de entrenamiento
         }
 
-        // 🔥 Manejo del `firstTime`
+        Log.d("ViewPagerAdapter", "Valor de first time " + firstTime);
+
         if (firstTime) {
             Log.d("ViewPagerAdapter", "✅ Es la primera vez. Agregando UserFormFragment.");
             fragmentList.add(new UserFormFragment());  // ✅ Muestra formulario de usuario

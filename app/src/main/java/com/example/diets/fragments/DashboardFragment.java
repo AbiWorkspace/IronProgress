@@ -12,7 +12,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.example.diets.R;
 import com.example.diets.activitys.MainActivity;
-import com.example.diets.activitys.WeightActivity;
+
+import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.model.User;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
@@ -161,10 +162,17 @@ public class DashboardFragment extends Fragment {
                     }
                     return true;
                 } else if (itemId == R.id.navigation_dashboard) {
-                    Log.d(TAG, "Navegando a WeightActivity");
-                    startActivity(new Intent(getActivity(), WeightActivity.class));
+                    Log.d("BottomNav", "🔁 Navegando a WeightFragment en pestaña Alimentación");
+
+                    if (getActivity() instanceof ViewPagerActivity) {
+                        ((ViewPagerActivity) getActivity()).switchToWeightFragment();
+                    } else {
+                        Log.e("BottomNav", "⚠️ ViewPagerActivity no disponible para navegar");
+                    }
+
                     return true;
                 }
+
                 return false;
             });
         } else {

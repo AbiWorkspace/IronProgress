@@ -49,7 +49,6 @@ public class EntrenamientoFragment extends Fragment {
 
     private void showWelcomeForm(View view) {
         Log.d(TAG, "showWelcomeForm: Mostrando formulario de bienvenida");
-
         TextView welcomeText = view.findViewById(R.id.welcomeText);
         Spinner daysSpinner = view.findViewById(R.id.daysSpinner);
         Spinner jobTypeSpinner = view.findViewById(R.id.jobTypeSpinner);
@@ -87,46 +86,14 @@ public class EntrenamientoFragment extends Fragment {
                 R.array.time_availability_options, android.R.layout.simple_spinner_item);
         timeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
-        // Verificar si los adaptadores tienen contenido antes de asignarlos a los Spinners
-        if (daysAdapter.getCount() > 0) {
-            daysSpinner.setAdapter(daysAdapter);
-            Log.d(TAG, "showWelcomeForm: Spinner de días lleno con opciones");
-        } else {
-            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de días", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de días");
-        }
+        Log.d(TAG, "showWelcomeForm: Configurando ArrayAdapter personalizado para los Spinners con texto blanco");
 
-        if (jobTypeAdapter.getCount() > 0) {
-            jobTypeSpinner.setAdapter(jobTypeAdapter);
-            Log.d(TAG, "showWelcomeForm: Spinner de tipo de trabajo lleno con opciones");
-        } else {
-            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de tipo de trabajo", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de tipo de trabajo");
-        }
 
-        if (goalAdapter.getCount() > 0) {
-            goalSpinner2.setAdapter(goalAdapter);
-            Log.d(TAG, "showWelcomeForm: Spinner de objetivos lleno con opciones");
-        } else {
-            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de objetivos", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de objetivos");
-        }
-
-        if (experienceAdapter.getCount() > 0) {
-            experienceSpinner.setAdapter(experienceAdapter);
-            Log.d(TAG, "showWelcomeForm: Spinner de experiencia lleno con opciones");
-        } else {
-            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de experiencia", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de experiencia");
-        }
-
-        if (timeAdapter.getCount() > 0) {
-            timeSpinner.setAdapter(timeAdapter);
-            Log.d(TAG, "showWelcomeForm: Spinner de disponibilidad de tiempo lleno con opciones");
-        } else {
-            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de disponibilidad de tiempo", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de disponibilidad de tiempo");
-        }
+        daysSpinner.setAdapter(daysAdapter);
+        jobTypeSpinner.setAdapter(jobTypeAdapter);
+        goalSpinner2.setAdapter(goalAdapter);
+        experienceSpinner.setAdapter(experienceAdapter);
+        timeSpinner.setAdapter(timeAdapter);
 
         submitButton.setOnClickListener(v -> {
             Log.d(TAG, "submitButton: Botón de enviar clicado");

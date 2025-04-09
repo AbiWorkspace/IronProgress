@@ -77,7 +77,8 @@ public class ExerciseSelectionDialogFragmentAlt  extends DialogFragment implemen
             trainingDay = (TrainingDay) args.getSerializable("trainingDay");
             if (trainingDay != null) {
                 Log.d(TAG, "onViewCreated: TrainingDay recibido: " + trainingDay);
-                loadExercises(trainingDay.getMovementPatterns());
+                loadExercises(trainingDay.getDayTitle());
+
             }
         }
 
@@ -122,87 +123,116 @@ public class ExerciseSelectionDialogFragmentAlt  extends DialogFragment implemen
 
     }
 
-    private void loadExercises(List<MovementPattern> movementPatterns) {
-        DatabaseReference exercisesRef = mDatabase.child("exercises");
-        exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                exercises.clear();
-                Log.d(TAG, "📌 Número total de ejercicios en Firebase: " + snapshot.getChildrenCount());
+    private void loadExercises(String dayKey) {
+        obtenerMovementPatternDelDia(dayKey, pattern -> {
+            if (pattern == null) {
+                Log.w(TAG, "⚠ No se pudo cargar el patrón de movimiento para " + dayKey);
+                return;
+            }
 
-                if (!snapshot.exists()) {
-                    Log.e(TAG, "❌ ERROR: No hay ejercicios en la base de datos.");
-                    return;
-                }
+            Log.d(TAG, "🔄 Cargando ejercicios usando patrón de movimiento completo: " + pattern.getName());
 
-                for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                    Object data = exerciseSnapshot.getValue();
-                    if (data instanceof Map) {
-                        Map<String, Object> dataMap = (Map<String, Object>) data;
-                        Exercise exercise = mapToExercise(dataMap);
+            DatabaseReference exercisesRef = mDatabase.child("exercises");
+            exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    exercises.clear();
+                    Log.d(TAG, "📌 Número total de ejercicios en Firebase: " + snapshot.getChildrenCount());
 
-                        if (exercise != null) {
-                            // 🔥 Evaluar el ejercicio para cada patrón de movimiento
-                            for (MovementPattern pattern : movementPatterns) {
+                    if (!snapshot.exists()) {
+                        Log.e(TAG, "❌ ERROR: No hay ejercicios en la base de datos.");
+                        return;
+                    }
+
+                    for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
+                        Object data = exerciseSnapshot.getValue();
+                        if (data instanceof Map) {
+                            Map<String, Object> dataMap = (Map<String, Object>) data;
+                            Exercise exercise = mapToExercise(dataMap);
+
+                            if (exercise != null) {
                                 Log.d(TAG, "-----------------------------");
                                 Log.d(TAG, "🛠 Evaluando patrón de movimiento: " + pattern.getName());
 
                                 if (hasMatchingMuscles(exercise, pattern)) {
                                     Log.d(TAG, "✅ Ejercicio ACEPTADO: " + exercise.getName() + " para el patrón " + pattern.getName());
                                     exercises.add(exercise);
-                                    break; // Evita agregar duplicados si coincide con múltiples patrones
                                 } else {
                                     Log.d(TAG, "❌ Ejercicio RECHAZADO: " + exercise.getName() + " para el patrón " + pattern.getName());
                                 }
                             }
                         }
                     }
+
+                    setupRecyclerView();
                 }
 
-                setupRecyclerView();
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "❌ ERROR en Firebase: " + error.getMessage());
-            }
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Log.e(TAG, "❌ ERROR en Firebase: " + error.getMessage());
+                }
+            });
         });
     }
 
+
     private boolean hasMatchingMuscles(Exercise exercise, MovementPattern pattern) {
-        if ((exercise.getSynergistMuscles() == null || exercise.getSynergistMuscles().isEmpty()) &&
-                (exercise.getMusclesWorked() == null || exercise.getMusclesWorked().isEmpty()) ||
-                pattern.getSynergistMuscles() == null || pattern.getSynergistMuscles().isEmpty()) {
+        boolean ejercicioIncompleto = (exercise.getSynergistMuscles() == null || exercise.getSynergistMuscles().isEmpty()) &&
+                (exercise.getMusclesWorked() == null || exercise.getMusclesWorked().isEmpty());
+        boolean patronIncompleto = (pattern.getSynergistMuscles() == null || pattern.getSynergistMuscles().isEmpty()) &&
+                (pattern.getMusclesWorked() == null || pattern.getMusclesWorked().isEmpty());
+
+        if (ejercicioIncompleto || patronIncompleto) {
             Log.w(TAG, "⚠ hasMatchingMuscles: Datos insuficientes para comparar.");
             return false;
         }
 
-        // 🔥 Normaliza todos los músculos en sets
+        // 🔄 Normalizamos músculos del patrón
         Set<String> patternMuscles = new HashSet<>();
-        for (String muscle : pattern.getSynergistMuscles()) {
-            patternMuscles.add(normalizeMuscleName(muscle));
+        if (pattern.getSynergistMuscles() != null) {
+            for (String muscle : pattern.getSynergistMuscles()) {
+                patternMuscles.add(normalizeMuscleName(muscle));
+            }
+        }
+        if (pattern.getMusclesWorked() != null) {
+            for (String muscle : pattern.getMusclesWorked()) {
+                patternMuscles.add(normalizeMuscleName(muscle));
+            }
         }
 
+        // 🔄 Normalizamos músculos del ejercicio
         Set<String> exerciseMuscles = new HashSet<>();
-        exerciseMuscles.addAll(exercise.getSynergistMuscles()); // Músculos sinérgicos
-        exerciseMuscles.addAll(extractMuscleList(String.join(",", exercise.getMusclesWorked()))); // Músculos trabajados
+        if (exercise.getSynergistMuscles() != null) {
+            for (String muscle : exercise.getSynergistMuscles()) {
+                exerciseMuscles.add(normalizeMuscleName(muscle));
+            }
+        }
+        if (exercise.getMusclesWorked() != null && !exercise.getMusclesWorked().isEmpty()) {
+            List<String> worked = extractMuscleList(exercise.getMusclesWorked()); // Usa método que limpia y divide
+            for (String muscle : worked) {
+                exerciseMuscles.add(normalizeMuscleName(muscle));
+            }
+        }
 
-        // 📌 Logs detallados para depuración
+        // 🧠 Logs detallados
         Log.d(TAG, "🔍 Evaluando ejercicio: " + exercise.getName());
         Log.d(TAG, "📌 Músculos del patrón (normalizados): " + patternMuscles);
-        Log.d(TAG, "📌 Todos los músculos del ejercicio (normalizados): " + exerciseMuscles);
+        Log.d(TAG, "📌 Músculos del ejercicio (normalizados): " + exerciseMuscles);
 
-        // 🔄 Verificar coincidencias en los músculos normalizados
         for (String muscle : exerciseMuscles) {
             if (patternMuscles.contains(muscle)) {
-                Log.d(TAG, "✅ Coincidencia encontrada para el músculo: " + muscle);
+                Log.d(TAG, "✅ Coincidencia encontrada: " + muscle);
                 return true;
             }
         }
 
-        Log.d(TAG, "❌ No se encontraron coincidencias para el ejercicio " + exercise.getName());
+        Log.d(TAG, "❌ No se encontraron coincidencias para el ejercicio: " + exercise.getName());
         return false;
     }
+
+
+
+
     private void obtenerMovementPatternDelDia(String dayKey, MovementPatternCallback callback) {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) {
@@ -224,14 +254,24 @@ public class ExerciseSelectionDialogFragmentAlt  extends DialogFragment implemen
 
                     String name = snapshot.child("name").getValue(String.class);
                     List<String> synergists = new ArrayList<>();
+                    List<String> workedMuscles = new ArrayList<>();
+
                     for (DataSnapshot muscleSnap : snapshot.child("synergistMuscles").getChildren()) {
                         synergists.add(muscleSnap.getValue(String.class));
+                    }
+
+                    for (DataSnapshot muscleSnap : snapshot.child("musclesWorked").getChildren()) {
+                        workedMuscles.add(muscleSnap.getValue(String.class));
                     }
 
                     MovementPattern pattern = new MovementPattern();
                     pattern.setName(name);
                     pattern.setSynergistMuscles(synergists);
-                    Log.d(TAG, "✅ MovementPattern creado: " + pattern.getName() + " con músculos → " + pattern.getSynergistMuscles());
+                    pattern.setMusclesWorked(workedMuscles);
+
+                    Log.d(TAG, "✅ MovementPattern creado: " + pattern.getName() +
+                            " con sinérgicos → " + pattern.getSynergistMuscles() +
+                            " y trabajados → " + pattern.getMusclesWorked());
 
                     callback.onPatternLoaded(pattern);
                 } else {
@@ -249,6 +289,7 @@ public class ExerciseSelectionDialogFragmentAlt  extends DialogFragment implemen
     }
 
 
+
     public interface MovementPatternCallback {
         void onPatternLoaded(MovementPattern pattern);
     }
@@ -262,20 +303,21 @@ public class ExerciseSelectionDialogFragmentAlt  extends DialogFragment implemen
         exercise.setEquipmentType((String) dataMap.getOrDefault("equipmentType", ""));
         exercise.setExerciseType((String) dataMap.getOrDefault("exerciseType", ""));
         exercise.setLoadIntensity((String) dataMap.getOrDefault("loadIntensity", ""));
-        exercise.setImage((String) dataMap.getOrDefault("image", ""));
         exercise.setDescription((String) dataMap.getOrDefault("description", ""));
         exercise.setMovementType((String) dataMap.getOrDefault("movementType", ""));
+
+        // ✅ EXTRAER imagen en base64
+        exercise.setImage((String) dataMap.getOrDefault("image", ""));
 
         // ✅ Convertimos "Espalda, Bíceps" en ["Espalda", "Bíceps"]
         Object musclesWorkedData = dataMap.get("musclesWorked");
         if (musclesWorkedData instanceof String) {
             List<String> muscleList = extractMuscleList((String) musclesWorkedData);
-            exercise.setMusclesWorked(String.join(", ", muscleList)); // 🔥 Convierte la lista en String
+            exercise.setMusclesWorked(String.join(", ", muscleList));
         } else {
-            exercise.setMusclesWorked(""); // Si es nulo, lo dejamos vacío
+            exercise.setMusclesWorked("");
         }
 
-        // ✅ Extraer músculos sinérgicos correctamente
         exercise.setSynergistMuscles(extractMuscleNames(dataMap.get("synergistMuscles")));
 
         return exercise;

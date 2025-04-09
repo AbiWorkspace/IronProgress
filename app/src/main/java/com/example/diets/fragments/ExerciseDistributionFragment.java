@@ -1,8 +1,11 @@
 package com.example.diets.fragments;
 
+import android.content.Context;
 import android.content.res.ColorStateList;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -28,6 +31,7 @@ import android.widget.RadioButton;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import java.io.Serializable;
 
@@ -53,7 +57,6 @@ public class ExerciseDistributionFragment extends Fragment {
 
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
-        // Obtener el userId del usuario autenticado
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
             userId = currentUser.getUid();
@@ -65,23 +68,19 @@ public class ExerciseDistributionFragment extends Fragment {
         saveButton.setOnClickListener(v -> {
             if (selectedDistribution != null) {
                 Log.d(TAG, "Distribución seleccionada: " + selectedDistribution);
-                // Guardar la distribución seleccionada en un Bundle
                 Bundle data = new Bundle();
                 data.putString("selectedDistribution", selectedDistribution);
                 data.putSerializable("trainingDays", (Serializable) trainingDays);
-                data.putString("userId", userId); // Asegúrate de pasar el userId
-
-                // Cambiar al siguiente fragmento
+                data.putString("userId", userId);
                 ((ViewPagerActivity) getActivity()).switchToSelectExercisesFragment(data);
             } else {
                 Log.d(TAG, "No se ha seleccionado ninguna distribución");
             }
         });
 
-        // Obtener los datos del Bundle
         Bundle data = getArguments();
         if (data != null) {
-            selectedDays = data.getInt("days", 3); // Valor predeterminado de 3 días si no se encuentra en el Bundle
+            selectedDays = data.getInt("days", 3);
         }
 
         loadExerciseDistributions(recommendedContainer, notRecommendedContainer, selectedDays);
@@ -147,7 +146,6 @@ public class ExerciseDistributionFragment extends Fragment {
         });
     }
 
-
     private void displayNoDistributionsMessage(LinearLayout container) {
         TextView noDistributionsText = new TextView(getContext());
         noDistributionsText.setText("No hay distribuciones");
@@ -158,89 +156,120 @@ public class ExerciseDistributionFragment extends Fragment {
         container.addView(noDistributionsText);
     }
 
-    private void displayDistributions(ExerciseDistribution exerciseDistribution, LinearLayout container) {
-        LinearLayout distributionLayout = new LinearLayout(getContext());
+    private void displayDistributions(ExerciseDistribution distribution, LinearLayout container) {
+        Context context = getContext();
+
+        LinearLayout distributionLayout = new LinearLayout(context);
         distributionLayout.setOrientation(LinearLayout.VERTICAL);
-        distributionLayout.setPadding(16, 16, 16, 16);
-        distributionLayout.setBackground(getResources().getDrawable(R.drawable.distribution_background));
+        distributionLayout.setPadding(12, 12, 12, 12);
+        distributionLayout.setBackground(ContextCompat.getDrawable(context, R.drawable.distribution_background));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 0, 0, 16);
         distributionLayout.setLayoutParams(params);
 
-        TextView titleText = new TextView(getContext());
-        titleText.setText(exerciseDistribution.getTitle());
-        titleText.setTextColor(getResources().getColor(R.color.white));
-        titleText.setPadding(8, 8, 8, 8);
+        TextView titleText = new TextView(context);
+        titleText.setText(distribution.getTitle());
+        titleText.setTextColor(Color.WHITE);
         titleText.setTextSize(20);
         titleText.setTypeface(null, Typeface.BOLD);
+        distributionLayout.addView(titleText);
 
-        TextView daysText = new TextView(getContext());
-        daysText.setText("Número de días: " + exerciseDistribution.getNumberOfDays());
-        daysText.setTextColor(getResources().getColor(R.color.white));
-        daysText.setPadding(8, 8, 8, 8);
-        daysText.setTextSize(18);
-        daysText.setTypeface(null, Typeface.BOLD);
+        TextView daysText = new TextView(context);
+        daysText.setText("Número de días: " + distribution.getNumberOfDays());
+        daysText.setTextColor(Color.LTGRAY);
+        daysText.setTextSize(16);
+        daysText.setPadding(0, 0, 0, 8);
+        distributionLayout.addView(daysText);
 
-        TextView distributionText = new TextView(getContext());
-        StringBuilder distributionDetails = new StringBuilder();
-        List<TrainingDay> trainingDaysList = exerciseDistribution.getTrainingDays();
+        for (int i = 0; i < distribution.getTrainingDays().size(); i++) {
+            TrainingDay day = distribution.getTrainingDays().get(i);
 
-        for (int i = 0; i < trainingDaysList.size(); i++) {
-            TrainingDay day = trainingDaysList.get(i);
-            distributionDetails.append("Día ").append(i + 1).append(":\n");
+            LinearLayout dayLayout = new LinearLayout(context);
+            dayLayout.setOrientation(LinearLayout.VERTICAL);
+            dayLayout.setPadding(8, 8, 8, 8);
+            dayLayout.setBackground(ContextCompat.getDrawable(context, R.drawable.day_card_background));
 
-            if (day.getMovementPatterns() != null) {
-                for (MovementPattern pattern : day.getMovementPatterns()) {
-                    distributionDetails.append("  - Patrón: ").append(pattern.getName()).append("\n");
-                    distributionDetails.append("    Músculos: ");
+            LinearLayout.LayoutParams dayParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            dayParams.setMargins(0, 8, 0, 8); // espaciado más compacto
+            dayLayout.setLayoutParams(dayParams);
 
-                    if (pattern.getSynergistMuscles() != null) {
-                        for (String muscleName : pattern.getSynergistMuscles()) { // ✅ Cambio aquí
-                            distributionDetails.append(muscleName).append(", ");
-                        }
-                        if (!pattern.getSynergistMuscles().isEmpty()) {
-                            distributionDetails.setLength(distributionDetails.length() - 2);
-                        }
-                    }
-                    distributionDetails.append("\n");
+            TextView dayTitle = new TextView(context);
+            dayTitle.setText("Día " + (i + 1) + " • Patrón: " + day.getMovementPatterns().get(0).getName());
+            dayTitle.setTextColor(Color.WHITE);
+            dayTitle.setTypeface(null, Typeface.BOLD);
+            dayTitle.setTextSize(16);
+            dayTitle.setPadding(0, 0, 0, 8);
+            dayLayout.addView(dayTitle);
+
+            // Layout oculto para músculos
+            LinearLayout muscleInfoLayout = new LinearLayout(context);
+            muscleInfoLayout.setOrientation(LinearLayout.VERTICAL);
+            muscleInfoLayout.setVisibility(View.GONE);
+
+            MovementPattern pattern = day.getMovementPatterns().get(0);
+
+            TextView workedText = new TextView(context);
+            workedText.setText("Trabajados: · " + TextUtils.join(" · ", pattern.getMusclesWorked()));
+            workedText.setTextColor(Color.GRAY);
+            workedText.setTextSize(14);
+            muscleInfoLayout.addView(workedText);
+
+            TextView synergistsText = new TextView(context);
+            synergistsText.setText("Sinergistas: · " + TextUtils.join(" · ", pattern.getSynergistMuscles()));
+            synergistsText.setTextColor(Color.GRAY);
+            synergistsText.setTextSize(14);
+            synergistsText.setPadding(0, 8, 0, 8);
+            muscleInfoLayout.addView(synergistsText);
+
+            TextView toggleText = new TextView(context);
+            toggleText.setText("Ver más");
+            toggleText.setTextColor(Color.parseColor("#B0BEC5"));
+            toggleText.setTypeface(null, Typeface.NORMAL);
+            toggleText.setTextSize(13);
+            toggleText.setPadding(0, 4, 0, 4);
+
+            final boolean[] expanded = {false};
+            toggleText.setOnClickListener(v -> {
+                if (!expanded[0]) {
+                    muscleInfoLayout.setVisibility(View.VISIBLE);
+                    toggleText.setText("Ver menos");
+                    expanded[0] = true;
+                } else {
+                    muscleInfoLayout.setVisibility(View.GONE);
+                    toggleText.setText("Ver más");
+                    expanded[0] = false;
                 }
-            }
+            });
+
+            dayLayout.addView(toggleText);
+            dayLayout.addView(muscleInfoLayout);
+            distributionLayout.addView(dayLayout);
+
+            // Divider entre días
+            View divider = new View(context);
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 1);
+            dividerParams.setMargins(0, 12, 0, 4);
+            divider.setLayoutParams(dividerParams);
+            divider.setBackgroundColor(Color.parseColor("#2F2F2F"));
+            distributionLayout.addView(divider);
         }
 
-        distributionText.setText(distributionDetails.toString());
-        distributionText.setTextColor(getResources().getColor(R.color.white));
-        distributionText.setPadding(8, 8, 8, 8);
-        distributionText.setTextSize(16);
-        distributionText.setTypeface(null, Typeface.NORMAL);
-
-        distributionLayout.addView(titleText);
-        distributionLayout.addView(daysText);
-        distributionLayout.addView(distributionText);
-
-        RadioButton radioButton = new RadioButton(getContext());
+        RadioButton radioButton = new RadioButton(context);
         radioButton.setPadding(8, 8, 8, 8);
         radioButton.setButtonTintList(ColorStateList.valueOf(getResources().getColor(R.color.red)));
-        radioButton.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        ));
-
         distributionLayout.addView(radioButton);
         radioButtons.add(radioButton);
 
         radioButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (isChecked) {
-                selectedDistribution = exerciseDistribution.getTitle();
-                List<TrainingDay> tempTrainingDays = exerciseDistribution.getTrainingDays();
-                trainingDays = new ArrayList<>(tempTrainingDays);
+                selectedDistribution = distribution.getTitle();
+                trainingDays = new ArrayList<>(distribution.getTrainingDays());
                 for (RadioButton rb : radioButtons) {
-                    if (rb != buttonView) {
-                        rb.setChecked(false);
-                    }
+                    if (rb != buttonView) rb.setChecked(false);
                 }
             }
         });

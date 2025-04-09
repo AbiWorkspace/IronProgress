@@ -7,12 +7,10 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.DragEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -20,7 +18,6 @@ import android.widget.PopupMenu;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -34,21 +31,14 @@ import com.example.diets.model.Exercise;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.TrainingDay;
 import com.example.diets.model.UserExercise;
-import com.example.diets.model.UserMovementPattern;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 public class SelectExercisesFragment extends Fragment implements ExercisesAdapter.OnExerciseSelectionChangedListener {
     private static final String TAG = "SelectExercisesFragment";
@@ -59,8 +49,8 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
     private List<TrainingDay> trainingDays;
     private String userGoal; // Meta del usuario
     private RecyclerView recyclerView; // Añadir esta línea
-    private List<Exercise> exercises = new ArrayList<>(); // Añadir esta línea
-
+    private List<Exercise> exercises = new ArrayList<>();
+    private List<Exercise> allExercisesCache = new ArrayList<>(); // 👈 Pega esto justo después
     private Map<TrainingDay, LinearLayout> dayContainers = new HashMap<>(); // Mapa para almacenar los contenedores de días
 
     @Nullable
@@ -79,8 +69,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         containerLayout = view.findViewById(R.id.containerLayout);
         Log.d(TAG, "[onViewCreated] ✅ containerLayout inicializado");
 
-
-
         // 🔥 Inicializar Firebase Database
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
@@ -88,7 +76,22 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         Bundle data = getArguments();
         if (data != null) {
             String selectedDistribution = data.getString("selectedDistribution");
-            trainingDays = (List<TrainingDay>) data.getSerializable("trainingDays");
+            List<TrainingDay> originalDays = (List<TrainingDay>) data.getSerializable("trainingDays");
+            trainingDays = new ArrayList<>();
+
+            if (originalDays != null) {
+                for (int i = 0; i < originalDays.size(); i++) {
+                    TrainingDay original = originalDays.get(i);
+
+                    TrainingDay copy = new TrainingDay();
+                    copy.setDayIndex(i);
+                    copy.setDayTitle("Día " + (i + 1));
+                    copy.setMovementPatterns(original.getMovementPatterns());
+                    copy.setExercises(new ArrayList<>()); // Asegura una lista nueva vacía
+                    trainingDays.add(copy);
+                }
+            }
+
             userGoal = data.getString("userGoal");
             userId = data.getString("userId");
 
@@ -145,6 +148,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         Log.d(TAG, "[onViewCreated] ✅ MÉTODO FINALIZADO");
 
     }
+
     private void saveSelectedExercises() {
         Log.d(TAG, "💾 Iniciando guardado en Firebase.");
 
@@ -155,11 +159,15 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         DatabaseReference userMovementPatternsRef = userRef.child("userMovementPatterns");
 
         // 🔥 LIMPIAR datos previos
+        Log.d(TAG, ">>> Eliminando datos previos en userExercises y userMovementPatterns...");
         userExercisesRef.removeValue();
         userMovementPatternsRef.removeValue();
 
         for (int i = 0; i < trainingDays.size(); i++) {
             TrainingDay trainingDay = trainingDays.get(i);
+            TrainingDay day = trainingDays.get(i);
+            day.setDayIndex(i); // <-- este campo está siempre en 0 actualmente
+            day.setDayTitle("Día " + (i + 1));
             String movementPatternName = "Día " + (i + 1);
             if (trainingDay.getMovementPatterns() != null && !trainingDay.getMovementPatterns().isEmpty()) {
                 movementPatternName = trainingDay.getMovementPatterns().get(0).getName();
@@ -170,12 +178,28 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             DatabaseReference dayRef = userMovementPatternsRef.child("Día " + (i + 1));
             dayRef.child("name").setValue(movementPatternName);
 
+// 🔥 NUEVO: Guardar musclesWorked y synergistMuscles a nivel de día
+            if (trainingDay.getMovementPatterns() != null && !trainingDay.getMovementPatterns().isEmpty()) {
+                MovementPattern pattern = trainingDay.getMovementPatterns().get(0); // suponiendo solo uno por día
+                if (pattern.getMusclesWorked() != null)
+                    dayRef.child("musclesWorked").setValue(pattern.getMusclesWorked());
+                if (pattern.getSynergistMuscles() != null)
+                    dayRef.child("synergistMuscles").setValue(pattern.getSynergistMuscles());
+            }
+
+
             List<Map<String, Object>> exerciseList = new ArrayList<>();
             for (UserExercise exercise : trainingDay.getExercises()) {
+                Log.d(TAG, ">>> Procesando UserExercise: " + exercise.getExerciseName());
+                Log.d(TAG, ">>> equipmentType=" + exercise.getEquipmentType() + ", exerciseType=" + exercise.getExerciseType());
+
                 Map<String, Object> exerciseMap = convertExerciseToMap(exercise);
                 exerciseMap.put("series", exercise.getSeries()); // 🔥 Guardar series
-                exerciseList.add(exerciseMap);
 
+                // Opcional: Veamos el resultado
+                Log.d(TAG, ">>> Mapa final a subir: " + exerciseMap);
+
+                exerciseList.add(exerciseMap);
                 userExercisesRef.push().setValue(exerciseMap);
             }
 
@@ -184,7 +208,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
         Log.d(TAG, "✅ Datos guardados correctamente en Firebase.");
     }
-
 
     // ✅ Método para convertir `Exercise` a `Map<String, Object>`
     private Map<String, Object> convertExerciseToMap(Exercise exercise) {
@@ -202,8 +225,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         exerciseMap.put("movementPatterns", exercise.getMovementPatterns());
         return exerciseMap;
     }
-
-
 
     private void createExerciseContainers(List<TrainingDay> trainingDays) {
         Log.d(TAG, "createExerciseContainers: Iniciando creación de contenedores");
@@ -225,7 +246,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             );
             params.setMargins(0, 0, 0, 16);
             dayContainer.setLayoutParams(params);
-            dayContainer.setBackgroundResource(R.drawable.container_background);
+            dayContainer.setBackgroundResource(R.drawable.distribution_background);
 
             RelativeLayout titleLayout = new RelativeLayout(getContext());
             titleLayout.setPadding(0, 0, 0, 16);
@@ -282,7 +303,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             for (MovementPattern pattern : trainingDay.getMovementPatterns()) {
                 RecyclerView recyclerView = new RecyclerView(getContext());
                 recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-                loadExercises(pattern, trainingDay); // Pasar también el TrainingDay
                 dayContainer.addView(recyclerView);
             }
 
@@ -301,8 +321,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             dayContainers.put(trainingDay, dayContainer);
             Log.d(TAG, "createExerciseContainers: dayContainer añadido para trainingDay: " + trainingDay.getDayIndex() + " con ID: " + containerId);
         }
-
-
     }
 
     private void showExerciseSelectionDialog(TrainingDay trainingDay, String userGoal) {
@@ -317,46 +335,8 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         args.putString("userGoal", userGoal);
         menuPopupFragment.setArguments(args);
 
-
         menuPopupFragment.show(getParentFragmentManager(), "MenuPopupFragment");
         Log.d(TAG, "showExerciseSelectionDialog: ✅ Abriendo MenuPopupFragment para seleccionar ejercicios.");
-    }
-
-
-    private void loadExercises(MovementPattern pattern, TrainingDay trainingDay) {
-        Log.d(TAG, "[loadExercises] 🔄 MÉTODO INICIADO");
-
-        DatabaseReference exercisesRef = mDatabase.child("exercises");
-        exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                exercises.clear();
-                Log.d(TAG, "[loadExercises] 📌 Número de ejercicios recuperados: " + snapshot.getChildrenCount());
-
-                for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                    Object data = exerciseSnapshot.getValue();
-
-                    if (data instanceof Map) {
-                        Map<String, Object> dataMap = (Map<String, Object>) data;
-                        Exercise exercise = mapToExercise(dataMap);
-
-                        if (exercise != null) {
-                            Log.d(TAG, "[loadExercises] ✅ Ejercicio recuperado: " + exercise.getName());
-                            exercises.add(exercise);
-                        }
-                    } else {
-                        Log.e(TAG, "[loadExercises] ❌ ERROR: Tipo de datos inválido: " + (data != null ? data.getClass().getSimpleName() : "null"));
-                    }
-                }
-
-
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "[loadExercises] ❌ Error en Firebase: " + error.getMessage());
-            }
-        });
     }
 
 
@@ -399,6 +379,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
         Log.d(TAG, "[addSelectedExercise] ✅ MÉTODO FINALIZADO");
     }
+
     private void addExerciseToDayContainer(Exercise exercise, TrainingDay trainingDay) {
         Log.d(TAG, "[addExerciseToDayContainer] 🔄 MÉTODO INICIADO para: " + exercise.getName());
 
@@ -408,7 +389,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             return;
         }
 
-        // Inflar el layout del ejercicio
+        // Inflar el layout del ejercicio (asegúrate de que exercise_item_container sea el layout correcto)
         LayoutInflater inflater = LayoutInflater.from(getContext());
         View exerciseContainer = inflater.inflate(R.layout.exercise_item_container, dayContainer, false);
 
@@ -428,7 +409,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
 
         exerciseNameView.setText(exercise.getName());
 
-        // ✅ Verificar si el ejercicio ya existe en el día
+        // Verificar si el ejercicio ya existe en el día
         UserExercise userExercise = null;
         for (UserExercise ue : trainingDay.getExercises()) {
             if (ue.getName().equals(exercise.getName())) {
@@ -438,8 +419,8 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         }
 
         if (userExercise == null) {
-            userExercise = new UserExercise(exercise);
-            userExercise.setSeries(3); // 🔥 Valor por defecto
+            userExercise = new UserExercise(exercise); // <-- AQUÍ se crea la copia
+            userExercise.setSeries(3); // Valor por defecto
             trainingDay.getExercises().add(userExercise);
         }
 
@@ -485,8 +466,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         Log.d(TAG, "[addExerciseToDayContainer] ✅ Ejercicio agregado visualmente al día " + trainingDay.getDayIndex());
     }
 
-
-
     private void configurePopupMenu(View exerciseContainer, Exercise exercise, TrainingDay trainingDay, LinearLayout dayContainer) {
         ImageView menuButton = exerciseContainer.findViewById(R.id.menuButton);
         if (menuButton == null) {
@@ -514,7 +493,6 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
                 } else if (itemId == R.id.action_delete) {
                     Log.d(TAG, "[configurePopupMenu] 🗑 Eliminando ejercicio: " + exercise.getName());
 
-
                     // 🔥 Remover visualmente el ejercicio del contenedor
                     dayContainer.removeView(exerciseContainer);
                     trainingDay.getExercises().removeIf(ex -> ex.getName().equals(exercise.getName()));
@@ -536,57 +514,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
         });
     }
 
-    private Exercise mapToExercise(Map<String, Object> dataMap) {
-        Exercise exercise = new Exercise();
-        exercise.setName((String) dataMap.getOrDefault("name", ""));
-        exercise.setEquipmentType((String) dataMap.getOrDefault("equipmentType", ""));
-        exercise.setExerciseType((String) dataMap.getOrDefault("exerciseType", ""));
-        exercise.setMusclesWorked((String) dataMap.getOrDefault("musclesWorked", ""));
-        exercise.setLoadIntensity((String) dataMap.getOrDefault("loadIntensity", ""));
-        exercise.setImage((String) dataMap.getOrDefault("image", ""));
-        exercise.setDescription((String) dataMap.getOrDefault("description", ""));
-        exercise.setMovementType((String) dataMap.getOrDefault("movementType", ""));
-
-        // ✅ Conversión segura de listas
-        exercise.setSynergistMuscles(convertToStringList(dataMap.get("synergistMuscles")));
-        exercise.setGoals(convertToStringList(dataMap.get("goals")));
-        exercise.setMovementPatterns(convertToMovementPatternList(dataMap.get("movementPatterns")));
-
-        return exercise;
-    }
-
-    // ✅ Convierte un objeto en List<String>, asegurando que no sea null
-    private List<String> convertToStringList(Object obj) {
-        if (obj instanceof List) {
-            return (List<String>) obj;
-        }
-        return new ArrayList<>(); // Si es null o incorrecto, devolver lista vacía
-    }
-
-    // ✅ Convierte un objeto en List<MovementPattern>
-    private List<MovementPattern> convertToMovementPatternList(Object obj) {
-        if (obj instanceof List) {
-            List<MovementPattern> movementPatterns = new ArrayList<>();
-            for (Object item : (List<?>) obj) {
-                if (item instanceof Map) {
-                    // Convertir cada elemento del Map a un objeto MovementPattern
-                    movementPatterns.add(mapToMovementPattern((Map<String, Object>) item));
-                }
-            }
-            return movementPatterns;
-        }
-        return new ArrayList<>();
-    }
-
-    // ✅ Método para convertir Map a MovementPattern
-    private MovementPattern mapToMovementPattern(Map<String, Object> dataMap) {
-        MovementPattern pattern = new MovementPattern();
-        pattern.setName((String) dataMap.getOrDefault("name", ""));
-        return pattern;
-    }
     public interface OnExercisesSelectedListener {
         void onExercisesSelected(List<Exercise> selectedExercises, TrainingDay trainingDay);
     }
-
-
 }

@@ -68,12 +68,25 @@ public class AssignLoadFragment extends Fragment {
         // Inicializar el ViewModel compartido
         sharedViewModel = new ViewModelProvider(requireActivity()).get(SharedViewModel.class);
 
-        // Observar los cambios en el ejercicio seleccionado
-        sharedViewModel.getSelectedExercise().observe(getViewLifecycleOwner(), userExercise -> {
-            if (userExercise != null) {
-                updateStatusButtonIconForExercise(userExercise);
+        sharedViewModel.getSelectedExercise().observe(getViewLifecycleOwner(), updatedExercise -> {
+            if (updatedExercise != null) {
+                for (UserExercise ue : userExercises) {
+                    if (ue.getName().equals(updatedExercise.getName())) {
+                        ue.setCurrentLoad(updatedExercise.getCurrentLoad());
+                        ue.setMaxReps(updatedExercise.getMaxReps());
+                        ue.setFamiliarity(updatedExercise.getFamiliarity());
+                        ue.setCompleted(updatedExercise.isCompleted());
+                        ue.setExerciseSeriesList(updatedExercise.getExerciseSeriesList());
+                        // NO break; se actualizan todos
+                    }
+                }
+                // Ahora se actualizan todos los duplicados
+                updateStatusButtonIconForExercise(updatedExercise);
             }
         });
+
+
+
 
         // Obtener el userId del usuario autenticado
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
@@ -156,6 +169,7 @@ public class AssignLoadFragment extends Fragment {
     }
     private UserExercise convertMapToUserExercise(Map<String, Object> map) {
         UserExercise userExercise = new UserExercise();
+
         userExercise.setName((String) map.get("name"));
         userExercise.setEquipmentType((String) map.get("equipmentType"));
         userExercise.setExerciseType((String) map.get("exerciseType"));
@@ -179,20 +193,32 @@ public class AssignLoadFragment extends Fragment {
         }
         List<String> synergistMuscleNames = new ArrayList<>();
         for (Muscle muscle : synergistMuscles) {
-            synergistMuscleNames.add(muscle.getName()); // Convertir Muscle a String
+            synergistMuscleNames.add(muscle.getName());
         }
         userExercise.setSynergistMuscles(synergistMuscleNames);
 
-        // 🔹 Otras conversiones sin cambios
         userExercise.setGoals(convertList(map.get("goals"), String.class));
         userExercise.setMovementPatterns(convertList(map.get("movementPatterns"), MovementPattern.class));
         userExercise.setCompleted(map.get("isCompleted") != null ? (Boolean) map.get("isCompleted") : false);
         userExercise.setMaxReps(map.get("maxReps") != null ? ((Long) map.get("maxReps")).intValue() : 0);
-        userExercise.setCurrentLoad(map.get("currentLoad") != null ? ((Long) map.get("currentLoad")).intValue() : 0);
-        userExercise.setFamiliarity((String) map.get("familiarity"));
+
+        // ✅ SOLO currentLoad - sin fallback
+        if (map.get("currentLoad") instanceof Long) {
+            int value = ((Long) map.get("currentLoad")).intValue();
+            Log.d(TAG, "convertMapToUserExercise: ➤ currentLoad válido para " + userExercise.getName() + ": " + value);
+            userExercise.setCurrentLoad(value);
+        } else {
+            Log.e(TAG, "convertMapToUserExercise: ❌ currentLoad inválido o nulo para " + userExercise.getName());
+            userExercise.setCurrentLoad(0);
+        }
+
+        // Familiaridad
+        userExercise.setFamiliarity(map.get("familiarity") != null ? (String) map.get("familiarity") : "Desconocido");
 
         return userExercise;
     }
+
+
 
 
     private <T> List<T> convertList(Object obj, Class<T> clazz) {
@@ -426,6 +452,13 @@ public class AssignLoadFragment extends Fragment {
      * ✅ Valida que todos los ejercicios tengan los datos completos.
      */
     private boolean areAllExercisesValid() {
+        Log.d(TAG, "areAllExercisesValid: Tamaño de userExercises = " + userExercises.size());
+        for (int i = 0; i < userExercises.size(); i++) {
+            UserExercise ue = userExercises.get(i);
+            Log.d(TAG, "➤ Index " + i + " = " + ue.getName() + " | currentLoad=" + ue.getCurrentLoad() +
+                    " | maxReps=" + ue.getMaxReps() + " | familiarity=" + ue.getFamiliarity());
+        }
+
         for (UserExercise exercise : userExercises) {
             if (!isExerciseValid(exercise)) {
                 Log.e(TAG, "AssignLoadFragment - areAllExercisesValid: ❌ Ejercicio con datos incompletos: " + exercise.getName());
@@ -444,29 +477,34 @@ public class AssignLoadFragment extends Fragment {
             return false;
         }
 
+        Log.d(TAG, "🟡 Validando ejercicio: " + exercise.getName());
+        Log.d(TAG, "    ➤ Peso actual (currentLoad): " + exercise.getCurrentLoad());
+        Log.d(TAG, "    ➤ Repeticiones máximas (maxReps): " + exercise.getMaxReps());
+        Log.d(TAG, "    ➤ Familiaridad: " + exercise.getFamiliarity());
+
         if (exercise.getName() == null || exercise.getName().trim().isEmpty()) {
             Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta el nombre del ejercicio.");
             return false;
         }
 
         if (exercise.getCurrentLoad() <= 0) {
-            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar peso en " + exercise.getName());
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar peso en " + exercise.getName() + " (Valor: " + exercise.getCurrentLoad() + ")");
             return false;
         }
 
         if (exercise.getMaxReps() <= 0) {
-            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar repeticiones en " + exercise.getName());
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar repeticiones en " + exercise.getName() + " (Valor: " + exercise.getMaxReps() + ")");
             return false;
         }
-
 
         if (exercise.getFamiliarity() == null || exercise.getFamiliarity().trim().isEmpty()) {
-            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar familiaridad en " + exercise.getName());
+            Log.e(TAG, "AssignLoadFragment - isExerciseValid: ❌ Falta asignar familiaridad en " + exercise.getName() + " (Valor: " + exercise.getFamiliarity() + ")");
             return false;
         }
 
-        Log.d(TAG, "AssignLoadFragment - isExerciseValid: ✅ Datos completos para " + exercise.getName());
+        Log.d(TAG, "✅ Datos válidos para " + exercise.getName());
         return true;
     }
+
 
 }

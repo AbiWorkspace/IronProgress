@@ -154,15 +154,7 @@ public class CreatedExercisesFragmentAlt extends Fragment implements AddExercise
 
             if (loadedExercises != null) {
                 exercises.clear();
-                if (movementPatterns != null) {
-                    for (Exercise exercise : loadedExercises) {
-                        if (hasMatchingMuscles(exercise, movementPatterns)) {
-                            exercises.add(exercise);
-                        }
-                    }
-                } else {
-                    exercises.addAll(loadedExercises);
-                }
+                exercises.addAll(loadedExercises);
             }
 
             setupRecyclerView();

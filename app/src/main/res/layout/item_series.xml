@@ -7,42 +7,43 @@
     android:background="@drawable/rounded_outer_corners"
     android:layout_marginBottom="8dp"
     android:minHeight="40dp"
-    android:gravity="center">
+    android:gravity="center_vertical">
 
+    <!-- Número de Serie -->
     <TextView
         android:id="@+id/seriesNumber"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:layout_marginEnd="8dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
         android:text="1"
-    android:textColor="#FFFFFF"
-    android:textSize="16sp"
-    android:textStyle="bold"
-    android:gravity="center"/>
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:gravity="center_vertical"/>
 
-
+    <!-- Carga Anterior -->
     <TextView
         android:id="@+id/previousLoad"
         android:layout_width="0dp"
-        android:layout_height="30dp"
-        android:layout_weight="1"
-        android:text="0.0 kg"
-    android:textSize="16sp"
-    android:textColor="#FFFFFF"
-    android:background="@drawable/rounded_corners"
-    android:padding="4dp"
-    android:gravity="center"
-    android:layout_marginEnd="8dp"/>
+        android:layout_height="wrap_content"
+        android:layout_weight="1.2"
+        android:text="Carga anterior "
+        android:textSize="14sp"
+        android:textColor="#FFFF"
+        android:background="@drawable/rounded_corners"
+        android:padding="4dp"
+        android:gravity="center"
+        android:layout_marginEnd="8dp"/>
 
-    <!-- Repeticiones -->
+    <!-- Reps -->
     <EditText
         android:id="@+id/repsInput"
         android:layout_width="0dp"
-        android:layout_height="30dp"
+        android:layout_height="wrap_content"
         android:layout_weight="1"
         android:hint="Reps"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:inputType="number"
         android:textColor="#FFFFFF"
         android:background="@drawable/rounded_corners"
@@ -50,14 +51,14 @@
         android:gravity="center"
         android:layout_marginEnd="8dp"/>
 
-    <!-- Peso actual -->
+    <!-- Peso -->
     <EditText
         android:id="@+id/weightInput"
         android:layout_width="0dp"
-        android:layout_height="30dp"
+        android:layout_height="wrap_content"
         android:layout_weight="1"
         android:hint="Peso"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:inputType="numberDecimal"
         android:textColor="#FFFFFF"
         android:background="@drawable/rounded_corners"
@@ -69,24 +70,24 @@
     <EditText
         android:id="@+id/rpeInput"
         android:layout_width="0dp"
-        android:layout_height="30dp"
+        android:layout_height="wrap_content"
         android:layout_weight="1"
         android:hint="RPE"
         android:text="0"
-    android:textSize="16sp"
-    android:inputType="numberDecimal"
-    android:textColor="#FFFFFF"
-    android:background="@drawable/rounded_corners"
-    android:padding="4dp"
-    android:gravity="center"
-    android:layout_marginEnd="8dp"/>
+        android:textSize="14sp"
+        android:inputType="numberDecimal"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/rounded_corners"
+        android:padding="4dp"
+        android:gravity="center"
+        android:layout_marginEnd="8dp"/>
 
-
-    <!-- Checkbox para marcar serie completada -->
+    <!-- Check completado -->
     <CheckBox
         android:id="@+id/checkSeriesCompleted"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:buttonTint="#E63946"
-        android:layout_gravity="center"/>
+        android:layout_marginEnd="8dp"/>
+
 </LinearLayout>

@@ -1,6 +1,7 @@
 package com.example.diets.fragments;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,6 +13,10 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
+import android.widget.ImageView;
 
 public class ExerciseDetailsFragment extends Fragment {
 
@@ -43,8 +48,32 @@ public class ExerciseDetailsFragment extends Fragment {
         ImageView imagePreview = view.findViewById(R.id.imagePreview);
         Button backButton = view.findViewById(R.id.backButton);
 
+
         if (getArguments() != null) {
             Exercise exercise = (Exercise) getArguments().getSerializable(ARG_EXERCISE);
+            Log.d("ExerciseDetailsFragment", "Base64 recibido: " + exercise.getImage());
+            String base64Image = exercise.getImage();
+
+            if (base64Image != null && !base64Image.trim().isEmpty()) {
+                try {
+                    base64Image = base64Image.replaceAll("\\s", ""); // elimina espacios y saltos de línea
+
+                    byte[] decodedBytes = Base64.decode(base64Image, Base64.DEFAULT);
+                    Bitmap decodedBitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+
+                    if (decodedBitmap != null) {
+                        imagePreview.setImageBitmap(decodedBitmap);
+                        Log.d("ExerciseDetailsFragment", "✅ Imagen cargada correctamente");
+                    } else {
+                        Log.e("ExerciseDetailsFragment", "❌ Error: Bitmap nulo luego de decodificar");
+                    }
+                } catch (Exception e) {
+                    Log.e("ExerciseDetailsFragment", "❌ Excepción al decodificar base64: " + e.getMessage(), e);
+                }
+            } else {
+                Log.w("ExerciseDetailsFragment", "⚠ No hay imagen base64 para mostrar");
+            }
+
 
             if (exercise != null) {
                 nameEditText.setText(exercise.getName());

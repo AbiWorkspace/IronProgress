@@ -76,6 +76,13 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         Bundle args = getArguments();
         if (args != null && args.containsKey("trainingDay")) {
             trainingDay = (TrainingDay) args.getSerializable("trainingDay");
+
+            // ✅ VALIDACIÓN EXTRA - Evitar dayTitle null
+            if (trainingDay != null && trainingDay.getDayTitle() == null) {
+                Log.w(TAG, "⚠️ TrainingDay recibido sin dayTitle. Asignando uno genérico.");
+                trainingDay.setDayTitle("Día sin nombre");
+            }
+
             if (trainingDay != null) {
                 Log.d(TAG, "📌 Día de entrenamiento recibido en CreatedExercisesFragment: " + trainingDay.getDayTitle());
                 loadExercisesFromInternalStorage(trainingDay.getMovementPatterns()); // ✅ FILTRO POR PATRÓN DE MOVIMIENTO
@@ -160,15 +167,9 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
 
             if (loadedExercises != null) {
                 exercises.clear();
-                if (movementPatterns != null) {
-                    for (Exercise exercise : loadedExercises) {
-                        if (hasMatchingMuscles(exercise, movementPatterns)) {
-                            exercises.add(exercise);
-                        }
-                    }
-                } else {
-                    exercises.addAll(loadedExercises); // Si no hay filtro, agregar todos
-                }
+                // 🔥 Desactivando filtro por patrón: cargar todos los ejercicios
+                exercises.addAll(loadedExercises);
+
             }
 
             setupRecyclerView();

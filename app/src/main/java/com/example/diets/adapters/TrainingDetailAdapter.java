@@ -1,14 +1,13 @@
 package com.example.diets.adapters;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.PopupMenu;
-import android.widget.TextView;
-import android.widget.Toast;
+import android.widget.*;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
@@ -35,19 +34,13 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
     private boolean seriesSaved = false;
     private String dayKey; // día actual
     ImageView iconAction;
+    ImageView exerciseImage;
 
     // ===================================================================================
-    // === INICIO MOD NUEVA FUNCIONALIDAD: Lista auxiliar para "pendientes de eliminar" ===
+    // === INICIO: LISTA AUXILIAR PARA "pendientes de eliminar" ===
     // ===================================================================================
-    /**
-     * Mantendrá los ejercicios que se eliminan localmente del RecyclerView,
-     * pero aún no eliminados permanentemente de Firebase.
-     */
     private final List<UserExercise> pendingDeletionExercises = new ArrayList<>();
 
-    /**
-     * Método público para obtener la lista de ejercicios marcados para eliminar.
-     */
     public List<UserExercise> getPendingDeletionExercises() {
         return pendingDeletionExercises;
     }
@@ -76,6 +69,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         Log.d(TAG, "TrainingDetailAdapter - onBindViewHolder: Asignando datos al ejercicio en posición " + position + " → " + exercise.getName());
         holder.bind(exercise);
 
+        // Marcamos "cambios sin guardar" si hacen click
         holder.itemView.setOnClickListener(v -> {
             hasUnsavedChanges = true;
             Log.d(TAG, "TrainingDetailAdapter - onBindViewHolder: ⚠️ Se detectó un cambio en " + exercise.getName());
@@ -126,19 +120,9 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         Log.d("TrainingDetailAdapter", "addExercise: Se añadió el ejercicio: " + exercise.getName());
     }
 
-    // ===================================================================================
-    // === INICIO MOD NUEVA FUNCIONALIDAD: Getter opcional para obtener "exercises"   ===
-    // ===================================================================================
-    /**
-     * Retorna la lista completa de ejercicios que el adapter está mostrando
-     * (ya sin los que se hayan eliminado localmente).
-     */
     public List<UserExercise> getExercises() {
         return exercises;
     }
-    // ===================================================================================
-    // === FIN MOD NUEVA FUNCIONALIDAD ===================================================
-    // ===================================================================================
 
     public int getVisibleSeriesCountForExercise(String exerciseName) {
         for (int i = 0; i < getItemCount(); i++) {
@@ -149,7 +133,8 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                     ExerciseViewHolder exerciseViewHolder = (ExerciseViewHolder) viewHolder;
                     if (exerciseViewHolder.seriesAdapter != null) {
                         int count = exerciseViewHolder.seriesAdapter.getSeriesList().size();
-                        Log.d(TAG, "TrainingDetailAdapter - getVisibleSeriesCountForExercise: Series visibles para '" + exerciseName + "' = " + count);
+                        Log.d(TAG, "TrainingDetailAdapter - getVisibleSeriesCountForExercise: Series visibles para '"
+                                + exerciseName + "' = " + count);
                         return count;
                     }
                 }
@@ -172,29 +157,86 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
             recyclerViewSeries = itemView.findViewById(R.id.recyclerViewSeries);
             btnAddSeries = itemView.findViewById(R.id.btnAddSeries);
             iconAction = itemView.findViewById(R.id.iconAction);
+            exerciseImage = itemView.findViewById(R.id.exerciseImage);
         }
 
         public void bind(UserExercise exercise) {
+            Log.d(TAG, "bind: 🚀 Iniciando bind() para el ejercicio: " + exercise.getName());
             exerciseName.setText(exercise.getName());
 
+            // ======================================
+            //  1) CREAR Y CONFIGURAR LAS SERIES
+            // ======================================
             seriesList = new ArrayList<>();
+            Log.d(TAG, "bind: 🔍 Cantidad de series solicitadas → " + exercise.getSeries());
+
             for (int i = 0; i < exercise.getSeries(); i++) {
-                seriesList.add(new ExerciseSeries(i + 1, exercise.getReps(), exercise.getWeight(), exercise.getRpe()));
+                int seriesNumber = i + 1;
+                int reps = exercise.getReps() > 0 ? exercise.getReps() : 8;
+                double rpe = exercise.getRpe() > 0 ? exercise.getRpe() : 7.0;
+                double weight = exercise.getLastLoad(); // 🔥 "currentLoad" o última carga usada
+
+                Log.d(TAG, "bind: 📐 Parámetros para serie " + seriesNumber
+                        + " → Reps=" + reps + ", RPE=" + rpe + ", Peso=" + weight);
+
+                ExerciseSeries serie = new ExerciseSeries(seriesNumber, reps, weight, rpe);
+
+                // 🔥 Asignamos la carga previa
+                serie.setPreviousLoad(weight);
+                Log.d(TAG, "bind: 💾 Carga previa asignada a serie " + seriesNumber + " → " + weight);
+
+                seriesList.add(serie);
+            }
+            Log.d(TAG, "bind: ✅ Final → se han creado " + seriesList.size() + " series para " + exercise.getName());
+
+            // ======================================
+            //  2) CONFIGURAR LA IMAGEN
+            // ======================================
+            String base64Image = exercise.getImage();
+            if (base64Image != null && !base64Image.trim().isEmpty()) {
+                try {
+                    base64Image = base64Image.replaceAll("\\s", "");
+                    byte[] decodedBytes = Base64.decode(base64Image, Base64.DEFAULT);
+                    Bitmap bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+
+                    if (bitmap != null) {
+                        exerciseImage.setImageBitmap(bitmap);
+                    } else {
+                        Log.e(TAG, "bind: ❌ Error: Bitmap decodificado es null.");
+                        exerciseImage.setImageResource(R.drawable.ic_placeholder);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "bind: ❌ Error al decodificar base64: ", e);
+                    exerciseImage.setImageResource(R.drawable.ic_placeholder);
+                }
+            } else {
+                Log.w(TAG, "bind: ⚠️ Imagen base64 ausente para " + exercise.getName());
+                exerciseImage.setImageResource(R.drawable.ic_placeholder);
             }
 
+            // ======================================
+            //  3) SETEAR ADAPTER DE SERIES
+            // ======================================
             seriesAdapter = new SeriesAdapter(seriesList);
             recyclerViewSeries.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             recyclerViewSeries.setAdapter(seriesAdapter);
 
             exerciseSeriesCountMap.put(exercise.getName(), seriesList.size());
 
+            // ======================================
+            //  4) BOTÓN AGREGAR NUEVA SERIE
+            // ======================================
             btnAddSeries.setOnClickListener(v -> {
                 int newSeriesNumber = seriesList.size() + 1;
                 seriesList.add(new ExerciseSeries(newSeriesNumber, 1, 0.0, 0.0));
                 seriesAdapter.notifyItemInserted(seriesList.size() - 1);
                 exerciseSeriesCountMap.put(exercise.getName(), seriesList.size());
+                Log.d(TAG, "bind: ➕ Nueva serie agregada a " + exercise.getName() + " (Total: " + seriesList.size() + ")");
             });
 
+            // ======================================
+            //  5) ICONO DE ACCIONES (Editar / Eliminar)
+            // ======================================
             iconAction.setOnClickListener(v -> {
                 PopupMenu popup = new PopupMenu(itemView.getContext(), iconAction);
                 popup.inflate(R.menu.menu_exercise_actions);
@@ -205,44 +247,27 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                         if (item.getItemId() == R.id.action_edit) {
                             Toast.makeText(itemView.getContext(), "Editar " + exercise.getName(), Toast.LENGTH_SHORT).show();
                             Log.d(TAG, "PopupMenu - Editar: " + exercise.getName());
-                            // Aquí podrías reiniciar seriesSaved o implementar un diálogo de edición
                             return true;
 
                         } else if (item.getItemId() == R.id.action_delete) {
-                            Log.d(TAG, "PopupMenu - Eliminar: " + exercise.getName());
-
                             new AlertDialog.Builder(itemView.getContext())
                                     .setTitle("Eliminar ejercicio")
                                     .setMessage("¿Estás seguro de que deseas eliminar " + exercise.getName() + "?")
                                     .setPositiveButton("Eliminar", (dialog, which) -> {
-                                        // ==========================================================================
-                                        // == INICIO MOD NUEVA FUNCIONALIDAD: marcar en "pendingDeletionExercises" ==
-                                        // ==========================================================================
                                         UserExercise exerciseToDelete = exercises.get(position);
-                                        // ==========================================================================
-                                        // == FIN MOD NUEVA FUNCIONALIDAD ===========================================
-                                        // ==========================================================================
-
                                         exercises.remove(position);
                                         notifyItemRemoved(position);
                                         notifyItemRangeChanged(position, exercises.size());
-                                        Log.d(TAG, "PopupMenu - Ejercicio eliminado localmente del RecyclerView: " + exercise.getName());
+                                        Log.d(TAG, "PopupMenu - Ejercicio eliminado del RecyclerView: " + exercise.getName());
 
-                                        // ==========================================================================
-                                        // == INICIO MOD NUEVA FUNCIONALIDAD: almacenar en lista de pendientes    ==
-                                        // ==========================================================================
                                         pendingDeletionExercises.add(exerciseToDelete);
-                                        Log.d(TAG, "PopupMenu - Se agregó a la lista de pendientes: " + exerciseToDelete.getName());
-                                        // ==========================================================================
-                                        // == FIN MOD NUEVA FUNCIONALIDAD ===========================================
-                                        // ==========================================================================
+                                        Log.d(TAG, "PopupMenu - Agregado a la lista de pendientes de eliminar: " + exerciseToDelete.getName());
                                     })
                                     .setNegativeButton("Cancelar", null)
                                     .show();
 
                             return true;
                         }
-
                     }
                     return false;
                 });
@@ -250,13 +275,17 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                 popup.show();
             });
 
+            // ======================================
+            //  6) CLICK EN EL NOMBRE DEL EJERCICIO
+            //     -> MUESTRA DETALLES (DIALOG)
+            // ======================================
             exerciseName.setOnClickListener(v -> {
                 Log.d(TAG, "ExerciseViewHolder - exerciseName Click: 📄 Solicitando detalles para " + exercise.getName());
 
                 DatabaseReference dayExercisesRef = FirebaseDatabase.getInstance()
                         .getReference("users")
                         .child(FirebaseAuth.getInstance().getCurrentUser().getUid())
-                        .child("userExercises"); // ⚠️ Cambiado a userExercises global
+                        .child("userExercises");
 
                 dayExercisesRef.orderByChild("name").equalTo(exercise.getName())
                         .addListenerForSingleValueEvent(new ValueEventListener() {
@@ -264,29 +293,29 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                             public void onDataChange(@NonNull DataSnapshot snapshot) {
                                 if (snapshot.exists()) {
                                     for (DataSnapshot exerciseSnapshot : snapshot.getChildren()) {
-                                        String firebaseKey = exerciseSnapshot.getKey(); // Esta es la que quieres
-
-                                        Log.d(TAG, "✅ Clave real de Firebase: " + firebaseKey);
+                                        String firebaseKey = exerciseSnapshot.getKey();
+                                        Log.d(TAG, "✅ Clave de Firebase encontrada: " + firebaseKey);
 
                                         ExerciseDetailsDialogFragment dialog =
-                                                ExerciseDetailsDialogFragment.newInstance(firebaseKey, dayKey); // ← Aquí
+                                                ExerciseDetailsDialogFragment.newInstance(firebaseKey, dayKey);
 
                                         FragmentActivity activity = (FragmentActivity) itemView.getContext();
                                         dialog.show(activity.getSupportFragmentManager(), "ExerciseDetailsDialog");
                                         break;
                                     }
                                 } else {
-                                    Log.e(TAG, "❌ No se encontró el ejercicio en /userExercises.");
+                                    Log.e(TAG, "❌ No se encontró el ejercicio en Firebase (/userExercises)");
                                 }
                             }
 
                             @Override
                             public void onCancelled(@NonNull DatabaseError error) {
-                                Log.e(TAG, "❌ Error al acceder a /userExercises", error.toException());
+                                Log.e(TAG, "❌ Error en Firebase al consultar /userExercises", error.toException());
                             }
                         });
             });
 
+            Log.d(TAG, "bind: ✅ Finalización de bind() para " + exercise.getName());
         }
     }
 
@@ -302,12 +331,10 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                     completadas.add(series);
                 }
             }
-
             seriesMap.put(name, completadas);
             Log.d(TAG, "getAllCompletedSeriesGroupedByExercise: " + name + " → " + completadas.size() + " completadas");
         }
 
         return seriesMap;
     }
-
 }

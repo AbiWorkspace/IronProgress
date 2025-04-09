@@ -64,6 +64,40 @@ public class RegisterActivity extends AppCompatActivity {
             }
         });
     }
+    private void writeNewUser(String userId, String firstName, String lastName, String email, Bitmap photoBitmap) {
+        DatabaseReference userRef = mDatabase.child("users").child(userId);
+
+        String encodedImage = (photoBitmap != null) ? encodeBitmapToBase64(photoBitmap) : "default";
+        Log.d(TAG, "Encoded image: " + encodedImage);
+
+        Map<String, Object> userUpdates = new HashMap<>();
+        userUpdates.put("firstName", firstName);
+        userUpdates.put("lastName", lastName);
+        userUpdates.put("email", email);
+        userUpdates.put("profilePhoto", encodedImage);
+        userUpdates.put("isFirstTime", true);
+
+        userRef.updateChildren(userUpdates)
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        Toast.makeText(this, "Usuario registrado exitosamente", Toast.LENGTH_SHORT).show();
+
+                        // Redirección a MainActivity
+                        Intent intent = new Intent(RegisterActivity.this, MainActivity.class);
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                        startActivity(intent);
+                        finish();
+
+                    } else {
+                        Log.e(TAG, "Error al guardar el usuario: " + task.getException());
+                        Toast.makeText(this, "Error al guardar el usuario", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error crítico al guardar los datos: " + e.getMessage());
+                    Toast.makeText(this, "Error crítico al guardar los datos", Toast.LENGTH_LONG).show();
+                });
+    }
 
     private void initializeUI() {
         firstNameEditText = findViewById(R.id.firstNameEditText);
@@ -136,33 +170,7 @@ public class RegisterActivity extends AppCompatActivity {
                 });
     }
 
-    private void writeNewUser(String userId, String firstName, String lastName, String email, Bitmap photoBitmap) {
-        DatabaseReference userRef = mDatabase.child("users").child(userId);
 
-        String encodedImage = (photoBitmap != null) ? encodeBitmapToBase64(photoBitmap) : "default";
-        Log.d(TAG, "Encoded image: " + encodedImage);
-
-        Map<String, Object> userUpdates = new HashMap<>();
-        userUpdates.put("firstName", firstName);
-        userUpdates.put("lastName", lastName);
-        userUpdates.put("email", email);
-        userUpdates.put("profilePhoto", encodedImage);
-        userUpdates.put("isFirstTime", true);
-
-        userRef.updateChildren(userUpdates)
-                .addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        Toast.makeText(this, "Usuario registrado exitosamente", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Log.e(TAG, "Error al guardar el usuario: " + task.getException());
-                        Toast.makeText(this, "Error al guardar el usuario", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error crítico al guardar los datos: " + e.getMessage());
-                    Toast.makeText(this, "Error crítico al guardar los datos", Toast.LENGTH_LONG).show();
-                });
-    }
 
     private String encodeBitmapToBase64(Bitmap bitmap) {
         if (bitmap == null) {

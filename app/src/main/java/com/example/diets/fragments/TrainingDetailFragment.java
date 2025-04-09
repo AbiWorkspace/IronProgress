@@ -87,16 +87,124 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         btnAddExercise.setEnabled(false); // Se habilitará cuando cargue el MovementPattern
 
         // ***********************************************************
-        // Recuperar argumentos (lista de ejercicios + dayKey = "Día X")
+        // Recuperar argumentos (dayKey = "Día X") y cargar ejercicios desde Firebase
         // ***********************************************************
         if (getArguments() != null) {
-            Log.d(TAG, "TrainingDetailFragment - onCreateView: Recuperando argumentos desde el Bundle.");
-            exercises = (List<UserExercise>) getArguments().getSerializable("exercises");
-
             dayKey = getArguments().getString("dayKey", "Día 1");
             Log.d(TAG, "TrainingDetailFragment - onCreateView: dayKey recibido → " + dayKey);
 
-            // 1) Cargar MovementPattern de Firebase según dayKey
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            if (user == null) {
+                Log.e(TAG, "❌ Usuario no autenticado.");
+                return view;
+            }
+            String userId = user.getUid();
+
+            // 1) Leer ejercicios desde Firebase
+            DatabaseReference dayExercisesRef = FirebaseDatabase.getInstance()
+                    .getReference("users")
+                    .child(userId)
+                    .child("userMovementPatterns")
+                    .child(dayKey)
+                    .child("userExercises");
+
+            dayExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    exercises = new ArrayList<>();
+
+                    FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+                    if (user == null) {
+                        Log.e(TAG, "❌ Usuario no autenticado.");
+                        return;
+                    }
+
+                    String userId = user.getUid();
+                    DatabaseReference globalExercisesRef = FirebaseDatabase.getInstance()
+                            .getReference("users")
+                            .child(userId)
+                            .child("userExercises");
+
+                    globalExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot globalSnapshot) {
+                            for (DataSnapshot exerciseSnap : snapshot.getChildren()) {
+                                UserExercise ue = new UserExercise();
+
+                                String nombreEjercicio = exerciseSnap.child("name").getValue(String.class);
+                                ue.setName(nombreEjercicio);
+
+                                // Buscar en userExercises (globales) el nodo que coincide por nombre
+                                boolean foundMatch = false;
+                                for (DataSnapshot globalSnap : globalSnapshot.getChildren()) {
+                                    String nombreGlobal = globalSnap.child("name").getValue(String.class);
+                                    if (nombreEjercicio != null && nombreEjercicio.equals(nombreGlobal)) {
+
+                                        // Recolectar último peso desde seriesData
+                                        DataSnapshot seriesDataSnap = globalSnap.child("seriesData");
+                                        double lastWeight = 0.0;
+
+                                        for (DataSnapshot serieSnap : seriesDataSnap.getChildren()) {
+                                            Double weight = serieSnap.child("weight").getValue(Double.class);
+                                            Log.d(TAG, "📦 Serie encontrada para " + nombreEjercicio + ": peso = " + weight);
+                                            if (weight != null) lastWeight = weight;
+                                        }
+
+                                        ue.setLastLoad(lastWeight);
+                                        Log.d(TAG, "TrainingDetailFragment - onDataChange: Carga previa recuperada desde seriesData para "
+                                                + ue.getName() + " → " + ue.getLastLoad());
+
+                                        foundMatch = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!foundMatch) {
+                                    Log.w(TAG, "⚠️ No se encontró seriesData para " + nombreEjercicio + ", usando carga 0.0");
+                                    ue.setLastLoad(0.0);
+                                }
+
+                                // Asignar series, reps, rpe, etc.
+                                ue.setSeries(exerciseSnap.child("series").getValue(Integer.class) != null
+                                        ? exerciseSnap.child("series").getValue(Integer.class)
+                                        : 3);
+                                ue.setReps(exerciseSnap.child("reps").getValue(Integer.class) != null
+                                        ? exerciseSnap.child("reps").getValue(Integer.class)
+                                        : 8);
+                                ue.setRpe(exerciseSnap.child("rpe").getValue(Double.class) != null
+                                        ? exerciseSnap.child("rpe").getValue(Double.class)
+                                        : 7.0);
+                                ue.setWeight(exerciseSnap.child("weight").getValue(Double.class) != null
+                                        ? exerciseSnap.child("weight").getValue(Double.class)
+                                        : 0.0);
+
+                                // Imagen, si existe
+                                String imageBase64 = exerciseSnap.child("image").getValue(String.class);
+                                ue.setImage(imageBase64 != null ? imageBase64 : "");
+
+                                exercises.add(ue);
+                            }
+
+                            Log.d(TAG, "✔️ Total ejercicios cargados con lastLoad desde seriesData: " + exercises.size());
+
+                            adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises, dayKey);
+                            recyclerViewExercises.setAdapter(adapter);
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Log.e(TAG, "❌ Error al leer userExercises globales: " + error.getMessage());
+                        }
+                    });
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Log.e(TAG, "❌ Error al cargar ejercicios de Firebase: " + error.getMessage());
+                }
+            });
+
+            // 2) Cargar MovementPattern de Firebase según dayKey
             obtenerMovementPatternDelDia(dayKey, pattern -> {
                 if (pattern != null) {
                     movementPatternDelDia = pattern;
@@ -105,14 +213,13 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                     Log.d(TAG, "📌 Nombre del patrón recuperado: " + movementPatternDelDia.getName());
                     Log.d(TAG, "💪 Músculos sinérgicos: " + musculosSinergicosDelDia);
 
-                    // ✅ Habilitar botón "Agregar Ejercicio" cuando se cargue el patrón
-                    btnAddExercise.setEnabled(true);
+                    btnAddExercise.setEnabled(true); // habilitar botón
                 } else {
                     Log.w(TAG, "⚠ No se encontró patrón de movimiento para el día: " + dayKey);
                 }
             });
         } else {
-            Log.w(TAG, "TrainingDetailFragment - onCreateView: No se recibieron argumentos. Inicializando lista vacía.");
+            Log.w(TAG, "TrainingDetailFragment - onCreateView: No se recibieron argumentos.");
             exercises = new ArrayList<>();
         }
 
@@ -123,7 +230,6 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
             Log.d(TAG, "btnAddExercise: Mostrando MenuPopupFragmentAlt con día: " + dayKey);
 
             if (movementPatternDelDia != null) {
-                // Se crea un TrainingDay temporal con movementPatternDelDia
                 TrainingDay trainingDay = new TrainingDay();
                 trainingDay.setDayIndex(0);
                 trainingDay.setDayTitle(dayKey);
@@ -142,7 +248,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         });
 
         btnBackToPrevious = view.findViewById(R.id.btnBackToPrevious);
-        btnBackToPrevious.setOnClickListener(v -> switchToDashboardWorkout());
+        btnBackToPrevious.setOnClickListener(v -> finishWorkout());
 
         chronometerTraining = view.findViewById(R.id.chronometerTraining);
         startChronometer();
@@ -150,17 +256,9 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         btnFinishWorkout = view.findViewById(R.id.btnFinishWorkout);
         btnFinishWorkout.setOnClickListener(v -> finishWorkout());
 
-        // Configurar adapter con la lista de UserExercise
-        adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises, dayKey);
-
-        if (recyclerViewExercises != null) {
-            recyclerViewExercises.setAdapter(adapter);
-        } else {
-            Log.e(TAG, "TrainingDetailFragment - onCreateView: ERROR - RecyclerView es NULL al asignar adaptador.");
-        }
-
         return view;
     }
+
 
     // ****************************************************************
     // Implementación de la interfaz OnExercisesSelectedListener:
@@ -667,18 +765,6 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
-    // Regresa al Dashboard (tu actividad principal con ViewPager)
-    private void switchToDashboardWorkout() {
-        Log.d(TAG, "TrainingDetailFragment - switchToDashboardWorkout: Usuario presionó el botón de retroceso.");
-        ViewPagerActivity activity = (ViewPagerActivity) requireActivity();
-        Bundle data = new Bundle();
-        activity.switchToDashboardWorkoutFragment(data);
-        Log.d(TAG, "TrainingDetailFragment - switchToDashboardWorkout: Navegación a DashboardWorkoutFragment realizada.");
-    }
-
-    // ===============================================================================================
-    // == INICIO MOD NUEVA FUNCIONALIDAD: método para borrar y reindexar ejercicios en Firebase  ===
-    // ===============================================================================================
     /**
      * Elimina de Firebase los ejercicios marcados como borrados localmente y luego reindexa
      * los ejercicios restantes (0, 1, 2, ...). Al finalizar, ejecuta el callback onComplete.

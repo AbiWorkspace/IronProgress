@@ -24,6 +24,15 @@ import java.util.List;
 public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesViewHolder> {
     private static final String TAG = "SeriesAdapter";
     private List<ExerciseSeries> seriesList;
+    private Double previousLoad;
+
+    public Double getPreviousLoad() {
+        return previousLoad;
+    }
+
+    public void setPreviousLoad(Double previousLoad) {
+        this.previousLoad = previousLoad;
+    }
 
     public SeriesAdapter(List<ExerciseSeries> seriesList) {
         Log.d(TAG, "SeriesAdapter - Constructor: Recibiendo lista de series con tamaño " + seriesList.size());
@@ -37,6 +46,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_series, parent, false);
         return new SeriesViewHolder(view);
     }
+
     public List<ExerciseSeries> getSeriesList() {
         return this.seriesList;
     }
@@ -56,7 +66,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     public List<ExerciseSeries> getUpdatedSeriesList() {
         List<ExerciseSeries> completedSeries = new ArrayList<>();
         for (ExerciseSeries series : seriesList) {
-            if (series.isCompleted()) { // 🔥 Solo se guardan las series completadas
+            if (series.isCompleted()) {
                 completedSeries.add(series);
                 Log.d(TAG, "SeriesAdapter - getUpdatedSeriesList: Agregando serie completada - " + series.toString());
             }
@@ -70,6 +80,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         EditText repsInput, weightInput, rpeInput;
         CheckBox checkSeriesCompleted;
         private boolean isUpdating = false;
+        TextView previousLoad; // <-- TextView para mostrar la carga anterior
 
         public SeriesViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -78,6 +89,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
             weightInput = itemView.findViewById(R.id.weightInput);
             rpeInput = itemView.findViewById(R.id.rpeInput);
             checkSeriesCompleted = itemView.findViewById(R.id.checkSeriesCompleted);
+            previousLoad = itemView.findViewById(R.id.previousLoad);
 
             Log.d(TAG, "SeriesViewHolder - Constructor: ViewHolder inicializado correctamente.");
 
@@ -93,27 +105,51 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
             isUpdating = true;
             Log.d(TAG, "SeriesViewHolder - bind: Asignando valores a la serie " + series.getSeriesNumber());
 
+            // 🔢 Número de serie
             seriesNumber.setText(String.valueOf(series.getSeriesNumber()));
 
+            // 🔁 Repeticiones
             repsInput.setText(String.valueOf(series.getReps()));
-            weightInput.setText(String.valueOf(series.getWeight()));
+
+            // ⚖️ Asignar PESO (solo si es mayor a 0)
+            Double weightValue = series.getWeight();
+            if (weightValue != null && weightValue > 0) {
+                weightInput.setText(String.valueOf(weightValue));
+            } else {
+                weightInput.setText("");
+            }
+
+            // 🔧 Asignar RPE
             rpeInput.setText(String.valueOf(series.getRpe()));
 
+            // ✅ Checkbox completado
             checkSeriesCompleted.setChecked(series.isCompleted());
+
+            // 📌 Mostrar valor de "carga anterior"
+            Double previousLoadValue = series.getPreviousLoad();
+            if (previousLoadValue != null) {
+                if (previousLoadValue % 1 == 0) {
+                    // Si es entero (por ej. 25.0)
+                    previousLoad.setText(String.valueOf(previousLoadValue.intValue()));
+                } else {
+                    // Si contiene decimales
+                    previousLoad.setText(String.valueOf(previousLoadValue));
+                }
+                Log.d(TAG, "SeriesViewHolder - bind: Carga anterior asignada → " + previousLoadValue);
+            } else {
+                previousLoad.setText("N/A");
+                Log.w(TAG, "SeriesViewHolder - bind: No se encontró valor de carga anterior para la serie " + series.getSeriesNumber());
+            }
 
             checkSeriesCompleted.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 Log.d(TAG, "CheckBox cambiado: " + isChecked + " para serie " + series.getSeriesNumber());
                 series.setCompleted(isChecked);
             });
 
-            // 🔥 Listener para capturar cambios en RPE y actualizar el objeto ExerciseSeries
+            // 🔥 Listener para cambios en RPE
             rpeInput.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
                 @Override
                 public void afterTextChanged(Editable s) {
                     if (isUpdating) return;
@@ -127,14 +163,10 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
                 }
             });
 
-            // 🔥 Listener para capturar cambios en PESO y actualizar el objeto ExerciseSeries
+            // 🔥 Listener para cambios en PESO
             weightInput.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
                 @Override
                 public void afterTextChanged(Editable s) {
                     if (isUpdating) return;
@@ -150,70 +182,69 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
 
             isUpdating = false;
         }
-    }
 
-    /**
-     * 🔥 Clase para restringir el input de RPE a valores entre 0 y 10, permitiendo solo enteros o con .5
-     */
-    public static class RPETextWatcher implements TextWatcher {
-        private EditText editText;
-        private boolean isUpdating = false;
+        /**
+         * 🔥 Clase para restringir el input de RPE a valores entre 0 y 10, permitiendo solo enteros o con .5
+         */
+        public static class RPETextWatcher implements TextWatcher {
+            private EditText editText;
+            private boolean isUpdating = false;
 
-        public RPETextWatcher(EditText editText) {
-            this.editText = editText;
-        }
+            public RPETextWatcher(EditText editText) {
+                this.editText = editText;
+            }
 
-        @Override
-        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
-        @Override
-        public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
 
-        @Override
-        public void afterTextChanged(Editable s) {
-            if (isUpdating) return;
-            isUpdating = true;
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isUpdating) return;
+                isUpdating = true;
 
-            String input = s.toString().trim();
-            if (input.isEmpty()) {
-                editText.setText("0");
-            } else {
-                try {
-                    float value = Float.parseFloat(input);
-                    if (value < 0 || value > 10 || (value % 1 != 0 && value % 1 != 0.5)) {
+                String input = s.toString().trim();
+                if (input.isEmpty()) {
+                    editText.setText("0");
+                } else {
+                    try {
+                        float value = Float.parseFloat(input);
+                        // Solo permitir 0-10 y .5
+                        if (value < 0 || value > 10 || (value % 1 != 0 && value % 1 != 0.5)) {
+                            editText.setText("0");
+                        }
+                    } catch (NumberFormatException e) {
                         editText.setText("0");
                     }
-                } catch (NumberFormatException e) {
-                    editText.setText("0");
                 }
+                Log.d(TAG, "RPETextWatcher - Validación aplicada: " + editText.getText().toString());
+                editText.setSelection(editText.getText().length());
+                isUpdating = false;
             }
-            Log.d(TAG, "RPETextWatcher - Validación aplicada: " + editText.getText().toString());
-            editText.setSelection(editText.getText().length());
-            isUpdating = false;
-        }
-    }
-
-
-
-    public static class InputFilterMinMax implements InputFilter {
-        private int min, max;
-
-        public InputFilterMinMax(int min, int max) {
-            this.min = min;
-            this.max = max;
         }
 
-        @Override
-        public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
-            try {
-                int input = Integer.parseInt(dest.toString() + source.toString());
-                if (isInRange(min, max, input)) return null;
-            } catch (NumberFormatException ignored) {}
-            return "";
-        }
+        public static class InputFilterMinMax implements InputFilter {
+            private int min, max;
 
-        private boolean isInRange(int min, int max, int input) {
-            return input >= min && input <= max;
+            public InputFilterMinMax(int min, int max) {
+                this.min = min;
+                this.max = max;
+            }
+
+            @Override
+            public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
+                try {
+                    int input = Integer.parseInt(dest.toString() + source.toString());
+                    if (isInRange(min, max, input)) return null;
+                } catch (NumberFormatException ignored) {}
+                return "";
+            }
+
+            private boolean isInRange(int min, int max, int input) {
+                return input >= min && input <= max;
+            }
         }
     }
 }

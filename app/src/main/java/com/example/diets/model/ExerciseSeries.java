@@ -2,8 +2,6 @@ package com.example.diets.model;
 
 import android.util.Log;
 
-import java.util.List;
-
 public class ExerciseSeries {
     private static final String TAG = "ExerciseSeries"; // 🔥 Nombre de la clase para logs
     private int seriesNumber;
@@ -11,6 +9,7 @@ public class ExerciseSeries {
     private double weight; // ✅ Debe ser double
     private double rpe;    // ✅ Debe ser double (no int)
     private boolean isCompleted; // ✅ Nuevo atributo para indicar si la serie está completada
+    private Double previousLoad;
 
     // 🔥 Constructor vacío requerido por Firebase
     public ExerciseSeries() {
@@ -33,7 +32,7 @@ public class ExerciseSeries {
         Log.d(TAG, "✅ Serie creada: Número de serie: " + seriesNumber + ", Reps: " + this.reps + ", Peso: " + this.weight + ", RPE: " + this.rpe + ", Completada: " + this.isCompleted);
     }
 
-    // 🔥 Constructor alternativo para compatibilidad sin `isCompleted` (se inicializa en `false`)
+    // 🔥 Constructor alternativo
     public ExerciseSeries(int seriesNumber, int reps, double weight, double rpe) {
         this(seriesNumber, reps, weight, rpe, false);
     }
@@ -79,14 +78,22 @@ public class ExerciseSeries {
         Log.d(TAG, "ExerciseSeries - setRpe: Modificando RPE a: " + this.rpe);
     }
 
-    public boolean isCompleted() { // ✅ Getter para saber si la serie está marcada como completada
+    public boolean isCompleted() {
         Log.d(TAG, "ExerciseSeries - isCompleted: Estado de completado: " + isCompleted);
         return isCompleted;
     }
 
-    public void setCompleted(boolean completed) { // ✅ Setter para actualizar el estado
+    public void setCompleted(boolean completed) {
         Log.d(TAG, "ExerciseSeries - setCompleted: Modificando estado de completado a: " + completed);
         this.isCompleted = completed;
+    }
+
+    public Double getPreviousLoad() {
+        return previousLoad;
+    }
+
+    public void setPreviousLoad(Double previousLoad) {
+        this.previousLoad = previousLoad;
     }
 
     @Override
@@ -96,7 +103,7 @@ public class ExerciseSeries {
         return info;
     }
 
-    // 🔥 Métodos de validación para asegurar valores correctos
+    // 🔥 Métodos de validación
     private int validateReps(int reps) {
         if (reps < 1 || reps > 30) {
             Log.e(TAG, "❌ ERROR: Reps fuera de rango (1-30). Asignando 1 por defecto.");
@@ -121,7 +128,7 @@ public class ExerciseSeries {
         return rpe;
     }
 
-    // 🔥 Método para asegurar que se obtiene correctamente el RPE desde Firebase
+    // 🔥 Método para asegurar RPE correcto al leer de Firebase
     public static double getRpeFromFirebase(Object rpeValue) {
         if (rpeValue instanceof Long) {
             return ((Long) rpeValue).doubleValue();

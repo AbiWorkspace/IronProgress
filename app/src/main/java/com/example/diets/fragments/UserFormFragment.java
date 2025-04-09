@@ -30,6 +30,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
 import java.util.Map;
+
 public class UserFormFragment extends Fragment {
 
     private Spinner genderSpinner, activityLevelSpinner, goalSpinner, weightSpinner, heightSpinner, ageSpinner;
@@ -144,7 +145,8 @@ public class UserFormFragment extends Fragment {
         Log.d(TAG, "   ➡️ Altura: " + height);
         Log.d(TAG, "   ➡️ Edad: " + age);
 
-        if (gender.isEmpty() || activityLevel.isEmpty() || goal.isEmpty() || weight.isEmpty() || height.isEmpty() || age.isEmpty()) {
+        if (gender.isEmpty() || activityLevel.isEmpty() || goal.isEmpty()
+                || weight.isEmpty() || height.isEmpty() || age.isEmpty()) {
             Log.e(TAG, "❌ Campos vacíos detectados.");
             showErrorDialog("Por favor, completa todos los campos antes de enviar.");
             return;
@@ -157,7 +159,7 @@ public class UserFormFragment extends Fragment {
         userData.put("gender", gender);
         userData.put("activityLevel", activityLevel);
         userData.put("goal", goal);
-        userData.put("firstTime", false); // 🔹 Se guarda como false
+        userData.put("firstTime", false);  // 🔥 Esto se actualiza junto con los demás datos
 
         Log.d(TAG, "📌 Datos preparados para guardar en Firebase.");
 
@@ -165,20 +167,8 @@ public class UserFormFragment extends Fragment {
         mDatabase.child("users").child(userId).updateChildren(userData)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
-                        Log.d(TAG, "✅ Datos guardados correctamente en Realtime Database.");
-
-                        // 🔥 AHORA ACTUALIZAMOS `firstTime = false` DESPUÉS DE QUE SE GUARDEN LOS DATOS
-                        mDatabase.child("users").child(userId).child("firstTime").setValue(false)
-                                .addOnCompleteListener(updateTask -> {
-                                    if (updateTask.isSuccessful()) {
-                                        Log.d(TAG, "✅ `firstTime` actualizado a FALSE en Realtime Database.");
-                                        showSuccessDialog("¡Formulario enviado exitosamente!");
-                                    } else {
-                                        Log.e(TAG, "❌ Error al actualizar `firstTime`", updateTask.getException());
-                                        showErrorDialog("Error al actualizar la información.");
-                                    }
-                                });
-
+                        Log.d(TAG, "✅ Datos guardados correctamente (incluido firstTime = false).");
+                        showSuccessDialog("¡Formulario enviado exitosamente!");
                     } else {
                         Log.e(TAG, "❌ Error al guardar en Realtime Database", task.getException());
                         showErrorDialog("Error al actualizar la información.");
@@ -187,6 +177,7 @@ public class UserFormFragment extends Fragment {
 
         Log.d(TAG, "🏁 handleSubmit() finalizado.");
     }
+
 
 
     private void showErrorDialog(String message) {

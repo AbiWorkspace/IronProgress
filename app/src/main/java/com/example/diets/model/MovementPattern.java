@@ -22,7 +22,7 @@ public class MovementPattern implements Serializable {
     private String name;
     private List<String> synergistMuscles = new ArrayList<>();
     private List<String> exerciseIds = new ArrayList<>();
-
+    private List<String> musclesWorked = new ArrayList<>();
     // Constructor sin argumentos requerido por Firebase
     public MovementPattern() {}
 
@@ -101,6 +101,13 @@ public class MovementPattern implements Serializable {
         }
     }
 
+    public List<String> getMusclesWorked() {
+        return musclesWorked;
+    }
+
+    public void setMusclesWorked(List<String> musclesWorked) {
+        this.musclesWorked = (musclesWorked != null) ? new ArrayList<>(musclesWorked) : new ArrayList<>();
+    }
     @Override
     public String toString() {
         return "MovementPattern{" +

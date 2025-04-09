@@ -1,5 +1,7 @@
 package com.example.diets.fragments;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -28,19 +30,12 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
-
+import com.google.firebase.database.*;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class ExerciseDetailsDialogFragment extends DialogFragment {
     private static final String ARG_EXERCISE = "exerciseId";
@@ -50,44 +45,51 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private DatabaseReference databaseReference;
     private Spinner spinnerRpeFilter;
     private List<ExerciseSeries> allSeriesData;
+    private String base64ImageString;  // ✅ Guardará la imagen base64 limpia para su uso global
+
     private String exerciseKey;
     private String dayKey;
-    private String exerciseIndex;
+    private String exerciseIndex; // Este es el ID real del ejercicio en /userExercises
+
+    // Vistas para MovementType, EquipmentType, ExerciseType, PatternName
+    private TextView textMovementType, textEquipmentType, textExerciseType, textPatternName;
 
     /**
-     * Método estático para crear una nueva instancia del fragmento, recibiendo el ID del ejercicio.
+     * Método estático para crear una nueva instancia del fragmento, recibiendo el ID del ejercicio y el dayKey.
      */
     public static ExerciseDetailsDialogFragment newInstance(String exerciseIndex, String dayKey) {
         ExerciseDetailsDialogFragment fragment = new ExerciseDetailsDialogFragment();
         Bundle args = new Bundle();
-        args.putString("exerciseIndex", exerciseIndex);  // ahora es el índice, no name
+        args.putString("exerciseIndex", exerciseIndex);
         args.putString("dayKey", dayKey);
         fragment.setArguments(args);
         return fragment;
     }
 
-
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        Log.d(TAG + " - onCreate", "[🧠Lógica] Iniciando método onCreate.");
 
         if (getArguments() != null) {
-            exerciseIndex = getArguments().getString("exerciseIndex"); // nuevo nombre
+            exerciseIndex = getArguments().getString("exerciseIndex");
             dayKey = getArguments().getString("dayKey");
-            Log.d("ExerciseDetailsDialog", "✅ Claves recibidas: " + dayKey + " | " + exerciseIndex);
+            Log.d(TAG + " - onCreate", "[📦Args] Claves recibidas - dayKey: " + dayKey + ", exerciseIndex: " + exerciseIndex);
         } else {
-            Log.e("ExerciseDetailsDialog", "❌ getArguments() es null");
+            Log.e(TAG + " - onCreate", "[⚠️Validación] getArguments() es null. No se recibieron claves.");
         }
-        Log.d(TAG + " - onCreate", "Inicializando el fragmento y configurando el estilo del diálogo.");
+
         setStyle(DialogFragment.STYLE_NORMAL, R.style.CustomDialogTheme);
+        Log.d(TAG + " - onCreate", "[🎨Estilo] Estilo del diálogo aplicado.");
 
         databaseReference = FirebaseDatabase.getInstance().getReference();
-        Log.d(TAG + " - onCreate", "Referencia a Firebase obtenida correctamente.");
+        Log.d(TAG + " - onCreate", "[🔥Firebase] Referencia a Firebase inicializada correctamente.");
 
         allSeriesData = new ArrayList<>();
-        Log.d(TAG + " - onCreate", "Lista de series inicializada: allSeriesData vacía.");
+        Log.d(TAG + " - onCreate", "[🧠Lógica] Lista allSeriesData creada vacía.");
     }
+
 
     @Nullable
     @Override
@@ -97,17 +99,25 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         Log.d(TAG + " - onCreateView", "Inflando la vista del fragmento.");
         View view = inflater.inflate(R.layout.dialog_exercise_details, container, false);
 
-        // Referencias a vistas
-        ImageView imageExercise         = view.findViewById(R.id.imageExercise);
-        TextView  textExerciseName      = view.findViewById(R.id.textExerciseName);
-        TextView  textDescription       = view.findViewById(R.id.textDescription);
-        TextView  textMusclesWorked     = view.findViewById(R.id.textMusclesWorked);
-        TextView  textSynergistMuscles  = view.findViewById(R.id.textSynergistMuscles);
-        TextView  textRM                = view.findViewById(R.id.textRM);
-        TextView  textPersonalRecord    = view.findViewById(R.id.textPersonalRecord);
-        chartExerciseProgress           = view.findViewById(R.id.chartExerciseProgress);
-        Button    btnClose              = view.findViewById(R.id.btnClose);
+        // Referencias a vistas existentes
+        ImageView imageExercise        = view.findViewById(R.id.imageExercise);
+        TextView  textExerciseName     = view.findViewById(R.id.textExerciseName);
+        TextView  textDescription      = view.findViewById(R.id.textDescription);
+        TextView  textMusclesWorked    = view.findViewById(R.id.textMusclesWorked);
+        TextView  textSynergistMuscles = view.findViewById(R.id.textSynergistMuscles);
+        TextView  textRM               = view.findViewById(R.id.textRM);
+        TextView  textPersonalRecord   = view.findViewById(R.id.textPersonalRecord);
+
+        chartExerciseProgress          = view.findViewById(R.id.chartExerciseProgress);
         spinnerRpeFilter               = view.findViewById(R.id.spinnerRpeFilter);
+
+        Button btnClose                = view.findViewById(R.id.btnClose);
+
+        // NUEVAS vistas para MovementType, EquipmentType, ExerciseType, PatternName
+        textMovementType  = view.findViewById(R.id.textMovementType);
+        textEquipmentType = view.findViewById(R.id.textEquipmentType);
+        textExerciseType  = view.findViewById(R.id.textExerciseType);
+        textPatternName   = view.findViewById(R.id.textPatternName);
 
         Log.d(TAG + " - onCreateView", "Vistas inicializadas correctamente.");
 
@@ -121,7 +131,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         Log.d(TAG, "Usuario autenticado con UID: " + userId);
 
         // Obtener ID del ejercicio desde argumentos
-        String exerciseId = exerciseIndex;  // Ya lo habías extraído correctamente en onCreate()
+        String exerciseId = exerciseIndex;
 
         if (exerciseId == null || exerciseId.isEmpty()) {
             Log.e(TAG, "⚠️ Error: ID del ejercicio no válido.");
@@ -129,16 +139,14 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         }
         Log.d(TAG, "Obteniendo datos del ejercicio con ID: " + exerciseId);
 
-        DatabaseReference ref = FirebaseDatabase.getInstance()
-                .getReference("users")
+        // Referencia a /userExercises/<exerciseId>
+        DatabaseReference ref = databaseReference
+                .child("users")
                 .child(userId)
                 .child("userExercises")
-                .child(exerciseIndex); // Aquí exerciseIndex es en realidad el exerciseId
+                .child(exerciseId);
 
-
-
-
-
+        // Lectura del ejercicio en /userExercises/<exerciseId>
         ref.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
@@ -147,63 +155,161 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                     return;
                 }
 
-                // Obtener datos de la BD
+                // 1) Leer datos principales
                 String exerciseName      = snapshot.child("name").getValue(String.class);
                 String description       = snapshot.child("description").getValue(String.class);
                 String musclesWorkedStr  = snapshot.child("musclesWorked").getValue(String.class);
-                Integer currentLoad      = snapshot.child("currentLoad").getValue(Integer.class);
-                Integer maxReps          = snapshot.child("maxReps").getValue(Integer.class);
                 String imageUrl          = snapshot.child("image").getValue(String.class);
 
-                // Listado de sinergistas
+                // 2) Leer MovementType, EquipmentType, ExerciseType
+                String movementType      = snapshot.child("movementType").getValue(String.class);
+                String equipmentType     = snapshot.child("equipmentType").getValue(String.class);
+                String exerciseType      = snapshot.child("exerciseType").getValue(String.class);
+
+                // 3) Leer pesos y reps "globales"
+                Integer currentLoad      = snapshot.child("currentLoad").getValue(Integer.class);
+                Integer maxReps          = snapshot.child("maxReps").getValue(Integer.class);
+
+                // 4) Leer sinergistas
                 List<String> synergyList = new ArrayList<>();
                 for (DataSnapshot ds : snapshot.child("synergistMuscles").getChildren()) {
                     String muscle = ds.getValue(String.class);
                     if (muscle != null) synergyList.add(muscle);
                 }
 
-                Log.d(TAG + " - onDataChange", "Ejercicio: " + exerciseName);
-                Log.d(TAG + " - onDataChange", "Descripción: " + description);
-                Log.d(TAG + " - onDataChange", "Músculos trabajados: " + musclesWorkedStr);
-                Log.d(TAG + " - onDataChange", "Músculos sinérgicos: " + synergyList);
-                Log.d(TAG + " - onDataChange", "Carga actual: " + currentLoad + " kg");
-                Log.d(TAG + " - onDataChange", "Repeticiones máximas: " + maxReps);
+                // Logs
+                Log.d(TAG, "Ejercicio: " + exerciseName);
+                Log.d(TAG, "Descripción: " + description);
+                Log.d(TAG, "Músculos trabajados: " + musclesWorkedStr);
+                Log.d(TAG, "Músculos sinérgicos: " + synergyList);
 
-                // Asignar datos a la UI
+                // Asignar a la UI
                 textExerciseName.setText(exerciseName);
                 textDescription.setText(description);
                 textMusclesWorked.setText("Músculos trabajados: " + capitalizeWords(musclesWorkedStr));
                 textSynergistMuscles.setText("Músculos sinérgicos: " + TextUtils.join(", ", synergyList));
 
-                // Cargar imagen con Glide
-                if (imageUrl != null && !imageUrl.isEmpty()) {
-                    Glide.with(requireContext())
-                            .load(imageUrl)
-                            .placeholder(R.drawable.ic_placeholder)
-                            .into(imageExercise);
-                    Log.d(TAG + " - onDataChange", "Imagen cargada correctamente desde: " + imageUrl);
+                // Imagen base64
+                if (imageUrl != null && !imageUrl.trim().isEmpty()) {
+                    Log.d(TAG, "bind: 📸 Imagen base64 detectada. Longitud original = " + imageUrl.length());
+                    base64ImageString = imageUrl.replaceAll("\\s", ""); // 🔥 Guardamos versión limpia
+
+                    try {
+                        String cleanedBase64 = imageUrl.replaceAll("\\s", "");
+                        Log.d(TAG, "bind: 🔍 Imagen base64 limpiada. Longitud después de limpieza = " + cleanedBase64.length());
+
+                        byte[] decodedBytes = android.util.Base64.decode(cleanedBase64, android.util.Base64.DEFAULT);
+                        Log.d(TAG, "bind: 📦 Bytes decodificados correctamente. Tamaño = " + decodedBytes.length);
+
+                        Bitmap bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+
+                        if (bitmap != null) {
+                            imageExercise.setImageBitmap(bitmap);
+                            Log.d(TAG, "bind: ✅ Imagen base64 convertida y asignada correctamente.");
+                        } else {
+                            Log.e(TAG, "bind: ❌ Error: Bitmap decodificado es null.");
+                            imageExercise.setImageResource(R.drawable.ic_placeholder);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "bind: ❌ Excepción al procesar imagen base64.", e);
+                        imageExercise.setImageResource(R.drawable.ic_placeholder);
+                    }
                 } else {
+                    Log.w(TAG, "bind: ⚠️ No se encontró imagen base64 para el ejercicio.");
                     imageExercise.setImageResource(R.drawable.ic_placeholder);
-                    Log.e(TAG + " - onDataChange", "URL de imagen no válida, usando imagen por defecto.");
                 }
 
-                // Calcular RM estimado
+                // Tipo de Movimiento
+                if (movementType != null && !movementType.isEmpty()) {
+                    textMovementType.setText("Tipo de Movimiento: " + movementType);
+                    Log.d(TAG, "✅ Tipo de Movimiento cargado: " + movementType);
+                } else {
+                    textMovementType.setText("Tipo de Movimiento: desconocido");
+                    Log.w(TAG, "⚠️ movementType es null o vacío");
+                }
+
+// Tipo de Equipamiento
+                if (equipmentType != null && !equipmentType.isEmpty()) {
+                    textEquipmentType.setText("Equipamiento: " + equipmentType);
+                    Log.d(TAG, "✅ Equipamiento cargado: " + equipmentType);
+                } else {
+                    textEquipmentType.setText("Equipamiento: desconocido");
+                    Log.w(TAG, "⚠️ equipmentType es null o vacío");
+                }
+
+// Tipo de Ejercicio
+                if (exerciseType != null && !exerciseType.isEmpty()) {
+                    textExerciseType.setText("Tipo de Ejercicio: " + exerciseType);
+                    Log.d(TAG, "✅ Tipo de Ejercicio cargado: " + exerciseType);
+                } else {
+                    textExerciseType.setText("Tipo de Ejercicio: desconocido");
+                    Log.w(TAG, "⚠️ exerciseType es null o vacío");
+                }
+
+
+                // 5) Cálculo RM estimado
                 if (currentLoad == null || currentLoad <= 0) currentLoad = 1;
                 if (maxReps == null || maxReps <= 0) maxReps = 1;
 
                 double estimatedRM = currentLoad * (1 + (maxReps / 30.0));
                 textRM.setText("RM Estimado: " + String.format("%.2f", estimatedRM) + " kg");
-                Log.d(TAG + " - onDataChange", "RM Estimado calculado: " + estimatedRM);
+                Log.d(TAG, "RM Estimado calculado: " + estimatedRM);
 
-                // Ahora descargamos las series
+                // 6) Obtener patrón de movimiento desde userMovementPatterns/dayKey/name
+                //    (opcional, si dayKey no es null)
+                if (dayKey != null && !dayKey.isEmpty()) {
+                    DatabaseReference patternRef = databaseReference
+                            .child("users")
+                            .child(userId)
+                            .child("userMovementPatterns")
+                            .child(dayKey)
+                            .child("name");
+
+                    patternRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            if (snapshot.exists()) {
+                                String patternName = snapshot.getValue(String.class);
+                                Log.d(TAG, "📥 Pattern name encontrado: " + patternName);
+
+                                if (patternName != null && !patternName.isEmpty()) {
+                                    textPatternName.setText("Patrón de Movimiento: " + patternName);
+                                    Log.d(TAG, "✅ Patrón de Movimiento asignado: " + patternName);
+                                } else {
+                                    Log.w(TAG, "⚠️ El campo name en userMovementPatterns está vacío");
+                                }
+                            } else {
+                                Log.w(TAG, "⚠️ No se encontró el nodo 'name' dentro de userMovementPatterns > " + dayKey);
+                            }
+
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Log.e(TAG, "Error al leer patternName", error.toException());
+                        }
+                    });
+                }
+
+                // 7) Llamar a fetchSeriesData para ver las series
                 fetchSeriesData(exerciseId, textPersonalRecord);
             }
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG + " - onDataChange", "❌ Error al obtener el ejercicio", error.toException());
+                Log.e(TAG, "❌ Error al obtener el ejercicio", error.toException());
             }
         });
+
+        imageExercise.setOnClickListener(v -> {
+            if (base64ImageString != null && !base64ImageString.isEmpty()) {
+                ImageFullscreenDialogFragment dialog = ImageFullscreenDialogFragment.newInstance(base64ImageString);
+                dialog.show(getParentFragmentManager(), "ImageFullscreenDialog");
+            } else {
+                Log.w(TAG, "❌ Imagen base64 no disponible para mostrar en pantalla completa.");
+            }
+        });
+
 
         // Botón Cerrar
         btnClose.setOnClickListener(v -> {
@@ -211,7 +317,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
             dismiss();
         });
 
-        // Evento de selección en el Spinner (filtrar RPE)
+        // Spinner RPE
         spinnerRpeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
@@ -224,14 +330,13 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                     Log.e(TAG + " - SpinnerRpe", "Error parseando RPE seleccionado: " + e.getMessage());
                 }
             }
-
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
                 Log.d(TAG + " - SpinnerRpe", "No se seleccionó ningún valor RPE en el Spinner.");
             }
         });
 
-        // Configuraciones iniciales de la gráfica para un look más profesional
+        // Configuraciones iniciales de la gráfica
         configureChartLookAndFeel();
 
         return view;
@@ -240,6 +345,188 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     /**
      * Configura la apariencia y comportamiento inicial de la gráfica para que luzca más profesional.
      */
+
+    /**
+     * Descarga todas las series desde /userExercises/<exerciseId>/seriesData
+     * y actualiza la gráfica y estadísticas.
+     */
+    private void fetchSeriesData(String exerciseId, TextView textPersonalRecord) {
+        Log.d(TAG + " - fetchSeriesData", "📥 Iniciando descarga de series: /userExercises/" + exerciseId + "/seriesData");
+
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            Log.e(TAG + " - fetchSeriesData", "⚠️ Usuario no autenticado, no se pueden obtener las series.");
+            return;
+        }
+
+        String userId = user.getUid();
+        DatabaseReference seriesRef = databaseReference
+                .child("users")
+                .child(userId)
+                .child("userExercises")
+                .child(exerciseId)
+                .child("seriesData");
+
+        allSeriesData.clear();
+
+        seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                double personalRecord = 0;
+                double bestRm = 0;
+                ExerciseSeries bestSeries = null;
+
+                for (DataSnapshot seriesSnapshot : dataSnapshot.getChildren()) {
+                    Integer seriesNumber = seriesSnapshot.child("seriesNumber").getValue(Integer.class);
+                    Integer reps = seriesSnapshot.child("reps").getValue(Integer.class);
+                    Double weight = seriesSnapshot.child("weight").getValue(Double.class);
+                    Double rpe = seriesSnapshot.child("rpe").getValue(Double.class);
+
+                    if (seriesNumber != null && reps != null && weight != null && rpe != null) {
+                        ExerciseSeries newSeries = new ExerciseSeries(seriesNumber, reps, weight, rpe);
+                        allSeriesData.add(newSeries);
+                        personalRecord = Math.max(personalRecord, weight);
+
+                        double rm = weight * (1 + (reps / 30.0));
+                        if (rm > bestRm) {
+                            bestRm = rm;
+                            bestSeries = newSeries;
+                        }
+
+                        Log.d(TAG, "✅ Serie cargada: #" + seriesNumber + ", Reps=" + reps + ", Peso=" + weight + ", RPE=" + rpe + ", RM=" + String.format("%.2f", rm));
+                    } else {
+                        Log.w(TAG, "⚠️ Datos de serie incompletos, se omite.");
+                    }
+                }
+
+                Log.d(TAG, "📊 Total series descargadas: " + allSeriesData.size());
+
+                // Personal Record
+                textPersonalRecord.setText("Personal Record: " + String.format("%.2f", personalRecord) + " kg");
+                textPersonalRecord.setTextColor(Color.parseColor("#BBBBBB")); // Blanco estándar
+
+                // Volumen Total
+                double totalVolume = 0.0;
+                for (ExerciseSeries s : allSeriesData) {
+                    totalVolume += s.getWeight() * s.getReps();
+                }
+                TextView textVolume = getView().findViewById(R.id.textVolume);
+                textVolume.setText("Volumen Total: " + String.format("%.2f", totalVolume) + " kg");
+                textVolume.setTextColor(Color.parseColor("#BBBBBB")); // Gris claro profesional
+
+                // Mejor Serie
+                TextView textBestSeries = getView().findViewById(R.id.textBestSeries);
+                if (bestSeries != null) {
+                    String resumen = "Mejor Serie: #" + bestSeries.getSeriesNumber()
+                            + " | " + bestSeries.getWeight() + " kg x " + bestSeries.getReps()
+                            + " reps (1RM: " + String.format("%.2f", bestRm) + " kg)";
+                    textBestSeries.setText(resumen);
+                    textBestSeries.setTextColor(Color.parseColor("#BBBBBB")); // Rojo vibrante suave, profesional
+                    Log.d(TAG, "🏆 Mejor Serie detectada: " + resumen);
+                } else {
+                    textBestSeries.setText("Mejor Serie: No disponible");
+                    textBestSeries.setTextColor(Color.parseColor("#BBBBBB"));
+                    Log.w(TAG, "⚠️ No se detectó mejor serie.");
+                }
+
+                // Dibujar gráfica optimizada visualmente
+                drawProgressChart(allSeriesData);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "❌ Error al obtener datos de series", error.toException());
+            }
+        });
+    }
+
+
+    /**
+     * Filtra la lista 'allSeriesData' por el RPE especificado y llama a 'drawProgressChart'.
+     */
+    private void filterAndDrawChartByRpe(float rpeFilter) {
+        Log.d(TAG + " - filterAndDrawChartByRpe", "Filtrando por RPE: " + rpeFilter);
+
+        if (allSeriesData.isEmpty()) {
+            Log.d(TAG, "No hay series en allSeriesData para filtrar.");
+            chartExerciseProgress.clear();
+            chartExerciseProgress.invalidate();
+            return;
+        }
+
+        List<ExerciseSeries> filteredSeries = new ArrayList<>();
+        for (ExerciseSeries s : allSeriesData) {
+            float rpeValue = (float) s.getRpe();
+            if (rpeValue == rpeFilter) {
+                filteredSeries.add(s);
+            }
+        }
+        Log.d(TAG, "Se encontraron " + filteredSeries.size() + " series con RPE = " + rpeFilter);
+
+        drawProgressChart(filteredSeries);
+    }
+
+    /**
+     * Dibuja la gráfica recibiendo una lista de series a mostrar (ya sea filtradas o completas).
+     */
+    private void drawProgressChart(List<ExerciseSeries> seriesData) {
+        Log.d(TAG + " - drawProgressChart", "Dibujando la gráfica con " + seriesData.size() + " series.");
+
+        if (seriesData.isEmpty()) {
+            chartExerciseProgress.setNoDataText("No hay datos suficientes");
+            chartExerciseProgress.setNoDataTextColor(Color.YELLOW);
+            chartExerciseProgress.clear();
+            chartExerciseProgress.invalidate();
+            return;
+        }
+
+        List<Entry> entries = new ArrayList<>();
+        float bestRM = 0;
+        Entry bestEntry = null;
+
+        for (ExerciseSeries series : seriesData) {
+            float x = (float) series.getSeriesNumber();
+            float y = (float) (series.getWeight() * (1 + (series.getReps() / 30.0)));
+            Entry entry = new Entry(x, y);
+            entries.add(entry);
+
+            if (y > bestRM) {
+                bestRM = y;
+                bestEntry = entry;
+            }
+        }
+
+        LineDataSet dataSet = new LineDataSet(entries, "Progreso RPE");
+        dataSet.setColor(Color.GREEN);
+        dataSet.setValueTextColor(Color.WHITE);
+        dataSet.setValueTextSize(12f);
+        dataSet.setLineWidth(2f);
+        dataSet.setCircleRadius(4f);
+        dataSet.setCircleColor(Color.GREEN);
+        dataSet.setDrawValues(true);
+
+        if (bestEntry != null) {
+            // Pintar mejor punto en rojo
+            List<Entry> bestEntries = new ArrayList<>();
+            bestEntries.add(bestEntry);
+            LineDataSet highlightSet = new LineDataSet(bestEntries, "Mejor Serie");
+            highlightSet.setColor(Color.RED);
+            highlightSet.setCircleColor(Color.RED);
+            highlightSet.setCircleRadius(6f);
+            highlightSet.setDrawValues(false);
+            highlightSet.setDrawCircles(true);
+
+            LineData lineData = new LineData(dataSet, highlightSet);
+            chartExerciseProgress.setData(lineData);
+        } else {
+            chartExerciseProgress.setData(new LineData(dataSet));
+        }
+
+        chartExerciseProgress.invalidate();
+    }
+
+
+
     private void configureChartLookAndFeel() {
         Log.d(TAG + " - configureChartLookAndFeel", "Aplicando configuraciones de look & feel a la gráfica.");
 
@@ -259,180 +546,46 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         chartExerciseProgress.setScaleEnabled(true);
         chartExerciseProgress.setPinchZoom(true);
 
-        // Configurar leyenda
+        // Leyenda
         Legend legend = chartExerciseProgress.getLegend();
         legend.setTextColor(Color.WHITE);
         legend.setForm(Legend.LegendForm.CIRCLE);
 
-        // Configurar eje X
+        // EJE X (Series)
         XAxis xAxis = chartExerciseProgress.getXAxis();
         xAxis.setTextColor(Color.WHITE);
         xAxis.setDrawGridLines(false);
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+        xAxis.setValueFormatter(new ValueFormatter() {
+            @Override
+            public String getFormattedValue(float value) {
+                return "Serie " + (int) value;
+            }
+        });
 
-        // Configurar eje Y izquierdo
+        // EJE Y IZQUIERDO (RM Estimado)
         YAxis leftAxis = chartExerciseProgress.getAxisLeft();
         leftAxis.setTextColor(Color.WHITE);
         leftAxis.setDrawGridLines(true);
+        leftAxis.setValueFormatter(new ValueFormatter() {
+            @Override
+            public String getFormattedValue(float value) {
+                return String.format("%.0f kg", value);
+            }
+        });
 
-        // Desactivar eje Y derecho si no se usa
+        // Desactivar eje Y derecho
         YAxis rightAxis = chartExerciseProgress.getAxisRight();
         rightAxis.setEnabled(false);
     }
 
-    /**
-     * Descarga todas las series desde users > UID > userExercises > exerciseId > seriesData
-     * y actualiza la gráfica y estadísticas.
-     */
-    private void fetchSeriesData(String exerciseId, TextView textPersonalRecord) {
-        Log.d(TAG + " - fetchSeriesData", "📥 Iniciando descarga de series desde ruta global: users > UID > userExercises > " + exerciseId);
 
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Log.e(TAG + " - fetchSeriesData", "⚠️ Usuario no autenticado, no se pueden obtener las series.");
-            return;
-        }
-
-        String userId = user.getUid();
-
-        DatabaseReference seriesRef = FirebaseDatabase.getInstance()
-                .getReference("users")
-                .child(userId)
-                .child("userExercises")
-                .child(exerciseId)
-                .child("seriesData");
-
-        seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                double personalRecord = 0;
-                allSeriesData.clear();
-                Log.d(TAG + " - fetchSeriesData", "📊 Descargando datos de series...");
-
-                for (DataSnapshot seriesSnapshot : dataSnapshot.getChildren()) {
-                    Integer seriesNumber = seriesSnapshot.child("seriesNumber").getValue(Integer.class);
-                    Integer reps         = seriesSnapshot.child("reps").getValue(Integer.class);
-                    Double weight        = seriesSnapshot.child("weight").getValue(Double.class);
-                    Double rpe           = seriesSnapshot.child("rpe").getValue(Double.class);
-
-                    if (seriesNumber != null && reps != null && weight != null && rpe != null) {
-                        ExerciseSeries newSeries = new ExerciseSeries(seriesNumber, reps, weight, rpe);
-                        allSeriesData.add(newSeries);
-
-                        // Actualizar PR
-                        personalRecord = Math.max(personalRecord, weight);
-                        Log.d(TAG + " - fetchSeriesData", "✅ Serie: #"
-                                + seriesNumber + " | Reps: " + reps + " | Peso: " + weight + " | RPE: " + rpe);
-                    } else {
-                        Log.w(TAG + " - fetchSeriesData", "⚠️ Datos incompletos en una serie, se omite.");
-                    }
-                }
-
-                Log.d(TAG + " - fetchSeriesData", "✅ Total series descargadas: " + allSeriesData.size());
-                textPersonalRecord.setText("Personal Record: " + String.format("%.2f", personalRecord) + " kg");
-
-                // Volumen total
-                double totalVolume = 0.0;
-                for (ExerciseSeries s : allSeriesData) {
-                    totalVolume += s.getWeight() * s.getReps();
-                }
-
-                TextView textVolume = getView().findViewById(R.id.textVolume);
-                textVolume.setText("Volumen total: " + String.format("%.2f", totalVolume));
-
-                drawProgressChart(allSeriesData);
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                Log.e(TAG + " - fetchSeriesData", "❌ Error al obtener datos de series", databaseError.toException());
-            }
-        });
-    }
-
-
-
-    /**
-     * Filtra la lista 'allSeriesData' por el RPE especificado y llama a 'drawProgressChart'.
-     */
-    private void filterAndDrawChartByRpe(float rpeFilter) {
-        Log.d(TAG + " - filterAndDrawChartByRpe", "Filtrando por RPE: " + rpeFilter);
-
-        if (allSeriesData.isEmpty()) {
-            Log.d(TAG + " - filterAndDrawChartByRpe", "No hay series en allSeriesData para filtrar.");
-            chartExerciseProgress.clear();
-            chartExerciseProgress.invalidate();
-            return;
-        }
-
-        List<ExerciseSeries> filteredSeries = new ArrayList<>();
-        for (ExerciseSeries s : allSeriesData) {
-            float rpeValue = (float) s.getRpe();
-            // Comparamos con el RPE seleccionado
-            if (rpeValue == rpeFilter) {
-                filteredSeries.add(s);
-            }
-        }
-
-        Log.d(TAG + " - filterAndDrawChartByRpe",
-                "Se encontraron " + filteredSeries.size() + " series con RPE = " + rpeFilter);
-
-        drawProgressChart(filteredSeries);
-    }
-
-    /**
-     * Dibuja la gráfica recibiendo una lista de series a mostrar (ya sea filtradas o completas).
-     */
-    private void drawProgressChart(List<ExerciseSeries> seriesData) {
-        Log.d(TAG + " - drawProgressChart", "Dibujando la gráfica con " + seriesData.size() + " series.");
-
-        if (seriesData.isEmpty()) {
-            chartExerciseProgress.setNoDataText("No hay datos suficientes");
-            chartExerciseProgress.setNoDataTextColor(Color.YELLOW);
-            Log.d(TAG + " - drawProgressChart", "No hay suficientes datos para la gráfica. Limpiando la gráfica...");
-            chartExerciseProgress.clear();
-            chartExerciseProgress.invalidate();
-            return;
-        }
-
-        // Creamos los puntos (x=seriesNumber, y=RM estimado)
-        List<Entry> entries = new ArrayList<>();
-        for (ExerciseSeries series : seriesData) {
-            float x = (float) series.getSeriesNumber();
-            float y = (float) (series.getWeight() * (1 + (series.getReps() / 30.0))); // RM estimado
-            entries.add(new Entry(x, y));
-
-            Log.d(TAG + " - drawProgressChart",
-                    "Agregando Entry => serieNum:" + x + ", RM estimado:" + y);
-        }
-
-        LineDataSet dataSet = new LineDataSet(entries, "Progreso RPE");
-        dataSet.setColor(Color.GREEN);
-        dataSet.setValueTextColor(Color.WHITE);
-        dataSet.setValueTextSize(10f);
-        dataSet.setLineWidth(2f);
-        dataSet.setCircleRadius(4f);
-        dataSet.setCircleColor(Color.GREEN);
-        dataSet.setDrawValues(true);
-
-        // Personalizar ejes, textos, leyenda, etc. (ya configurado en configureChartLookAndFeel())
-        LineData lineData = new LineData(dataSet);
-        chartExerciseProgress.setData(lineData);
-        chartExerciseProgress.invalidate();
-
-        Log.d(TAG + " - drawProgressChart", "Gráfica actualizada con " + seriesData.size() + " series.");
-    }
-
-    /**
-     * Capitaliza la primera letra de cada palabra en el string.
-     */
     private String capitalizeWords(String text) {
         if (text == null || text.isEmpty()) {
             return "";
         }
         String[] words = text.split("\\s+");
         StringBuilder capitalizedText = new StringBuilder();
-
         for (String word : words) {
             if (word.length() > 1) {
                 capitalizedText.append(Character.toUpperCase(word.charAt(0)))
@@ -445,4 +598,3 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         return capitalizedText.toString().trim();
     }
 }
-

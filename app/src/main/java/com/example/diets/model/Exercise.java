@@ -24,6 +24,7 @@ public class Exercise implements Serializable {
     private List<String> synergistMuscles = new ArrayList<>(); // Ahora se almacena como List<String>
     private List<String> goals = new ArrayList<>();
     private List<MovementPattern> movementPatterns = new ArrayList<>();
+    private int series = 3; // Valor por defecto
 
     // Constructor vacío requerido por Firebase
     public Exercise() {
@@ -63,6 +64,13 @@ public class Exercise implements Serializable {
 
     public void setSynergistMuscles(List<String> synergistMuscles) {
         this.synergistMuscles = (synergistMuscles != null) ? new ArrayList<>(synergistMuscles) : new ArrayList<>();
+    }
+    public int getSeries() {
+        return series;
+    }
+
+    public void setSeries(int series) {
+        this.series = series;
     }
 
     // 🔹 Método auxiliar para obtener la lista de músculos como objetos Muscle
@@ -158,9 +166,8 @@ public class Exercise implements Serializable {
     public String getMovementType() {
         return movementType;
     }
-
     public void setMovementType(String movementType) {
-        if (movementType.equals("compound") || movementType.equals("isolation")) {
+        if (movementType.equals("multiarticular") || movementType.equals("aislado")) {
             this.movementType = movementType;
         } else {
             this.movementType = "desconocido";

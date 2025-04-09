@@ -23,15 +23,13 @@ public class UserExercise extends Exercise implements Serializable {
     private double rpe;
     private String dayName;
     private List<ExerciseSeries> exerciseSeriesList;
-
-
-    @PropertyName("name")  // 🔥 Se mapea correctamente a Firebase
+    private double lastLoad;
+    @PropertyName("name")
     private String exerciseName;
 
-
-
-    // ✅ Constructor para inicializar desde un ejercicio base
+    // Constructor que copia todos los campos de Exercise al nuevo UserExercise
     public UserExercise(Exercise exercise) {
+        // 1) Llamada a super(...) como PRIMERA instrucción
         super(
                 exercise.getId(),
                 exercise.getName(),
@@ -47,18 +45,56 @@ public class UserExercise extends Exercise implements Serializable {
                 safeConvertToMovementPatternList(exercise.getMovementPatterns())
         );
 
+        // 2) Luego podemos hacer logs acerca de 'exercise'
+        Log.d("UserExercise", ">>> [CONSTRUCTOR] Recibimos un Exercise con:");
+        Log.d("UserExercise", "        name=" + exercise.getName());
+        Log.d("UserExercise", "        equipmentType=" + exercise.getEquipmentType());
+        Log.d("UserExercise", "        exerciseType=" + exercise.getExerciseType());
+        Log.d("UserExercise", "        musclesWorked=" + exercise.getMusclesWorked());
+        Log.d("UserExercise", "        loadIntensity=" + exercise.getLoadIntensity());
+        Log.d("UserExercise", "        image=" + exercise.getImage());
+        Log.d("UserExercise", "        description=" + exercise.getDescription());
+        Log.d("UserExercise", "        movementType=" + exercise.getMovementType());
+
+        // 3) Revisamos lo que quedó asignado en la superclase
+        Log.d("UserExercise", ">>> [CONSTRUCTOR] Después de super(...):");
+        Log.d("UserExercise", "        getEquipmentType()=" + this.getEquipmentType());
+        Log.d("UserExercise", "        getExerciseType()=" + this.getExerciseType());
+
+        // 4) Asignamos el "name" al campo exerciseName (que es el que se sube como "name" en Firebase)
+        this.setExerciseName(exercise.getName());
+
+        // 5) Inicializamos campos propios de UserExercise
         this.isCompleted = false;
         this.maxReps = 0;
         this.currentLoad = 0;
         this.familiarity = "";
-        this.series = 3;
+        this.series = 3;  // Valor por defecto
         this.dayName = "";
         this.exerciseSeriesList = new ArrayList<>();
 
-        Log.d("UserExercise", "Constructor con parámetros - Inicializando desde un ejercicio base.");
+        // 6) Logs finales con los valores de este UserExercise
+        Log.d("UserExercise", ">>> [CONSTRUCTOR] Campos finales del UserExercise:");
+        Log.d("UserExercise", "        exerciseName=" + this.exerciseName);
+        Log.d("UserExercise", "        equipmentType=" + this.getEquipmentType());
+        Log.d("UserExercise", "        exerciseType=" + this.getExerciseType());
+        Log.d("UserExercise", "        series=" + this.series);
+        Log.d("UserExercise", ">>> [CONSTRUCTOR] Fin de constructor");
     }
 
-    // ✅ Métodos Getter y Setter con LOGS DETALLADOS
+    public UserExercise() {
+        super();
+        this.isCompleted = false;
+        this.maxReps = 0;
+        this.currentLoad = 0;
+        this.familiarity = "";
+        this.exerciseName = "";
+        this.dayName = "";
+        this.exerciseSeriesList = new ArrayList<>();
+    }
+
+    // =============== GETTERS/SETTERS CON LOGS ===============
+
     public boolean isCompleted() {
         Log.d("UserExercise", "isCompleted() llamado: " + isCompleted);
         return isCompleted;
@@ -69,8 +105,7 @@ public class UserExercise extends Exercise implements Serializable {
         isCompleted = completed;
     }
 
-
-    // ✅ Excluir `getName()` para evitar conflictos con Firebase
+    // Excluimos getName() para evitar conflictos con Firebase
     @Exclude
     @Override
     public String getName() {
@@ -160,7 +195,11 @@ public class UserExercise extends Exercise implements Serializable {
                 .addOnSuccessListener(aVoid -> Log.d("Firebase", "✅ Ejercicio guardado con éxito en Firebase"))
                 .addOnFailureListener(e -> Log.e("Firebase", "❌ Error al guardar el ejercicio en Firebase", e));
     }
-    // ✅ Método para convertir de manera segura un objeto a una lista de Strings
+
+    // =========================================
+    //       MÉTODOS DE COPIA SEGURA
+    // =========================================
+
     private static List<String> safeConvertToList(Object obj) {
         if (obj instanceof List) {
             List<String> stringList = new ArrayList<>();
@@ -180,7 +219,6 @@ public class UserExercise extends Exercise implements Serializable {
         return new ArrayList<>();
     }
 
-    // ✅ Método para convertir una lista de Map a una lista de MovementPattern
     private static List<MovementPattern> safeConvertToMovementPatternList(Object obj) {
         if (obj instanceof List) {
             List<MovementPattern> movementPatterns = new ArrayList<>();
@@ -196,23 +234,11 @@ public class UserExercise extends Exercise implements Serializable {
         return new ArrayList<>();
     }
 
-    // ✅ Método auxiliar para mapear un objeto Map a MovementPattern
     private static MovementPattern mapToMovementPattern(Map<String, Object> dataMap) {
         MovementPattern pattern = new MovementPattern();
         pattern.setName((String) dataMap.getOrDefault("name", ""));
         Log.d("UserExercise", "mapToMovementPattern() - Mapeo completado: " + pattern.getName());
         return pattern;
-    }
-
-    public UserExercise() {
-        super();
-        this.isCompleted = false;
-        this.maxReps = 0;
-        this.currentLoad = 0;
-        this.familiarity = "";
-        this.exerciseName = "";
-        this.dayName = "";
-        this.exerciseSeriesList = new ArrayList<>();
     }
 
     @PropertyName("name")
@@ -237,10 +263,16 @@ public class UserExercise extends Exercise implements Serializable {
     public int getCurrentLoad() {
         return currentLoad;
     }
-
+    public double getLastLoad() {
+        return lastLoad;
+    }
+    public void setLastLoad(double lastLoad) {
+        this.lastLoad = lastLoad;
+    }
     public void setCurrentLoad(int currentLoad) {
         this.currentLoad = currentLoad;
     }
+
     @Override
     public String toString() {
         return "UserExercise{" +
@@ -256,6 +288,8 @@ public class UserExercise extends Exercise implements Serializable {
                 ", reps=" + reps +
                 ", rpe=" + rpe +
                 ", exerciseSeriesList=" + exerciseSeriesList +
+                ", equipmentType='" + getEquipmentType() + '\'' +
+                ", exerciseType='" + getExerciseType() + '\'' +
                 '}';
     }
 }

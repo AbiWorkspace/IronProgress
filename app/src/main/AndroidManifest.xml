@@ -57,14 +57,14 @@
         <activity android:name=".activitys.RegisterActivity" android:exported="true" />
         <activity android:name=".activitys.AdminActivity" android:exported="true" />
         <activity android:name=".activitys.ViewPagerActivity" android:exported="true" />
-        <activity android:name=".activitys.FoodActivity" android:exported="true" />
+
         <activity android:name=".activitys.UserListActivity" android:exported="true" />
         <activity android:name=".activitys.UserDetailsActivity" android:exported="true" />
         <activity android:name=".activitys.RegisterUserByAdminActivity" android:exported="true" />
         <activity android:name=".activitys.EditUserActivity"
             android:exported="true"
             android:label="Editar Usuario" />
-        <activity android:name=".activitys.WeightActivity" android:exported="true" />
+
 
     </application>
 
