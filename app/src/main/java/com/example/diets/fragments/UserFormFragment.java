@@ -159,7 +159,7 @@ public class UserFormFragment extends Fragment {
         userData.put("gender", gender);
         userData.put("activityLevel", activityLevel);
         userData.put("goal", goal);
-        userData.put("firstTime", false);  // 🔥 Esto se actualiza junto con los demás datos
+        userData.put("isFirstTime", false);  // 🔥 Esto se actualiza junto con los demás datos
 
         Log.d(TAG, "📌 Datos preparados para guardar en Firebase.");
 

@@ -69,7 +69,8 @@ public class ViewPagerActivity extends AppCompatActivity
         userRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
-                Boolean firstTimeValue = snapshot.child("firstTime").getValue(Boolean.class);
+                Boolean firstTimeValue = snapshot.child("isFirstTime").getValue(Boolean.class);
+
                 boolean firstTime = firstTimeValue != null && firstTimeValue;
 
                 boolean trainingFormCompleted = snapshot.child("trainingFormCompleted").getValue(Boolean.class) != null

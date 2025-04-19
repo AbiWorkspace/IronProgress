@@ -42,7 +42,7 @@
             android:backgroundTint="#E63946"
             android:hint="Nuevo ejercicio"
             android:padding="16dp"
-            android:text="Nuevo Ejercicio"
+            android:text="Crear  Ejercicio"
             android:textColor="#FFFFFF"
             android:textSize="18sp" />
 

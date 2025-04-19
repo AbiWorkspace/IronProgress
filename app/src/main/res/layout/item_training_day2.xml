@@ -28,13 +28,12 @@
             android:id="@+id/dayTitleTextView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Parte Superior"
-            android:textSize="20sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
+            android:layout_marginStart="10dp"
             android:layout_toEndOf="@id/dayIndexTextView"
-            android:layout_marginStart="8dp"
-            android:layout_centerVertical="true"/>
+
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold" />
     </RelativeLayout>
 
     <!-- 📌 Contenedor independiente para los ejercicios -->
@@ -63,16 +62,16 @@
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp"/>
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/exercisesRecyclerView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="100dp"
-                android:scrollbars="vertical"
-                android:nestedScrollingEnabled="false"
-                android:overScrollMode="never"/>
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/exercisesRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+        android:scrollbars="vertical"
+        android:nestedScrollingEnabled="true"
+        android:overScrollMode="always"/>
 
-        </LinearLayout>
+
+    </LinearLayout>
     </androidx.cardview.widget.CardView>
 
     <!-- Botón para iniciar el entrenamiento -->

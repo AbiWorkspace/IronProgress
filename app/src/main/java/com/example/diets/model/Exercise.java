@@ -25,7 +25,8 @@ public class Exercise implements Serializable {
     private List<String> goals = new ArrayList<>();
     private List<MovementPattern> movementPatterns = new ArrayList<>();
     private int series = 3; // Valor por defecto
-
+    private List<String> images = new ArrayList<>();
+    private List<String> imageGallery = new ArrayList<>();
     // Constructor vacío requerido por Firebase
     public Exercise() {
     }
@@ -68,7 +69,23 @@ public class Exercise implements Serializable {
     public int getSeries() {
         return series;
     }
+    public List<String> getImages() {              // NUEVO
+        return images;
+    }
+    public void setImages(List<String> images) {   // NUEVO
+        this.images = (images != null) ? new ArrayList<>(images) : new ArrayList<>();
+    }
 
+    /* Mantén este para compatibilidad si lo usabas en otros sitios */
+    @Deprecated
+    public String getImage() {                     // devuelve la 1.ª si existe
+        return images.isEmpty() ? null : images.get(0);
+    }
+    @Deprecated
+    public void setImage(String image) {           // solo pone/unifica la 1.ª
+        images.clear();
+        if (image != null) images.add(image);
+    }
     public void setSeries(int series) {
         this.series = series;
     }
@@ -147,13 +164,6 @@ public class Exercise implements Serializable {
         this.loadIntensity = loadIntensity;
     }
 
-    public String getImage() {
-        return image;
-    }
-
-    public void setImage(String image) {
-        this.image = image;
-    }
 
     public String getDescription() {
         return description;
@@ -173,7 +183,13 @@ public class Exercise implements Serializable {
             this.movementType = "desconocido";
         }
     }
+    public List<String> getImageGallery() {
+        return imageGallery;
+    }
 
+    public void setImageGallery(List<String> imageGallery) {
+        this.imageGallery = imageGallery;
+    }
     public List<String> getGoals() {
         return goals;
     }

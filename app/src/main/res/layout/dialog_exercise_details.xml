@@ -19,14 +19,14 @@
             android:orientation="vertical">
 
             <!-- Imagen del Ejercicio -->
-            <ImageView
-                android:id="@+id/imageExercise"
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/imageCarousel"
                 android:layout_width="match_parent"
-                android:layout_height="180dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/ic_placeholder"
+                android:layout_height="200dp"
+                android:layout_marginBottom="16dp"
                 android:background="@drawable/rounded_corners"
                 android:elevation="8dp" />
+
 
             <!-- Nombre del Ejercicio -->
             <TextView

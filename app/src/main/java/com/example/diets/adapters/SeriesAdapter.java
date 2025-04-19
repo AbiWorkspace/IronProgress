@@ -47,10 +47,6 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         return new SeriesViewHolder(view);
     }
 
-    public List<ExerciseSeries> getSeriesList() {
-        return this.seriesList;
-    }
-
     @Override
     public void onBindViewHolder(@NonNull SeriesViewHolder holder, int position) {
         ExerciseSeries series = seriesList.get(position);
@@ -61,6 +57,10 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     @Override
     public int getItemCount() {
         return seriesList.size();
+    }
+
+    public List<ExerciseSeries> getSeriesList() {
+        return this.seriesList;
     }
 
     public List<ExerciseSeries> getUpdatedSeriesList() {
@@ -75,12 +75,19 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         return completedSeries;
     }
 
+    public void commitAllEdits() {
+        Log.d("SeriesAdapter", "commitAllEdits: Guardando cambios en todas las series.");
+        for (ExerciseSeries series : seriesList) {
+            Log.d("SeriesAdapter", "commitAllEdits: Revisando serie " + series.getSeriesNumber());
+        }
+    }
+
     static class SeriesViewHolder extends RecyclerView.ViewHolder {
         TextView seriesNumber;
         EditText repsInput, weightInput, rpeInput;
         CheckBox checkSeriesCompleted;
+        TextView previousLoad;
         private boolean isUpdating = false;
-        TextView previousLoad; // <-- TextView para mostrar la carga anterior
 
         public SeriesViewHolder(@NonNull View itemView) {
             super(itemView);
@@ -93,140 +100,103 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
 
             Log.d(TAG, "SeriesViewHolder - Constructor: ViewHolder inicializado correctamente.");
 
-            // Aplicar restricciones de entrada
             repsInput.setFilters(new InputFilter[]{new InputFilterMinMax(1, 30)});
             weightInput.setFilters(new InputFilter[]{new InputFilterMinMax(0, 500)});
-
-            // Listener para rpeInput (0 - 10 con .5 permitido)
-            rpeInput.addTextChangedListener(new RPETextWatcher(rpeInput));
         }
 
         public void bind(ExerciseSeries series) {
             isUpdating = true;
-            Log.d(TAG, "SeriesViewHolder - bind: Asignando valores a la serie " + series.getSeriesNumber());
 
-            // 🔢 Número de serie
             seriesNumber.setText(String.valueOf(series.getSeriesNumber()));
+            previousLoad.setText(series.getPreviousLoad() != null
+                    ? (series.getPreviousLoad() % 1 == 0
+                    ? String.valueOf(series.getPreviousLoad().intValue())
+                    : String.valueOf(series.getPreviousLoad()))
+                    : "N/A");
 
-            // 🔁 Repeticiones
-            repsInput.setText(String.valueOf(series.getReps()));
-
-            // ⚖️ Asignar PESO (solo si es mayor a 0)
-            Double weightValue = series.getWeight();
-            if (weightValue != null && weightValue > 0) {
-                weightInput.setText(String.valueOf(weightValue));
-            } else {
-                weightInput.setText("");
+            // Reps
+            String currentReps = String.valueOf(series.getReps());
+            if (!repsInput.getText().toString().equals(currentReps)) {
+                repsInput.setText(currentReps);
             }
 
-            // 🔧 Asignar RPE
-            rpeInput.setText(String.valueOf(series.getRpe()));
+            double weight = series.getWeight();
+            String currentWeight = (weight > 0) ? String.valueOf(weight) : "";
 
-            // ✅ Checkbox completado
+            if (!weightInput.getText().toString().equals(currentWeight)) {
+                weightInput.setText(currentWeight);
+            }
+
+            // RPE
+            String currentRpe = String.valueOf(series.getRpe());
+            if (!rpeInput.getText().toString().equals(currentRpe)) {
+                rpeInput.setText(currentRpe);
+            }
+
             checkSeriesCompleted.setChecked(series.isCompleted());
 
-            // 📌 Mostrar valor de "carga anterior"
-            Double previousLoadValue = series.getPreviousLoad();
-            if (previousLoadValue != null) {
-                if (previousLoadValue % 1 == 0) {
-                    // Si es entero (por ej. 25.0)
-                    previousLoad.setText(String.valueOf(previousLoadValue.intValue()));
-                } else {
-                    // Si contiene decimales
-                    previousLoad.setText(String.valueOf(previousLoadValue));
-                }
-                Log.d(TAG, "SeriesViewHolder - bind: Carga anterior asignada → " + previousLoadValue);
-            } else {
-                previousLoad.setText("N/A");
-                Log.w(TAG, "SeriesViewHolder - bind: No se encontró valor de carga anterior para la serie " + series.getSeriesNumber());
-            }
-
-            checkSeriesCompleted.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                Log.d(TAG, "CheckBox cambiado: " + isChecked + " para serie " + series.getSeriesNumber());
-                series.setCompleted(isChecked);
-            });
-
-            // 🔥 Listener para cambios en RPE
-            rpeInput.addTextChangedListener(new TextWatcher() {
+            repsInput.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                @Override
-                public void afterTextChanged(Editable s) {
+                @Override public void afterTextChanged(Editable s) {
                     if (isUpdating) return;
                     try {
-                        double rpe = Double.parseDouble(s.toString());
-                        series.setRpe(rpe);
-                        Log.d(TAG, "SeriesViewHolder - afterTextChanged: Nuevo RPE para serie " + series.getSeriesNumber() + " -> " + rpe);
+                        int reps = Integer.parseInt(s.toString());
+                        series.setReps(reps);
+                        Log.d(TAG, "SeriesViewHolder - afterTextChanged: Nuevo REPS -> " + reps);
                     } catch (NumberFormatException e) {
-                        Log.e(TAG, "❌ Error: RPE ingresado no válido para la serie " + series.getSeriesNumber());
+                        repsInput.setError("Reps inválido");
+                        Log.e(TAG, "❌ Error: Reps ingresado no válido");
                     }
                 }
             });
 
-            // 🔥 Listener para cambios en PESO
             weightInput.addTextChangedListener(new TextWatcher() {
                 @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
                 @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                @Override
-                public void afterTextChanged(Editable s) {
+                @Override public void afterTextChanged(Editable s) {
                     if (isUpdating) return;
                     try {
                         double weight = Double.parseDouble(s.toString());
                         series.setWeight(weight);
-                        Log.d(TAG, "SeriesViewHolder - afterTextChanged: Nuevo PESO para serie " + series.getSeriesNumber() + " -> " + weight);
+                        Log.d(TAG, "SeriesViewHolder - afterTextChanged: Nuevo PESO -> " + weight);
                     } catch (NumberFormatException e) {
-                        Log.e(TAG, "❌ Error: Peso ingresado no válido para la serie " + series.getSeriesNumber());
+                        weightInput.setError("Peso inválido");
+                        Log.e(TAG, "❌ Error: Peso ingresado no válido");
                     }
                 }
+            });
+
+            rpeInput.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    if (isUpdating) return;
+                    try {
+                        float rpe = Float.parseFloat(s.toString());
+                        if (rpe < 0 || rpe > 10 || (rpe % 1 != 0 && rpe % 1 != 0.5)) {
+                            rpeInput.setError("RPE inválido. Usa .5 o entero entre 0–10");
+                        } else {
+                            series.setRpe(rpe);
+                            Log.d(TAG, "SeriesViewHolder - afterTextChanged: Nuevo RPE -> " + rpe);
+                        }
+                    } catch (NumberFormatException e) {
+                        rpeInput.setError("RPE inválido");
+                        Log.e(TAG, "❌ Error: RPE ingresado no válido");
+                    }
+                }
+            });
+
+            checkSeriesCompleted.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                series.setCompleted(isChecked);
+                Log.d(TAG, "CheckBox cambiado: " + isChecked + " para serie " + series.getSeriesNumber());
             });
 
             isUpdating = false;
         }
 
-        /**
-         * 🔥 Clase para restringir el input de RPE a valores entre 0 y 10, permitiendo solo enteros o con .5
-         */
-        public static class RPETextWatcher implements TextWatcher {
-            private EditText editText;
-            private boolean isUpdating = false;
-
-            public RPETextWatcher(EditText editText) {
-                this.editText = editText;
-            }
-
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
-
-            @Override
-            public void afterTextChanged(Editable s) {
-                if (isUpdating) return;
-                isUpdating = true;
-
-                String input = s.toString().trim();
-                if (input.isEmpty()) {
-                    editText.setText("0");
-                } else {
-                    try {
-                        float value = Float.parseFloat(input);
-                        // Solo permitir 0-10 y .5
-                        if (value < 0 || value > 10 || (value % 1 != 0 && value % 1 != 0.5)) {
-                            editText.setText("0");
-                        }
-                    } catch (NumberFormatException e) {
-                        editText.setText("0");
-                    }
-                }
-                Log.d(TAG, "RPETextWatcher - Validación aplicada: " + editText.getText().toString());
-                editText.setSelection(editText.getText().length());
-                isUpdating = false;
-            }
-        }
-
         public static class InputFilterMinMax implements InputFilter {
-            private int min, max;
+            private final int min, max;
 
             public InputFilterMinMax(int min, int max) {
                 this.min = min;
@@ -237,13 +207,9 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
             public CharSequence filter(CharSequence source, int start, int end, Spanned dest, int dstart, int dend) {
                 try {
                     int input = Integer.parseInt(dest.toString() + source.toString());
-                    if (isInRange(min, max, input)) return null;
+                    if (input >= min && input <= max) return null;
                 } catch (NumberFormatException ignored) {}
                 return "";
-            }
-
-            private boolean isInRange(int min, int max, int input) {
-                return input >= min && input <= max;
             }
         }
     }

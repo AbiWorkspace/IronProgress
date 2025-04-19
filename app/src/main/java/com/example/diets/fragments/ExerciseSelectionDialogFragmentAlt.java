@@ -343,6 +343,43 @@ public class ExerciseSelectionDialogFragmentAlt  extends DialogFragment implemen
 
         return muscleNames;
     }
+    private void loadExerciseImagesFromFirebase(Exercise exercise, Runnable onComplete) {
+        DatabaseReference ref = FirebaseDatabase.getInstance().getReference("exerciseImages");
+        ref.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                for (DataSnapshot child : snapshot.getChildren()) {
+                    String name = child.child("name").getValue(String.class);
+                    if (name != null && name.equalsIgnoreCase(exercise.getName())) {
+                        List<String> base64Images = new ArrayList<>();
+                        for (int i = 1; i <= 3; i++) {
+                            String img = child.child("images").child("image" + i).getValue(String.class);
+                            if (img != null) base64Images.add(img);
+                        }
+                        exercise.setImageGallery(base64Images);
+                        break;
+                    }
+                }
+                onComplete.run(); // continúa mostrando detalles
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "❌ Error al cargar imágenes del ejercicio: " + error.getMessage());
+                onComplete.run();
+            }
+        });
+    }
+
+    private void showExerciseDetails(Exercise exercise) {
+        loadExerciseImagesFromFirebase(exercise, () -> {
+            ExerciseDetailsFragment detailsFragment = ExerciseDetailsFragment.newInstance(exercise);
+            getParentFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, detailsFragment)
+                    .addToBackStack(null)
+                    .commit();
+        });
+    }
 
     private List<String> extractMuscleList(String musclesWorked) {
         List<String> muscleList = new ArrayList<>();
@@ -412,13 +449,7 @@ public class ExerciseSelectionDialogFragmentAlt  extends DialogFragment implemen
 
 
 
-    private void showExerciseDetails(Exercise exercise) {
-        ExerciseDetailsFragment detailsFragment = ExerciseDetailsFragment.newInstance(exercise);
-        getParentFragmentManager().beginTransaction()
-                .replace(R.id.fragment_container, detailsFragment)
-                .addToBackStack(null)
-                .commit();
-    }
+
     public void addExerciseToSelection(Exercise exercise) {
         if (!selectedExercises.contains(exercise)) {
             selectedExercises.add(exercise);

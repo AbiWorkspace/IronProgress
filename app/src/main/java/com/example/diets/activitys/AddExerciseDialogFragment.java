@@ -57,131 +57,157 @@ import java.util.Map;
 import java.util.Set;
 
 public class AddExerciseDialogFragment extends DialogFragment {
+
     private static final int PICK_IMAGE_REQUEST = 1;
-    private static final String FILE_NAME = "exercises.json"; // Añadir esta línea
+    private static final String FILE_NAME       = "exercises.json";
 
+    /* ------------ UI ------------ */
     private EditText nameEditText, descriptionEditText;
-    private Spinner equipmentTypeSpinner, exerciseTypeSpinner, movementTypeSpinner, musclesWorkedSpinner, movementPatternSpinner;
-    private Button saveButton, cancelButton, selectImageButton;
+    private Spinner equipmentTypeSpinner, exerciseTypeSpinner,
+            movementTypeSpinner, musclesWorkedSpinner, movementPatternSpinner;
+    private Button  saveButton, cancelButton, selectImageButton;
     private ImageView imagePreview;
-    private AddExerciseListener listener;
-    private Set<String> musclesSet = new HashSet<>();
-    private String imageBase64;
-    private Set<String> movementPatternsSet = new HashSet<>();
 
-    public interface AddExerciseListener {
-        void onExerciseAdded(Exercise exercise);
-    }
+    /* ------------ Datos ------------ */
+    private AddExerciseListener listener;
+    private final Set<String> musclesSet          = new HashSet<>();
+    private final Set<String> movementPatternsSet = new HashSet<>();
+
+    /* >>> MOD: ahora guardamos TODAS las imágenes seleccionadas <<< */
+    private final List<String> imagesBase64 = new ArrayList<>();   // NUEVO
+    private String imageBase64;                                     // se mantiene por compatibilidad
+
+    /* ------------------------------------------------------------------ */
+    public interface AddExerciseListener { void onExerciseAdded(Exercise exercise); }
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        Log.d("AddExerciseDialogFragment", "onCreateView: Inflando el layout del fragmento");
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_add_exercise_dialog, container, false);
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view,
+                              @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-        Log.d("AddExerciseDialogFragment", "onViewCreated: Vista creada");
 
-        nameEditText = view.findViewById(R.id.nameEditText);
-        equipmentTypeSpinner = view.findViewById(R.id.equipmentTypeSpinner);
-        exerciseTypeSpinner = view.findViewById(R.id.exerciseTypeSpinner);
-        musclesWorkedSpinner = view.findViewById(R.id.musclesWorkedSpinner);
+        /* ==== referencias ==== */
+        nameEditText           = view.findViewById(R.id.nameEditText);
+        equipmentTypeSpinner   = view.findViewById(R.id.equipmentTypeSpinner);
+        exerciseTypeSpinner    = view.findViewById(R.id.exerciseTypeSpinner);
+        musclesWorkedSpinner   = view.findViewById(R.id.musclesWorkedSpinner);
         movementPatternSpinner = view.findViewById(R.id.movementPatternSpinner);
-        descriptionEditText = view.findViewById(R.id.descriptionEditText);
-        movementTypeSpinner = view.findViewById(R.id.movementTypeSpinner);
-        saveButton = view.findViewById(R.id.saveButton);
-        cancelButton = view.findViewById(R.id.cancelButton);
-        selectImageButton = view.findViewById(R.id.selectImageButton);
-        imagePreview = view.findViewById(R.id.imagePreview);
+        descriptionEditText    = view.findViewById(R.id.descriptionEditText);
+        movementTypeSpinner    = view.findViewById(R.id.movementTypeSpinner);
+        saveButton             = view.findViewById(R.id.saveButton);
+        cancelButton           = view.findViewById(R.id.cancelButton);
+        selectImageButton      = view.findViewById(R.id.selectImageButton);
+        imagePreview           = view.findViewById(R.id.imagePreview);
 
-        // Configurar los Spinners
-        ArrayAdapter<CharSequence> equipmentAdapter = ArrayAdapter.createFromResource(getContext(), R.array.equipment_types, android.R.layout.simple_spinner_item);
+        /* ==== spinners fijos (igual que antes) ==== */
+        ArrayAdapter<CharSequence> equipmentAdapter =
+                ArrayAdapter.createFromResource(getContext(), R.array.equipment_types,
+                        android.R.layout.simple_spinner_item);
         equipmentAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         equipmentTypeSpinner.setAdapter(equipmentAdapter);
-        Log.d("AddExerciseDialogFragment", "onViewCreated: Spinner de tipo de equipo configurado");
 
-        ArrayAdapter<CharSequence> exerciseAdapter = ArrayAdapter.createFromResource(getContext(), R.array.exercise_types, android.R.layout.simple_spinner_item);
+        ArrayAdapter<CharSequence> exerciseAdapter =
+                ArrayAdapter.createFromResource(getContext(), R.array.exercise_types,
+                        android.R.layout.simple_spinner_item);
         exerciseAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         exerciseTypeSpinner.setAdapter(exerciseAdapter);
-        Log.d("AddExerciseDialogFragment", "onViewCreated: Spinner de tipo de ejercicio configurado");
 
-        ArrayAdapter<CharSequence> movementAdapter = ArrayAdapter.createFromResource(getContext(), R.array.movement_types, android.R.layout.simple_spinner_item);
+        ArrayAdapter<CharSequence> movementAdapter =
+                ArrayAdapter.createFromResource(getContext(), R.array.movement_types,
+                        android.R.layout.simple_spinner_item);
         movementAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         movementTypeSpinner.setAdapter(movementAdapter);
-        Log.d("AddExerciseDialogFragment", "onViewCreated: Spinner de tipo de movimiento configurado");
 
-        // Cargar músculos desde la base de datos
+        /* ==== datos dinámicos ==== */
         loadMusclesFromDatabase();
-
-        // Cargar patrones de movimiento desde la base de datos
         loadMovementPatternsFromDatabase();
 
+        /* ==== listeners ==== */
         selectImageButton.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-            startActivityForResult(intent, PICK_IMAGE_REQUEST);
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);        // ⭐ permite varias
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            startActivityForResult(Intent.createChooser(intent, "Selecciona imagen(es)"),
+                    PICK_IMAGE_REQUEST);
         });
 
-        saveButton.setOnClickListener(v -> {
-            Log.d("AddExerciseDialogFragment", "saveButton: Botón de guardar presionado");
-            String exerciseName = nameEditText.getText().toString().trim();
-            if (exerciseName.isEmpty()) {
-                nameEditText.setError("El nombre del ejercicio no puede ser nulo");
-                Log.d("AddExerciseDialogFragment", "saveButton: El nombre del ejercicio está vacío");
-                return;
-            }
+        cancelButton.setOnClickListener(v -> dismiss());
 
-            Exercise newExercise = new Exercise();
-            newExercise.setName(exerciseName);
-            Log.d("AddExerciseDialogFragment", "saveButton: Nombre del ejercicio establecido: " + exerciseName);
-
-            String equipmentType = equipmentTypeSpinner.getSelectedItem().toString();
-            newExercise.setEquipmentType(equipmentType);
-            Log.d("AddExerciseDialogFragment", "saveButton: Tipo de equipo establecido: " + equipmentType);
-
-            String exerciseType = exerciseTypeSpinner.getSelectedItem().toString();
-            newExercise.setExerciseType(exerciseType);
-            Log.d("AddExerciseDialogFragment", "saveButton: Tipo de ejercicio establecido: " + exerciseType);
-
-            String musclesWorked = musclesWorkedSpinner.getSelectedItem().toString();
-            newExercise.setMusclesWorked(musclesWorked);
-            Log.d("AddExerciseDialogFragment", "saveButton: Músculos trabajados establecidos: " + musclesWorked);
-
-            String description = descriptionEditText.getText().toString();
-            newExercise.setDescription(description);
-            Log.d("AddExerciseDialogFragment", "saveButton: Descripción establecida: " + description);
-
-            String movementType = movementTypeSpinner.getSelectedItem().toString();
-            newExercise.setMovementType(movementType);
-            Log.d("AddExerciseDialogFragment", "saveButton: Tipo de movimiento establecido: " + movementType);
-
-            // Añadir el patrón de movimiento seleccionado
-            String selectedPatternName = movementPatternSpinner.getSelectedItem().toString();
-            MovementPattern selectedPattern = new MovementPattern();
-            selectedPattern.setName(selectedPatternName);
-            newExercise.getMovementPatterns().add(selectedPattern);
-            Log.d("AddExerciseDialogFragment", "saveButton: Patrón de movimiento agregado: " + selectedPatternName);
-
-            // Guardar el ejercicio en el almacenamiento interno
-            saveExerciseToInternalStorage(newExercise);
-
-            if (listener != null) {
-                Log.d("AddExerciseDialogFragment", "saveButton: Llamando al listener para agregar el ejercicio");
-                listener.onExerciseAdded(newExercise);
-            } else {
-                Log.d("AddExerciseDialogFragment", "saveButton: Listener es null");
-            }
-            dismiss();
-        });
-
-        cancelButton.setOnClickListener(v -> {
-            Log.d("AddExerciseDialogFragment", "cancelButton: Botón de cancelar presionado");
-            dismiss();
-        });
+        saveButton.setOnClickListener(v -> saveExercise());
     }
 
+    /* ------------------------------------------------------------------ */
+    private void saveExercise() {
+        String exerciseName = nameEditText.getText().toString().trim();
+        if (exerciseName.isEmpty()) {
+            nameEditText.setError("El nombre del ejercicio no puede ser nulo");
+            return;
+        }
+
+        Exercise newExercise = new Exercise();
+        newExercise.setName(exerciseName);
+        newExercise.setEquipmentType(equipmentTypeSpinner.getSelectedItem().toString());
+        newExercise.setExerciseType(exerciseTypeSpinner.getSelectedItem().toString());
+        newExercise.setMusclesWorked(musclesWorkedSpinner.getSelectedItem().toString());
+        newExercise.setDescription(descriptionEditText.getText().toString());
+        newExercise.setMovementType(movementTypeSpinner.getSelectedItem().toString());
+
+        /* patrón de movimiento */
+        MovementPattern selectedPattern = new MovementPattern();
+        selectedPattern.setName(movementPatternSpinner.getSelectedItem().toString());
+        newExercise.getMovementPatterns().add(selectedPattern);
+
+        /* >>> MOD: guardar todas las imágenes seleccionadas <<< */
+        newExercise.setImages(imagesBase64);
+
+        saveExerciseToInternalStorage(newExercise);
+
+        if (listener != null) listener.onExerciseAdded(newExercise);
+        dismiss();
+    }
+
+    /* ------------------------------------------------------------------ */
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != PICK_IMAGE_REQUEST || resultCode != Activity.RESULT_OK || data == null)
+            return;
+
+        /* —— varias imágenes —— */
+        if (data.getClipData() != null) {
+            int n = data.getClipData().getItemCount();
+            for (int i = 0; i < n; i++) {
+                Uri uri = data.getClipData().getItemAt(i).getUri();
+                addImageFromUri(uri, i == 0);
+            }
+        } else if (data.getData() != null) {        // —— una sola ——
+            addImageFromUri(data.getData(), true);
+        }
+    }
+
+    private void addImageFromUri(Uri uri, boolean showPreview) {
+        if (uri == null) return;
+        try {
+            Bitmap bitmap = MediaStore.Images.Media.getBitmap(
+                    requireActivity().getContentResolver(), uri);
+
+            String b64 = encodeImageToBase64(bitmap);
+            imagesBase64.add(b64);          // ⭐ se añade a la lista
+            imageBase64 = b64;              // compatibilidad con antiguo campo
+
+            if (showPreview) imagePreview.setImageBitmap(bitmap);
+        } catch (IOException e) {
+            Log.e("AddExerciseDialogFragment", "Error al seleccionar la imagen", e);
+        }
+    }
     private void saveExerciseToInternalStorage(Exercise exercise) {
         Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: Guardando ejercicio en almacenamiento interno");
 
@@ -298,20 +324,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
         return input.substring(0, 1).toUpperCase() + input.substring(1);
     }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
-            Uri imageUri = data.getData();
-            try {
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getActivity().getContentResolver(), imageUri);
-                imagePreview.setImageBitmap(bitmap);
-                imageBase64 = encodeImageToBase64(bitmap);
-            } catch (IOException e) {
-                Log.e("AddExerciseDialogFragment", "Error al seleccionar la imagen", e);
-            }
-        }
-    }
+
     private List<Exercise> loadExercisesFromInternalStorage() {
         List<Exercise> exercises = new ArrayList<>();
 

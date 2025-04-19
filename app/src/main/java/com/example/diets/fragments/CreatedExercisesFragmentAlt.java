@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -36,6 +37,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 public class CreatedExercisesFragmentAlt extends Fragment implements AddExerciseDialogFragment.AddExerciseListener,
         ExercisesAdapter.OnExerciseClickListener, ExercisesAdapter.OnExerciseSelectionChangedListener {
 
@@ -194,9 +196,17 @@ public class CreatedExercisesFragmentAlt extends Fragment implements AddExercise
 
     private void setupRecyclerView() {
         if (recyclerView != null) {
-            adapter = new ExercisesAdapter(exercises, new ArrayList<>(), exercise -> {
-                addExerciseToSelection(exercise);
-            }, this);
+            adapter = new ExercisesAdapter(
+                    exercises,
+                    new ArrayList<>(),
+                    new ExercisesAdapter.OnExerciseClickListener() {
+                        @Override
+                        public void onExerciseClick(Exercise exercise) {
+                            CreatedExercisesFragmentAlt.this.onExerciseClick(exercise);
+                        }
+                    },
+                    this
+            );
             recyclerView.setAdapter(adapter);
             adapter.notifyDataSetChanged();
         }
@@ -217,7 +227,38 @@ public class CreatedExercisesFragmentAlt extends Fragment implements AddExercise
 
     @Override
     public void onExerciseClick(Exercise exercise) {
-        addExerciseToSelection(exercise);
+        Log.d(TAG, "🖱 Contenedor clickeado - ejercicio: " + (exercise != null ? exercise.getName() : "null"));
+
+        if (exercise == null) {
+            Log.e(TAG, "❌ Error: El objeto Exercise es null. No se puede abrir el fragmento de detalles.");
+            return;
+        }
+
+        try {
+            ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
+            Log.d(TAG, "🧩 Instancia de ExerciseDetailsFragment creada correctamente");
+
+            Fragment parent = getParentFragment(); // Este debería ser MenuPopupFragment
+            if (parent == null) {
+                Log.e(TAG, "❌ Error: getParentFragment() devolvió null. Este fragmento no tiene un fragmento padre.");
+                return;
+            }
+
+            FragmentManager childManager = parent.getChildFragmentManager();
+            if (childManager == null) {
+                Log.e(TAG, "❌ Error: childFragmentManager es null. No se puede proceder con la transacción.");
+                return;
+            }
+
+            Log.d(TAG, "🔁 Iniciando transacción de fragmento...");
+            childManager.beginTransaction()
+                    .replace(R.id.fragment_container, fragment)
+                    .addToBackStack(null)
+                    .commit();
+            Log.d(TAG, "✅ Fragmento ExerciseDetailsFragment insertado correctamente en el contenedor.");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Excepción al intentar abrir ExerciseDetailsFragment: " + e.getMessage(), e);
+        }
     }
 
     @Override

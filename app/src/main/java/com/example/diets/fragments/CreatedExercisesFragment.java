@@ -11,6 +11,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
@@ -97,6 +98,8 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
 
         // ✅ BOTÓN PARA GUARDAR EJERCICIOS SELECCIONADOS (NO SE TOCA)
         doneButton.setOnClickListener(v -> {
+            Log.d(TAG, "✅ Enviando " + selectedExercises.size() + " ejercicios seleccionados al listener...");
+
             if (listener != null) {
                 for (Exercise exercise : selectedExercises) {
                     listener.onExerciseSelected(exercise);
@@ -178,50 +181,22 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         }
     }
 
-    // 🔥 Método para filtrar ejercicios según músculos sinérgicos
-    private boolean hasMatchingMuscles(Exercise exercise, List<MovementPattern> movementPatterns) {
-        if (exercise.getSynergistMuscles() == null || exercise.getSynergistMuscles().isEmpty()) {
-            return false;
-        }
 
-        for (MovementPattern pattern : movementPatterns) {
-            Set<String> patternMuscles = new HashSet<>(extractMuscleNames(pattern.getSynergistMuscles()));
-
-            for (String muscle : exercise.getSynergistMuscles()) {
-                if (patternMuscles.contains(muscle)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    // 🔥 Extraer nombres de músculos de una lista de objetos
-    private List<String> extractMuscleNames(Object obj) {
-        List<String> muscleNames = new ArrayList<>();
-
-        if (obj instanceof List) {
-            List<?> muscleList = (List<?>) obj;
-            for (Object muscle : muscleList) {
-                if (muscle instanceof Map) {
-                    Map<String, Object> muscleMap = (Map<String, Object>) muscle;
-                    String muscleName = (String) muscleMap.get("name");
-                    if (muscleName != null) {
-                        muscleNames.add(muscleName);
-                    }
-                }
-            }
-        }
-
-        return muscleNames;
-    }
 
     private void setupRecyclerView() {
         if (recyclerView != null) {
-            adapter = new ExercisesAdapter(exercises, new ArrayList<>(), exercise -> {
-                addExerciseToSelection(exercise);
-            }, this);
+            adapter = new ExercisesAdapter(
+                    exercises,
+                    new ArrayList<>(),
+                    new ExercisesAdapter.OnExerciseClickListener() {
+                        @Override
+                        public void onExerciseClick(Exercise exercise) {
+                            CreatedExercisesFragment.this.onExerciseClick(exercise);
+                        }
+                    },
+                    this
+            );
+
 
             recyclerView.setAdapter(adapter);
             adapter.notifyDataSetChanged();
@@ -240,11 +215,44 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         adapter.notifyItemInserted(exercises.size() - 1);
         saveExercisesToInternalStorage();
     }
-
     @Override
     public void onExerciseClick(Exercise exercise) {
-        addExerciseToSelection(exercise);
+        Log.d(TAG, "🖱 Contenedor clickeado - ejercicio: " + (exercise != null ? exercise.getName() : "null"));
+
+        if (exercise == null) {
+            Log.e(TAG, "❌ Error: El objeto Exercise es null. No se puede abrir el fragmento de detalles.");
+            return;
+        }
+
+        try {
+            ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
+            Log.d(TAG, "🧩 Instancia de ExerciseDetailsFragment creada correctamente");
+
+            Fragment parent = getParentFragment(); // Este debería ser MenuPopupFragment
+            if (parent == null) {
+                Log.e(TAG, "❌ Error: getParentFragment() devolvió null. Este fragmento no tiene un fragmento padre.");
+                return;
+            }
+
+            FragmentManager childManager = parent.getChildFragmentManager();
+            if (childManager == null) {
+                Log.e(TAG, "❌ Error: childFragmentManager es null. No se puede proceder con la transacción.");
+                return;
+            }
+
+            Log.d(TAG, "🔁 Iniciando transacción de fragmento...");
+            childManager.beginTransaction()
+                    .replace(R.id.fragment_container, fragment)
+                    .addToBackStack(null)
+                    .commit();
+            Log.d(TAG, "✅ Fragmento ExerciseDetailsFragment insertado correctamente en el contenedor.");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Excepción al intentar abrir ExerciseDetailsFragment: " + e.getMessage(), e);
+        }
     }
+
+
+
 
     @Override
     public void onExerciseSelected(Exercise exercise) {

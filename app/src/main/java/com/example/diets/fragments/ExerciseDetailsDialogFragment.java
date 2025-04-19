@@ -18,9 +18,12 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
+import androidx.viewpager2.widget.ViewPager2;
 
 import com.bumptech.glide.Glide;
 import com.example.diets.R;
+import com.example.diets.adapters.ImagePagerAdapter;
+import com.example.diets.model.Exercise;
 import com.example.diets.model.ExerciseSeries;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Description;
@@ -34,6 +37,8 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.*;
 import com.github.mikephil.charting.formatter.ValueFormatter;
+
+import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,10 +51,12 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private Spinner spinnerRpeFilter;
     private List<ExerciseSeries> allSeriesData;
     private String base64ImageString;  // ✅ Guardará la imagen base64 limpia para su uso global
+    private ViewPager2 imageCarousel;
 
     private String exerciseKey;
     private String dayKey;
     private String exerciseIndex; // Este es el ID real del ejercicio en /userExercises
+    private List<Bitmap> carouselBitmaps = new ArrayList<>();
 
     // Vistas para MovementType, EquipmentType, ExerciseType, PatternName
     private TextView textMovementType, textEquipmentType, textExerciseType, textPatternName;
@@ -100,13 +107,14 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         View view = inflater.inflate(R.layout.dialog_exercise_details, container, false);
 
         // Referencias a vistas existentes
-        ImageView imageExercise        = view.findViewById(R.id.imageExercise);
+
         TextView  textExerciseName     = view.findViewById(R.id.textExerciseName);
         TextView  textDescription      = view.findViewById(R.id.textDescription);
         TextView  textMusclesWorked    = view.findViewById(R.id.textMusclesWorked);
         TextView  textSynergistMuscles = view.findViewById(R.id.textSynergistMuscles);
         TextView  textRM               = view.findViewById(R.id.textRM);
         TextView  textPersonalRecord   = view.findViewById(R.id.textPersonalRecord);
+        imageCarousel = view.findViewById(R.id.imageCarousel);
 
         chartExerciseProgress          = view.findViewById(R.id.chartExerciseProgress);
         spinnerRpeFilter               = view.findViewById(R.id.spinnerRpeFilter);
@@ -159,7 +167,6 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                 String exerciseName      = snapshot.child("name").getValue(String.class);
                 String description       = snapshot.child("description").getValue(String.class);
                 String musclesWorkedStr  = snapshot.child("musclesWorked").getValue(String.class);
-                String imageUrl          = snapshot.child("image").getValue(String.class);
 
                 // 2) Leer MovementType, EquipmentType, ExerciseType
                 String movementType      = snapshot.child("movementType").getValue(String.class);
@@ -177,86 +184,97 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                     if (muscle != null) synergyList.add(muscle);
                 }
 
-                // Logs
-                Log.d(TAG, "Ejercicio: " + exerciseName);
-                Log.d(TAG, "Descripción: " + description);
-                Log.d(TAG, "Músculos trabajados: " + musclesWorkedStr);
-                Log.d(TAG, "Músculos sinérgicos: " + synergyList);
-
-                // Asignar a la UI
+                // 5) Asignar datos a la UI
                 textExerciseName.setText(exerciseName);
                 textDescription.setText(description);
                 textMusclesWorked.setText("Músculos trabajados: " + capitalizeWords(musclesWorkedStr));
                 textSynergistMuscles.setText("Músculos sinérgicos: " + TextUtils.join(", ", synergyList));
 
-                // Imagen base64
-                if (imageUrl != null && !imageUrl.trim().isEmpty()) {
-                    Log.d(TAG, "bind: 📸 Imagen base64 detectada. Longitud original = " + imageUrl.length());
-                    base64ImageString = imageUrl.replaceAll("\\s", ""); // 🔥 Guardamos versión limpia
+                // 6) Lógica del carrusel 🔥
+                ViewPager2 imageCarousel = getView().findViewById(R.id.imageCarousel);  // Asegúrate que exista en el layout
+                DatabaseReference imagesRef = FirebaseDatabase.getInstance()
+                        .getReference("exerciseImages");
 
-                    try {
-                        String cleanedBase64 = imageUrl.replaceAll("\\s", "");
-                        Log.d(TAG, "bind: 🔍 Imagen base64 limpiada. Longitud después de limpieza = " + cleanedBase64.length());
+                imagesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        for (DataSnapshot child : snapshot.getChildren()) {
+                            String name = child.child("name").getValue(String.class);
+                            if (name != null && name.equalsIgnoreCase(exerciseName)) {
+                                Log.d(TAG, "✅ Nombre coincide para cargar imágenes extra: " + name);
 
-                        byte[] decodedBytes = android.util.Base64.decode(cleanedBase64, android.util.Base64.DEFAULT);
-                        Log.d(TAG, "bind: 📦 Bytes decodificados correctamente. Tamaño = " + decodedBytes.length);
+                                List<Bitmap> bitmaps = new ArrayList<>();
+                                for (DataSnapshot imageSnap : child.child("images").getChildren()) {
+                                    String base64 = imageSnap.getValue(String.class);
+                                    if (base64 != null && !base64.trim().isEmpty()) {
+                                        try {
+                                            byte[] bytes = android.util.Base64.decode(base64.replaceAll("\\s", ""), android.util.Base64.DEFAULT);
+                                            Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                                            if (bmp != null) {
+                                                bitmaps.add(bmp);
+                                                Log.d(TAG, "🖼 Imagen agregada correctamente al carrusel.");
+                                            }
+                                        } catch (Exception e) {
+                                            Log.e(TAG, "❌ Error al decodificar imagen base64.", e);
+                                        }
+                                    }
+                                }
+                                carouselBitmaps.clear();
+                                carouselBitmaps.addAll(bitmaps);
+                                if (!bitmaps.isEmpty()) {
+                                    ImagePagerAdapter adapter = new ImagePagerAdapter();
+                                    adapter.submit(bitmaps);
+                                    imageCarousel.setAdapter(adapter);
 
-                        Bitmap bitmap = BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.length);
+                                    Log.d(TAG, "📸 Carrusel de imágenes cargado correctamente con " + bitmaps.size() + " imágenes.");
+                                } else {
+                                    Log.w(TAG, "⚠️ No se encontraron imágenes válidas para el ejercicio.");
+                                }
 
-                        if (bitmap != null) {
-                            imageExercise.setImageBitmap(bitmap);
-                            Log.d(TAG, "bind: ✅ Imagen base64 convertida y asignada correctamente.");
-                        } else {
-                            Log.e(TAG, "bind: ❌ Error: Bitmap decodificado es null.");
-                            imageExercise.setImageResource(R.drawable.ic_placeholder);
+
+                                imageCarousel.setOnClickListener(v -> {
+                                    int currentItem = imageCarousel.getCurrentItem();
+                                    if (carouselBitmaps != null && !carouselBitmaps.isEmpty()) {
+                                        Bitmap selectedImage = carouselBitmaps.get(currentItem);
+                                        if (selectedImage != null) {
+                                            // 🔥 Convertimos el Bitmap a Base64 para pasarlo al fragmento
+                                            ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                                            selectedImage.compress(Bitmap.CompressFormat.PNG, 100, stream);
+                                            String base64Selected = android.util.Base64.encodeToString(stream.toByteArray(), android.util.Base64.DEFAULT);
+
+                                            ImageFullscreenDialogFragment dialog = ImageFullscreenDialogFragment.newInstance(base64Selected);
+                                            dialog.show(getParentFragmentManager(), "ImageFullscreenDialog");
+                                        } else {
+                                            Log.w(TAG, "⚠️ La imagen actual del carrusel es null.");
+                                        }
+                                    } else {
+                                        Log.w(TAG, "❌ No hay imágenes cargadas en el carrusel.");
+                                    }
+                                });
+
+                                break;
+                            }
                         }
-                    } catch (Exception e) {
-                        Log.e(TAG, "bind: ❌ Excepción al procesar imagen base64.", e);
-                        imageExercise.setImageResource(R.drawable.ic_placeholder);
                     }
-                } else {
-                    Log.w(TAG, "bind: ⚠️ No se encontró imagen base64 para el ejercicio.");
-                    imageExercise.setImageResource(R.drawable.ic_placeholder);
-                }
 
-                // Tipo de Movimiento
-                if (movementType != null && !movementType.isEmpty()) {
-                    textMovementType.setText("Tipo de Movimiento: " + movementType);
-                    Log.d(TAG, "✅ Tipo de Movimiento cargado: " + movementType);
-                } else {
-                    textMovementType.setText("Tipo de Movimiento: desconocido");
-                    Log.w(TAG, "⚠️ movementType es null o vacío");
-                }
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Log.e(TAG, "❌ Error al consultar exerciseImages.", error.toException());
+                    }
+                });
 
-// Tipo de Equipamiento
-                if (equipmentType != null && !equipmentType.isEmpty()) {
-                    textEquipmentType.setText("Equipamiento: " + equipmentType);
-                    Log.d(TAG, "✅ Equipamiento cargado: " + equipmentType);
-                } else {
-                    textEquipmentType.setText("Equipamiento: desconocido");
-                    Log.w(TAG, "⚠️ equipmentType es null o vacío");
-                }
+                // 7) Mostrar info adicional
+                textMovementType.setText("Tipo de Movimiento: " + (movementType != null ? movementType : "desconocido"));
+                textEquipmentType.setText("Equipamiento: " + (equipmentType != null ? equipmentType : "desconocido"));
+                textExerciseType.setText("Tipo de Ejercicio: " + (exerciseType != null ? exerciseType : "desconocido"));
 
-// Tipo de Ejercicio
-                if (exerciseType != null && !exerciseType.isEmpty()) {
-                    textExerciseType.setText("Tipo de Ejercicio: " + exerciseType);
-                    Log.d(TAG, "✅ Tipo de Ejercicio cargado: " + exerciseType);
-                } else {
-                    textExerciseType.setText("Tipo de Ejercicio: desconocido");
-                    Log.w(TAG, "⚠️ exerciseType es null o vacío");
-                }
-
-
-                // 5) Cálculo RM estimado
+                // 8) Calcular RM
                 if (currentLoad == null || currentLoad <= 0) currentLoad = 1;
                 if (maxReps == null || maxReps <= 0) maxReps = 1;
-
                 double estimatedRM = currentLoad * (1 + (maxReps / 30.0));
                 textRM.setText("RM Estimado: " + String.format("%.2f", estimatedRM) + " kg");
-                Log.d(TAG, "RM Estimado calculado: " + estimatedRM);
 
-                // 6) Obtener patrón de movimiento desde userMovementPatterns/dayKey/name
-                //    (opcional, si dayKey no es null)
+                // 9) Patrón de movimiento
                 if (dayKey != null && !dayKey.isEmpty()) {
                     DatabaseReference patternRef = databaseReference
                             .child("users")
@@ -270,28 +288,20 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                         public void onDataChange(@NonNull DataSnapshot snapshot) {
                             if (snapshot.exists()) {
                                 String patternName = snapshot.getValue(String.class);
-                                Log.d(TAG, "📥 Pattern name encontrado: " + patternName);
-
                                 if (patternName != null && !patternName.isEmpty()) {
                                     textPatternName.setText("Patrón de Movimiento: " + patternName);
-                                    Log.d(TAG, "✅ Patrón de Movimiento asignado: " + patternName);
-                                } else {
-                                    Log.w(TAG, "⚠️ El campo name en userMovementPatterns está vacío");
                                 }
-                            } else {
-                                Log.w(TAG, "⚠️ No se encontró el nodo 'name' dentro de userMovementPatterns > " + dayKey);
                             }
-
                         }
 
                         @Override
                         public void onCancelled(@NonNull DatabaseError error) {
-                            Log.e(TAG, "Error al leer patternName", error.toException());
+                            Log.e(TAG, "❌ Error al leer patrón", error.toException());
                         }
                     });
                 }
 
-                // 7) Llamar a fetchSeriesData para ver las series
+                // 10) Series
                 fetchSeriesData(exerciseId, textPersonalRecord);
             }
 
@@ -301,14 +311,8 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
             }
         });
 
-        imageExercise.setOnClickListener(v -> {
-            if (base64ImageString != null && !base64ImageString.isEmpty()) {
-                ImageFullscreenDialogFragment dialog = ImageFullscreenDialogFragment.newInstance(base64ImageString);
-                dialog.show(getParentFragmentManager(), "ImageFullscreenDialog");
-            } else {
-                Log.w(TAG, "❌ Imagen base64 no disponible para mostrar en pantalla completa.");
-            }
-        });
+
+
 
 
         // Botón Cerrar
@@ -597,4 +601,13 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         }
         return capitalizedText.toString().trim();
     }
+    public static ExerciseDetailsDialogFragment newInstanceFromInternal(Exercise exercise) {
+        ExerciseDetailsDialogFragment fragment = new ExerciseDetailsDialogFragment();
+        Bundle args = new Bundle();
+        args.putSerializable("exercise", exercise);
+        args.putBoolean("isFromInternal", true);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
 }
