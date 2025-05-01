@@ -1,6 +1,8 @@
 package com.example.diets.fragments;
+
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -10,350 +12,294 @@ import android.widget.*;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
 import com.example.diets.activitys.MainActivity;
-
 import com.example.diets.activitys.ViewPagerActivity;
+import com.example.diets.adapters.FoodBlockAdapter;
+import com.example.diets.model.FoodBlock;
+import com.example.diets.model.FoodItem;
 import com.example.diets.model.User;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.common.reflect.TypeToken;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.*;
-import java.util.Locale;
-import android.text.InputFilter;
-import android.content.SharedPreferences;
-import android.widget.ImageButton;
+import com.google.gson.Gson;
 
-public class DashboardFragment extends Fragment {
+import java.lang.reflect.Type;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+
+
+public class DashboardFragment extends Fragment implements FoodBlockAdapter.OnFoodChangedListener {
 
     private static final String TAG = "DashboardFragment";
-    private OnNavigationItemSelectedListener mListener;
+    /* --- UI --- */
+    private LinearProgressIndicator barCalories, barProtein, barCarbs, barFat;
+    private TextView labelCalories, labelProtein, labelCarbs, labelFat, txtCurrentDate;
+    private ImageButton btnPrevDay, btnNextDay;
 
-    // UI Elements
-    private TextView caloriesNeededTextView, caloriesTodayTextView, proteinTextView, fatTextView, carbTextView;
-    private EditText foodTextField;
-    private User user;
+    /* --- Firebase / auth --- */
     private DatabaseReference mDatabase;
     private FirebaseAuth mAuth;
-    private NavigationView navigationView;
-    private LinearLayout foodContainer;
-    private static final int MAX_FOOD_BLOCKS = 10;
+
+    /* --- Datos & prefs --- */
     private static final String PREFS_NAME = "FoodPrefs";
+    private static final int MAX_FOOD_BLOCKS = 10;
     private static final String[] DEFAULT_FOOD_NAMES = {"Desayuno", "Almuerzo", "Comida", "Snack", "Cena"};
+    private final List<FoodBlock> foodBlockList = new ArrayList<>();
+    private FoodBlockAdapter foodBlockAdapter;
 
-    public interface OnNavigationItemSelectedListener {
-        void onNavigationItemSelected(int position);
+    private User user;
+    private double goalsKcal, goalsP, goalsF, goalsC;
+
+    /* --- Navegación por fecha --- */
+    private LocalDate currentDate = LocalDate.now();
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault());
+
+    /* Listener hacia activity */
+    private OnNavigationItemSelectedListener mListener;
+    public interface OnNavigationItemSelectedListener { void onNavigationItemSelected(int position); }
+
+    /* ===== Ciclo de vida ===== */
+    @Override public void onAttach(@NonNull Context ctx) {
+        super.onAttach(ctx);
+        if (ctx instanceof OnNavigationItemSelectedListener) mListener = (OnNavigationItemSelectedListener) ctx;
+        else throw new RuntimeException(ctx + " must implement OnNavigationItemSelectedListener");
+    }
+
+    @Nullable @Override
+    public View onCreateView(@NonNull LayoutInflater inf, @Nullable ViewGroup cont, @Nullable Bundle saved) {
+        return inf.inflate(R.layout.activity_food, cont, false);
     }
 
     @Override
-    public void onAttach(@NonNull Context context) {
-        super.onAttach(context);
-        if (context instanceof OnNavigationItemSelectedListener) {
-            mListener = (OnNavigationItemSelectedListener) context;
-        } else {
-            throw new RuntimeException(context.toString() + " must implement OnNavigationItemSelectedListener");
-        }
-    }
-
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.activity_food, container, false);
-    }
-
-    @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-
-        // Inicializa FirebaseAuth y UI
+    public void onViewCreated(@NonNull View v, @Nullable Bundle saved) {
+        super.onViewCreated(v, saved);
         mAuth = FirebaseAuth.getInstance();
-        initializeUI(view);
-
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
-        // Carga los datos del usuario desde Firebase
-        if (mAuth.getCurrentUser() != null) {
-            loadUserData(mAuth.getCurrentUser().getUid());
-        }
+        bindUI(v);
+        setupDateNavigation();
+        setupBottomNav(v);
+        setupDrawer(v);
 
-        // Configura el NavigationView (menú lateral)
-        setupNavigationView(view);
+        /* Cargar usuario */
+        FirebaseUser cur = mAuth.getCurrentUser();
+//        if (cur != null) loadUserData(cur.getUid());
 
-        // Cargar comidas guardadas o predeterminadas
-        loadSavedOrDefaultFoodBlocks();
+        /* Cargar comidas */
+        loadFoodBlocksForDate(currentDate);
     }
 
-    private void loadUserData(String userId) {
-        Log.d(TAG, "📌 Cargando datos del usuario para userId: " + userId);
+    @Override public void onPause() {
+        super.onPause();
+        guardarComidasDelDia(currentDate);   // <-- guarda el día visible
+    }
+    public LocalDate getCurrentDate() {
+        return currentDate;
+    }
 
-        mDatabase.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    Log.d(TAG, "🔥 Datos obtenidos: " + snapshot.getValue());
+    /* ===== UI helpers ===== */
+    private void bindUI(View v) {
+        // Etiquetas y barras
+        labelCalories = v.findViewById(R.id.labelCalories);
+        labelProtein  = v.findViewById(R.id.labelProtein);
+        labelCarbs    = v.findViewById(R.id.labelCarbs);
+        labelFat      = v.findViewById(R.id.labelFat);
+        barCalories = v.findViewById(R.id.barCalories);
+        barProtein  = v.findViewById(R.id.barProtein);
+        barCarbs    = v.findViewById(R.id.barCarbs);
+        barFat      = v.findViewById(R.id.barFat);
 
-                    // 🔥 Extraer datos manualmente (EVITANDO `getValue(User.class)`)
-                    String gender = snapshot.child("gender").getValue(String.class);
-                    int age = snapshot.child("age").getValue(Integer.class) != null ? snapshot.child("age").getValue(Integer.class) : 0;
-                    boolean firstTime = snapshot.child("firstTime").getValue(Boolean.class) != null ? snapshot.child("firstTime").getValue(Boolean.class) : false;
-                    String activityLevel = snapshot.child("activityLevel").getValue(String.class);
-                    String goal = snapshot.child("goal").getValue(String.class);
-                    double weight = snapshot.child("weight").getValue(Double.class) != null ? snapshot.child("weight").getValue(Double.class) : 0;
-                    double height = snapshot.child("height").getValue(Double.class) != null ? snapshot.child("height").getValue(Double.class) : 0;
+        // Fecha + flechas
+        txtCurrentDate = v.findViewById(R.id.txtCurrentDate);
+        btnPrevDay     = v.findViewById(R.id.btnPrevDay);
+        btnNextDay     = v.findViewById(R.id.btnNextDay);
+        txtCurrentDate.setText(currentDate.format(DISPLAY_FMT));
 
-                    // 🔥 Crear instancia de User manualmente
-                    user = new User();
-                    user.setGender(gender);
-                    user.setAge(age);
-                    user.setFirstTime(firstTime);
-                    user.setActivityLevel(activityLevel);
-                    user.setGoal(goal);
-                    user.setWeight(weight);
-                    user.setHeight(height);
+        // Lista de bloques
+        RecyclerView rv = v.findViewById(R.id.recyclerFoodBlocks);
+        rv.setLayoutManager(new LinearLayoutManager(getContext()));
+        foodBlockAdapter = new FoodBlockAdapter(foodBlockList, getContext(), this);
+        rv.setAdapter(foodBlockAdapter);
 
-                    Log.d(TAG, "✅ Usuario cargado manualmente: " + user.toString());
-
-                    // 🔥 Asegurar que los valores son correctos antes de llamar a `updateNutritionalValues()`
-                    Log.d(TAG, "📊 Datos del usuario:");
-                    Log.d(TAG, "➡️ Edad: " + user.getAge());
-                    Log.d(TAG, "➡️ Género: " + user.getGender());
-                    Log.d(TAG, "➡️ Nivel de actividad: " + user.getActivityLevel());
-                    Log.d(TAG, "➡️ Objetivo: " + user.getGoal());
-                    Log.d(TAG, "➡️ Peso: " + user.getWeight());
-                    Log.d(TAG, "➡️ Altura: " + user.getHeight());
-
-                    // 🔥 Actualizar la UI con la información obtenida
-                    updateNutritionalValues(user);
-                } else {
-                    Log.w(TAG, "⚠ No se encontraron datos del usuario en la base de datos.");
-                }
+        // Botón agregar bloque
+        v.findViewById(R.id.addFoodButton).setOnClickListener(view -> {
+            if (foodBlockList.size() >= MAX_FOOD_BLOCKS) {
+                Toast.makeText(getContext(), "Máximo de bloques alcanzado", Toast.LENGTH_SHORT).show();
+                return;
             }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "❌ Error al cargar los datos del usuario: " + error.getMessage(), error.toException());
-            }
+            foodBlockList.add(new FoodBlock("Nueva comida"));
+            foodBlockAdapter.notifyItemInserted(foodBlockList.size() - 1);
         });
     }
 
-
-    private void initializeUI(View view) {
-        foodTextField = view.findViewById(R.id.foodTextField);
-        caloriesNeededTextView = view.findViewById(R.id.caloriesNeededTextView);
-        caloriesTodayTextView = view.findViewById(R.id.caloriesTodayTextView);
-        proteinTextView = view.findViewById(R.id.proteinTextView);
-        fatTextView = view.findViewById(R.id.fatTextView);
-        carbTextView = view.findViewById(R.id.carbTextView);
-
-        foodContainer = view.findViewById(R.id.foodContainer);
-        Button addFoodButton = view.findViewById(R.id.addFoodButton);
-
-        addFoodButton.setOnClickListener(v -> addFoodBlock());
-
-        BottomNavigationView bottomNavigationView = view.findViewById(R.id.bottom_navigation);
-        if (bottomNavigationView != null) {
-            Log.d(TAG, "BottomNavigationView encontrado");
-            bottomNavigationView.setOnNavigationItemSelectedListener(item -> {
-                int itemId = item.getItemId();
-                if (itemId == R.id.navigation_home) {
-                    Log.d(TAG, "Navegando a EntrenamientoFragment");
-                    if (mListener != null) {
-                        mListener.onNavigationItemSelected(1); // Cambia al primer fragmento del ViewPager
-                    }
-                    return true;
-                } else if (itemId == R.id.navigation_dashboard) {
-                    Log.d("BottomNav", "🔁 Navegando a WeightFragment en pestaña Alimentación");
-
-                    if (getActivity() instanceof ViewPagerActivity) {
-                        ((ViewPagerActivity) getActivity()).switchToWeightFragment();
-                    } else {
-                        Log.e("BottomNav", "⚠️ ViewPagerActivity no disponible para navegar");
-                    }
-
-                    return true;
-                }
-
-                return false;
-            });
-        } else {
-            Log.e(TAG, "BottomNavigationView no encontrado");
-        }
-
-        navigationView = view.findViewById(R.id.navigation_view);
+    private void setupDateNavigation() {
+        btnPrevDay.setOnClickListener(v -> switchDate(currentDate.minusDays(1)));
+        btnNextDay.setOnClickListener(v -> {
+            LocalDate tomorrow = currentDate.plusDays(1);
+            if (!tomorrow.isAfter(LocalDate.now())) switchDate(tomorrow); // No permitir futuro
+        });
     }
 
-    private void setupNavigationView(View view) {
-        navigationView.setNavigationItemSelectedListener(item -> {
-            if (item.getItemId() == R.id.nav_logout) {
-                handleLogout();
+    private void setupBottomNav(View v) {
+        BottomNavigationView bottom = v.findViewById(R.id.bottom_navigation);
+        if (bottom == null) return;
+        bottom.setOnItemSelectedListener(item -> {
+            if (item.getItemId() == R.id.navigation_home) {
+                if (mListener != null) mListener.onNavigationItemSelected(1);
+                return true;
+            } else if (item.getItemId() == R.id.navigation_dashboard) {
+                if (getActivity() instanceof ViewPagerActivity)
+                    ((ViewPagerActivity) getActivity()).switchToWeightFragment();
                 return true;
             }
             return false;
         });
     }
 
-    private void handleLogout() {
-        mAuth.signOut();
-        Toast.makeText(getActivity(), "Sesión cerrada exitosamente", Toast.LENGTH_SHORT).show();
-
-        // Redirige a la pantalla de inicio de sesión
-        Intent intent = new Intent(getActivity(), MainActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
+    private void setupDrawer(View v) {
+        NavigationView nav = v.findViewById(R.id.navigation_view);
+        nav.setNavigationItemSelectedListener(item -> {
+            if (item.getItemId() == R.id.nav_logout) {
+                mAuth.signOut();
+                startActivity(new Intent(getActivity(), MainActivity.class)
+                        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+                return true;
+            }
+            return false;
+        });
     }
 
-    private void updateNutritionalValues(User user) {
-        double caloriesNeeded = user.calculateCalories(
-                user.getWeight(),
-                user.getHeight(),
-                user.getAge(),
-                user.getGender(),
-                user.getActivityLevel(),
-                user.getGoal()
-        );
-
-        double proteinNeeded = user.calculateProtein();
-        double fatNeeded = user.calculateFat();
-        double carbNeeded = user.calculateCarbs();
-
-        if (getActivity() != null) {
-            getActivity().runOnUiThread(() -> {
-                caloriesTodayTextView.setText(String.format(Locale.getDefault(), "Calorías consumidas: %.2f kcal", user.getCaloriesToday()));
-                caloriesNeededTextView.setText(String.format(Locale.getDefault(), "Calorías necesarias: %.2f kcal", caloriesNeeded));
-                proteinTextView.setText(String.format(Locale.getDefault(), "Proteínas necesarias: %.2f g", proteinNeeded));
-                fatTextView.setText(String.format(Locale.getDefault(), "Grasas necesarias: %.2f g", fatNeeded));
-                carbTextView.setText(String.format(Locale.getDefault(), "Carbohidratos necesarios: %.2f g", carbNeeded));
-            });
-        }
+    /* ===== Navegar entre fechas ===== */
+    private void switchDate(LocalDate newDate) {
+        guardarComidasDelDia(currentDate);   // Guarda antes de cambiar
+        currentDate = newDate;
+        txtCurrentDate.setText(currentDate.format(DISPLAY_FMT));
+        loadFoodBlocksForDate(currentDate);
     }
 
-    private void addFoodBlock() {
-        if (foodContainer.getChildCount() < MAX_FOOD_BLOCKS) {
-            View foodBlock = getLayoutInflater().inflate(R.layout.food_block, null);
-            EditText foodTitle = foodBlock.findViewById(R.id.foodTitle);
-            foodTitle.setFilters(new InputFilter[] { new InputFilter.LengthFilter(20) });
+    /* ===== Persistencia por fecha ===== */
+    private String keyFood(LocalDate date)   { return "food_"   + date.format(DATE_FMT); }
+    private String keyTotK(LocalDate date)   { return "totKcal_"+ date.format(DATE_FMT); }
+    private String keyTotP(LocalDate date)   { return "totProt_"+ date.format(DATE_FMT); }
+    private String keyTotF(LocalDate date)   { return "totFat_" + date.format(DATE_FMT); }
+    private String keyTotC(LocalDate date)   { return "totCarb_"+ date.format(DATE_FMT); }
 
-            // Añadir margen inferior para separación
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-            );
-            params.setMargins(0, 0, 0, 16); // Margen inferior de 16dp
-            foodBlock.setLayoutParams(params);
+    public void guardarComidasDelDia(LocalDate date) {
+        if (getContext()==null) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor ed = prefs.edit();
 
-            foodContainer.addView(foodBlock);
+        /* Serializar bloques */
+        String json = new Gson().toJson(foodBlockList);
+        ed.putString(keyFood(date), json);
 
-            // Guardar el nombre de la comida cuando se modifique
-            foodTitle.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) {
-                    saveFoodNames();
-                }
-            });
+        /* Guardar totales */
+        Totales t = calcularTotalesActuales();
+        ed.putFloat(keyTotK(date), (float) t.kcal);
+        ed.putFloat(keyTotP(date), (float) t.prot);
+        ed.putFloat(keyTotF(date), (float) t.fat);
+        ed.putFloat(keyTotC(date), (float) t.carb);
 
-            // Configurar el menú desplegable
-            ImageButton menuButton = foodBlock.findViewById(R.id.menuButton);
-            menuButton.setOnClickListener(v -> {
-                PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
-                popupMenu.getMenuInflater().inflate(R.menu.food_block_menu, popupMenu.getMenu());
-                popupMenu.setOnMenuItemClickListener(item -> {
-                    if (item.getItemId() == R.id.action_delete) {
-                        foodContainer.removeView(foodBlock);
-                        saveFoodNames();
-                        return true;
-                    }
-                    return false;
-                });
-                popupMenu.show();
-            });
+        ed.apply();
+        Log.d(TAG, "📝 Guardado de día " + date);
+    }
 
-            // Añadir lógica para añadir alimentos
-            LinearLayout foodItemsContainer = foodBlock.findViewById(R.id.foodItemsContainer);
-            ImageButton addFoodItemButton = foodBlock.findViewById(R.id.addFoodItemButton);
-            addFoodItemButton.setOnClickListener(v -> addFoodItem(foodItemsContainer));
+    private void loadFoodBlocksForDate(LocalDate date) {
+        if (getContext()==null) return;
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String json = prefs.getString(keyFood(date), null);
+
+        foodBlockList.clear();
+        if (json == null) {
+            Log.d(TAG, "📅 Día sin datos → bloques por defecto");
+            for (String def : DEFAULT_FOOD_NAMES) foodBlockList.add(new FoodBlock(def));
         } else {
-            Toast.makeText(getActivity(), "No puedes añadir más de 10 comidas", Toast.LENGTH_SHORT).show();
+            Type type = new TypeToken<List<FoodBlock>>(){}.getType();
+            foodBlockList.addAll(new Gson().fromJson(json, type));
+            Log.d(TAG, "📦 Cargados bloques de " + date);
         }
-    }
-    private void addFoodBlockWithName(String name) {
-        View foodBlock = getLayoutInflater().inflate(R.layout.food_block, null);
-        EditText foodTitle = foodBlock.findViewById(R.id.foodTitle);
-        foodTitle.setText(name);
-        foodTitle.setFilters(new InputFilter[] { new InputFilter.LengthFilter(20) });
-
-        // Añadir margen inferior para separación
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        params.setMargins(0, 0, 0, 16); // Margen inferior de 16dp
-        foodBlock.setLayoutParams(params);
-
-        foodContainer.addView(foodBlock);
-
-        // Guardar el nombre de la comida cuando se modifique
-        foodTitle.setOnFocusChangeListener((v, hasFocus) -> {
-            if (!hasFocus) {
-                saveFoodNames();
-            }
-        });
-
-        // Configurar el menú desplegable
-        ImageButton menuButton = foodBlock.findViewById(R.id.menuButton);
-        menuButton.setOnClickListener(v -> {
-            PopupMenu popupMenu = new PopupMenu(getContext(), menuButton);
-            popupMenu.getMenuInflater().inflate(R.menu.food_block_menu, popupMenu.getMenu());
-            popupMenu.setOnMenuItemClickListener(item -> {
-                if (item.getItemId() == R.id.action_delete) {
-                    foodContainer.removeView(foodBlock);
-                    saveFoodNames();
-                    return true;
-                }
-                return false;
-            });
-            popupMenu.show();
-        });
-
-        // Añadir lógica para añadir alimentos
-        LinearLayout foodItemsContainer = foodBlock.findViewById(R.id.foodItemsContainer);
-        ImageButton addFoodItemButton = foodBlock.findViewById(R.id.addFoodItemButton);
-        addFoodItemButton.setOnClickListener(v -> addFoodItem(foodItemsContainer));
+        foodBlockAdapter.notifyDataSetChanged();
+        recalculateDayTotals();
     }
 
-    private void addFoodItem(LinearLayout foodItemsContainer) {
-        View foodItem = getLayoutInflater().inflate(R.layout.food_item, null);
+//    /* ===== User data ===== */
+//    private void loadUserData(String uid) {
+//        mDatabase.child("users").child(uid)
+//                .addListenerForSingleValueEvent(new ValueEventListener() {
+//                    @Override public void onDataChange(@NonNull DataSnapshot snap) {
+//                        if (!snap.exists()) return;
+//                        user = snap.getValue(User.class);
+//                        if (user!=null) updateNutritionalValues(user);
+//                    }
+//                    @Override public void onCancelled(@NonNull DatabaseError err) {
+//                        Log.e(TAG,"Firebase error: "+err.getMessage());
+//                    }
+//                });
+//    }
 
-        // Añadir margen inferior para separación
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        params.setMargins(0, 0, 0, 8); // Margen inferior de 8dp
-        foodItem.setLayoutParams(params);
+    /* ===== Actualizar metas ===== */
+    private void updateNutritionalValues(User u) {
+        goalsKcal = u.calculateCalories(u.getWeight(), u.getHeight(), u.getAge(),
+                u.getGender(), u.getActivityLevel(), u.getGoal());
+        goalsP = u.calculateProtein();
+        goalsF = u.calculateFat();
+        goalsC = u.calculateCarbs();
 
-        foodItemsContainer.addView(foodItem);
+        barCalories.setMax((int) goalsKcal);
+        barProtein .setMax((int) goalsP);
+        barFat     .setMax((int) goalsF);
+        barCarbs   .setMax((int) goalsC);
+
+        recalculateDayTotals();
     }
 
-    private void saveFoodNames() {
-        SharedPreferences prefs = getActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        SharedPreferences.Editor editor = prefs.edit();
-        for (int i = 0; i < foodContainer.getChildCount(); i++) {
-            View foodBlock = foodContainer.getChildAt(i);
-            EditText foodTitle = foodBlock.findViewById(R.id.foodTitle);
-            String foodName = foodTitle.getText().toString();
-            editor.putString("foodName" + i, foodName);
-        }
-        editor.apply();
-    }
-
-    private void loadSavedOrDefaultFoodBlocks() {
-        SharedPreferences prefs = getActivity().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        for (int i = 0; i < MAX_FOOD_BLOCKS; i++) {
-            String foodName = prefs.getString("foodName" + i, null);
-            if (foodName != null) {
-                addFoodBlockWithName(foodName);
-            } else if (i < DEFAULT_FOOD_NAMES.length) {
-                addFoodBlockWithName(DEFAULT_FOOD_NAMES[i]);
+    /* ===== Totales del día ===== */
+    private static class Totales { double kcal, prot, fat, carb; }
+    private Totales calcularTotalesActuales() {
+        Totales t = new Totales();
+        for (FoodBlock b : foodBlockList) {
+            for (FoodItem item : b.getItems()) {
+                if (!item.isChecked()) continue;
+                double f = item.getGrams()/100.0;
+                t.kcal += item.getKcalPer100g()*f;
+                t.prot += item.getProteinPer100g()*f;
+                t.fat  += item.getFatPer100g()*f;
+                t.carb += item.getCarbsPer100g()*f;
             }
         }
+        return t;
     }
+
+    public void recalculateDayTotals() {
+        Totales t = calcularTotalesActuales();
+        labelCalories.setText(String.format(Locale.getDefault(),
+                "Calorías: %.0f / %.0f kcal", t.kcal, goalsKcal));
+        labelProtein .setText(String.format(Locale.getDefault(),
+                "Proteínas: %.0f / %.0f g", t.prot, goalsP));
+        labelFat     .setText(String.format(Locale.getDefault(),
+                "Grasas: %.0f / %.0f g", t.fat, goalsF));
+        labelCarbs   .setText(String.format(Locale.getDefault(),
+                "Carbohidratos: %.0f / %.0f g", t.carb, goalsC));
+
+        barCalories.setProgress((int) Math.min(t.kcal, goalsKcal));
+        barProtein .setProgress((int) Math.min(t.prot, goalsP));
+        barFat     .setProgress((int) Math.min(t.fat , goalsF));
+        barCarbs   .setProgress((int) Math.min(t.carb, goalsC));
+    }
+
+    /* ===== Callback desde FoodBlockAdapter cuando cambian items ===== */
+    @Override public void onFoodChanged() { recalculateDayTotals(); }
 }

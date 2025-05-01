@@ -1,5 +1,6 @@
 package com.example.diets.adapters;
 
+import android.content.Context;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Spanned;
@@ -13,10 +14,17 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
 import com.example.diets.model.ExerciseSeries;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +33,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     private static final String TAG = "SeriesAdapter";
     private List<ExerciseSeries> seriesList;
     private Double previousLoad;
-
+    private final String exerciseName;
+    private final TrainingDetailAdapter parentAdapter;
     public Double getPreviousLoad() {
         return previousLoad;
     }
@@ -34,9 +43,11 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         this.previousLoad = previousLoad;
     }
 
-    public SeriesAdapter(List<ExerciseSeries> seriesList) {
+    public SeriesAdapter(List<ExerciseSeries> seriesList, String exerciseName, TrainingDetailAdapter parentAdapter) {
         Log.d(TAG, "SeriesAdapter - Constructor: Recibiendo lista de series con tamaño " + seriesList.size());
         this.seriesList = seriesList;
+        this.exerciseName = exerciseName;
+        this.parentAdapter = parentAdapter;
     }
 
     @NonNull
@@ -44,7 +55,9 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     public SeriesViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         Log.d(TAG, "SeriesAdapter - onCreateViewHolder: Creando vista para un nuevo elemento de la lista.");
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_series, parent, false);
-        return new SeriesViewHolder(view);
+        return new SeriesViewHolder(view, this, exerciseName, parentAdapter); // ✅ este constructor ahora es correcto
+
+
     }
 
     @Override
@@ -74,23 +87,77 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         Log.d(TAG, "SeriesAdapter - getUpdatedSeriesList: Total de series completadas a guardar: " + completedSeries.size());
         return completedSeries;
     }
-
+    public void reindexSeries() {
+        for (int i = 0; i < seriesList.size(); i++) {
+            seriesList.get(i).setSeriesNumber(i + 1);
+        }
+        notifyDataSetChanged();
+    }
     public void commitAllEdits() {
         Log.d("SeriesAdapter", "commitAllEdits: Guardando cambios en todas las series.");
         for (ExerciseSeries series : seriesList) {
             Log.d("SeriesAdapter", "commitAllEdits: Revisando serie " + series.getSeriesNumber());
         }
     }
+    public void cargarUltimaSerieDesdeFirebase(String exerciseId, Context context) {
+        Log.d(TAG, "cargarUltimaSerieDesdeFirebase: Cargando series históricas para ejercicio " + exerciseId);
 
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        DatabaseReference seriesRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(userId)
+                .child("userExercises")
+                .child(exerciseId)
+                .child("seriesData");
+
+        seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                ExerciseSeries ultimaSerie = null;
+                for (DataSnapshot seriesSnapshot : dataSnapshot.getChildren()) {
+                    try {
+                        ExerciseSeries serie = seriesSnapshot.getValue(ExerciseSeries.class);
+                        ultimaSerie = serie; // al final, será la última iterada
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error al mapear serie previa", e);
+                    }
+                }
+
+                if (ultimaSerie != null) {
+                    Log.d(TAG, "✅ Última serie obtenida: " + ultimaSerie.toString());
+                    for (ExerciseSeries s : seriesList) {
+                        s.setWeight(ultimaSerie.getWeight());
+                        s.setReps(ultimaSerie.getReps());
+                        s.setRpe(ultimaSerie.getRpe());
+                    }
+                    notifyDataSetChanged();
+                } else {
+                    Log.w(TAG, "⚠️ No se encontraron series anteriores.");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "❌ Error al leer series previas desde Firebase", error.toException());
+            }
+        });
+    }
     static class SeriesViewHolder extends RecyclerView.ViewHolder {
         TextView seriesNumber;
         EditText repsInput, weightInput, rpeInput;
         CheckBox checkSeriesCompleted;
         TextView previousLoad;
         private boolean isUpdating = false;
+        private final SeriesAdapter adapter;
 
-        public SeriesViewHolder(@NonNull View itemView) {
+        private final String exerciseName;
+        private final TrainingDetailAdapter parentAdapter;
+        public SeriesViewHolder(@NonNull View itemView, SeriesAdapter adapter, String exerciseName, TrainingDetailAdapter parentAdapter) {
             super(itemView);
+            this.adapter = adapter;
+            this.exerciseName = exerciseName;
+            this.parentAdapter = parentAdapter;
+
             seriesNumber = itemView.findViewById(R.id.seriesNumber);
             repsInput = itemView.findViewById(R.id.repsInput);
             weightInput = itemView.findViewById(R.id.weightInput);
@@ -102,17 +169,40 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
 
             repsInput.setFilters(new InputFilter[]{new InputFilterMinMax(1, 30)});
             weightInput.setFilters(new InputFilter[]{new InputFilterMinMax(0, 500)});
+
+            itemView.setOnLongClickListener(v -> {
+                int position = getAdapterPosition();
+                if (position != RecyclerView.NO_POSITION) {
+                    new AlertDialog.Builder(itemView.getContext())
+                            .setTitle("Eliminar serie")
+                            .setMessage("¿Deseas eliminar esta serie?")
+                            .setPositiveButton("Eliminar", (dialog, which) -> {
+                                Log.d(TAG, "🗑 Serie eliminada en posición: " + position);
+                                adapter.seriesList.remove(position);
+                                adapter.reindexSeries(); // ✅ NUEVO método para reindexar
+                            })
+                            .setNegativeButton("Cancelar", null)
+                            .show();
+                }
+                parentAdapter.updateSeriesCount(exerciseName, adapter.seriesList.size());
+                return true;
+            });
+
+
         }
+
+
 
         public void bind(ExerciseSeries series) {
             isUpdating = true;
 
             seriesNumber.setText(String.valueOf(series.getSeriesNumber()));
-            previousLoad.setText(series.getPreviousLoad() != null
-                    ? (series.getPreviousLoad() % 1 == 0
+            String loadText = (series.getPreviousLoad() != null)
+                    ? "Prev: " + (series.getPreviousLoad() % 1 == 0
                     ? String.valueOf(series.getPreviousLoad().intValue())
                     : String.valueOf(series.getPreviousLoad()))
-                    : "N/A");
+                    : "N/A";
+            previousLoad.setText(loadText);
 
             // Reps
             String currentReps = String.valueOf(series.getReps());
@@ -127,11 +217,11 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
                 weightInput.setText(currentWeight);
             }
 
-            // RPE
-            String currentRpe = String.valueOf(series.getRpe());
+            String currentRpe = series.getRpe() > 0 ? String.valueOf(series.getRpe()) : "";
             if (!rpeInput.getText().toString().equals(currentRpe)) {
                 rpeInput.setText(currentRpe);
             }
+
 
             checkSeriesCompleted.setChecked(series.isCompleted());
 
@@ -211,6 +301,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
                 } catch (NumberFormatException ignored) {}
                 return "";
             }
+
         }
     }
 }

@@ -7,7 +7,7 @@
     <color name="accentRed">#E63946</color>      <!-- Botones o elementos destacados -->
     <color name="hintColorLight">#BBBBBB</color> <!-- Hints o texto secundario -->
     <color name="dark_gray">#2F2F2F</color>
-
+    <color name="teal_700">#018786</color>
     <!-- Colores heredados y renombrados -->
     <color name="colorPrimary">#1C1C1C</color> <!-- Usar como fondo -->
     <color name="colorPrimaryDark">#000000</color>

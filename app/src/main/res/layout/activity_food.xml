@@ -9,7 +9,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:background="#1C1C1C">
 
         <ScrollView
             android:layout_width="match_parent"
@@ -21,119 +22,178 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:gravity="center">
+                android:gravity="center_horizontal"
+                android:background="#1C1C1C">
 
-                <!-- Sección de bienvenida -->
-                <TextView
-                    android:id="@+id/dashboardGreeting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Hola"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF"
-                    android:layout_marginBottom="16dp" />
-
-                <TextView
-                    android:id="@+id/proteinTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Proteínas necesarias: 0g"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:layout_gravity="start"
-                    android:layout_marginStart="8dp" />
-
-                <TextView
-                    android:id="@+id/fatTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Grasas necesarias: 0g"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:layout_gravity="start"
-                    android:layout_marginStart="8dp" />
-
-                <TextView
-                    android:id="@+id/carbTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Carbohidratos necesarios: 0g"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:layout_gravity="start"
-                    android:layout_marginStart="8dp" />
-
-                <TextView
-                    android:id="@+id/caloriesNeededTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Calorías necesarias: 0 kcal"
-                    android:textSize="18sp"
-                    android:layout_marginTop="16dp"
-                    android:textColor="#FFFFFF"
-                    android:layout_gravity="start"
-                    android:layout_marginStart="8dp" />
-
-                <TextView
-                    android:id="@+id/caloriesTodayTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Calorías consumidas: 0 kcal"
-                    android:textSize="18sp"
-                    android:layout_marginTop="8dp"
-                    android:textColor="#FFFFFF"
-                    android:layout_gravity="start"
-                    android:layout_marginStart="8dp" />
-
-                <EditText
-                    android:id="@+id/foodTextField"
-                    android:layout_width="299dp"
-                    android:layout_height="57dp"
-                    android:ems="10"
-                    android:hint="Ingresa un alimento"
-                    android:inputType="text"
-                    android:textAlignment="center"
-                    android:layout_marginTop="16dp"
-                    android:background="#2F2F2F"
-                    android:textColor="#FFFFFF"
-                    android:textColorHint="#BBBBBB"
-                    android:drawableStart="@drawable/ic_search"
-                    android:paddingStart="16dp"
-                    android:paddingEnd="16dp" />
-
+                <!-- ⏪⏩ Navegación de fecha -->
                 <LinearLayout
-                    android:id="@+id/foodContainer"
+                    android:id="@+id/dateHeader"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_marginTop="16dp">
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:padding="8dp"
+                    android:layout_marginBottom="8dp">
+
+                    <ImageButton
+                        android:id="@+id/btnPrevDay"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_chevron_left"
+                        android:contentDescription="Día anterior"
+                        android:background="?attr/selectableItemBackgroundBorderless" />
+
+                    <TextView
+                        android:id="@+id/txtCurrentDate"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="Hoy"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="#FFFFFF" />
+
+                    <ImageButton
+                        android:id="@+id/btnNextDay"
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:src="@drawable/ic_chevron_right"
+                        android:contentDescription="Día siguiente"
+                        android:background="?attr/selectableItemBackgroundBorderless" />
                 </LinearLayout>
 
-                <!-- Botón para añadir más bloques de alimentos -->
+                <!-- 🔥 TÍTULO DEL FRAGMENTO -->
+                <TextView
+                    android:id="@+id/fragmentTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Resumen Nutricional Diario"
+                    android:textSize="24sp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"
+                    android:gravity="center" />
+
+                <!-- 🔴 CALORÍAS -->
+                <TextView
+                    android:id="@+id/labelCalories"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Calorías: 0 / 0 kcal"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="2dp" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/barCalories"
+                    style="@style/Widget.Material3.LinearProgressIndicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp"
+                    android:progress="0"
+                    android:max="100"
+                    app:indicatorColor="#E63946"
+                    app:trackColor="#2F2F2F" />
+
+                <!-- 🔴 PROTEÍNAS -->
+                <TextView
+                    android:id="@+id/labelProtein"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Proteínas: 0 / 0 g"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="2dp" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/barProtein"
+                    style="@style/Widget.Material3.LinearProgressIndicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp"
+                    android:progress="0"
+                    android:max="100"
+                    app:indicatorColor="#E63946"
+                    app:trackColor="#2F2F2F" />
+
+                <!-- 🔴 CARBOHIDRATOS -->
+                <TextView
+                    android:id="@+id/labelCarbs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Carbohidratos: 0 / 0 g"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="2dp" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/barCarbs"
+                    style="@style/Widget.Material3.LinearProgressIndicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp"
+                    android:progress="0"
+                    android:max="100"
+                    app:indicatorColor="#E63946"
+                    app:trackColor="#2F2F2F" />
+
+                <!-- 🔴 GRASAS -->
+                <TextView
+                    android:id="@+id/labelFat"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Grasas: 0 / 0 g"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="2dp" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/barFat"
+                    style="@style/Widget.Material3.LinearProgressIndicator"
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp"
+                    android:progress="0"
+                    android:max="100"
+                    app:indicatorColor="#E63946"
+                    app:trackColor="#2F2F2F" />
+
+                <!-- 📋 Recycler de bloques de comida -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerFoodBlocks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp" />
+
+                <!-- ➕ Botón para añadir comida -->
                 <Button
                     android:id="@+id/addFoodButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Añadir Comida"
+                    android:textAllCaps="false"
+                    android:textSize="16sp"
+                    android:layout_marginTop="24dp"
+                    android:layout_marginBottom="16dp"
                     android:backgroundTint="#E63946"
-                    android:textSize="14sp"
-                    android:padding="8dp"
                     android:textColor="#FFFFFF"
-                    android:layout_marginTop="16dp" />
+                    android:elevation="4dp" />
+
             </LinearLayout>
         </ScrollView>
 
+        <!-- Menú inferior de navegación -->
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottom_navigation"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"
-            android:background="@color/backgroundDark"
+            android:background="#2F2F2F"
             android:elevation="8dp"
             app:itemIconTint="@color/red"
             app:itemTextColor="@color/red"
             app:menu="@menu/bottom_navigation_menu" />
+
     </LinearLayout>
 
     <!-- Menú lateral -->
@@ -143,4 +203,5 @@
         android:layout_height="match_parent"
         android:layout_gravity="start"
         app:menu="@menu/activity_main_drawer" />
+
 </androidx.drawerlayout.widget.DrawerLayout>

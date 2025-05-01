@@ -5,6 +5,7 @@
     android:background="@color/backgroundDark"
     android:padding="16dp">
 
+
     <ScrollView
         android:id="@+id/scrollContainer"
         android:layout_width="match_parent"
@@ -17,6 +18,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
+            <!-- Título -->
             <TextView
                 android:id="@+id/weightTextView"
                 android:layout_width="match_parent"
@@ -24,9 +26,10 @@
                 android:text="Gestión del Peso"
                 android:textSize="24sp"
                 android:textColor="@color/white"
-                android:gravity="center"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:gravity="center" />
 
+            <!-- Peso -->
             <EditText
                 android:id="@+id/weightInput"
                 android:layout_width="match_parent"
@@ -38,6 +41,7 @@
                 android:textColor="@color/white"
                 android:textColorHint="@color/hintColor" />
 
+            <!-- Botón fecha -->
             <Button
                 android:id="@+id/selectDateButton"
                 android:layout_width="wrap_content"
@@ -47,6 +51,7 @@
                 android:backgroundTint="@color/colorAccent"
                 android:layout_marginTop="8dp" />
 
+            <!-- Fecha seleccionada -->
             <TextView
                 android:id="@+id/selectedDateText"
                 android:layout_width="match_parent"
@@ -55,12 +60,43 @@
                 android:textColor="@color/white"
                 android:layout_marginTop="8dp" />
 
+            <!-- ───── NUEVOS INDICADORES SEMANALES ───── -->
+            <TextView
+                android:id="@+id/avgCalText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Calorías medias 7d: —"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:layout_marginTop="8dp" />
+
+            <TextView
+                android:id="@+id/avgWeightText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Peso medio 7d: —"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/trendText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="—"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:layout_marginBottom="8dp" />
+            <!-- ──────────────────────────────────────── -->
+
+            <!-- Gráfica -->
             <com.github.mikephil.charting.charts.LineChart
                 android:id="@+id/weightChart"
                 android:layout_width="match_parent"
                 android:layout_height="300dp"
                 android:layout_marginTop="16dp" />
 
+            <!-- Guardar -->
             <Button
                 android:id="@+id/saveWeightButton"
                 android:layout_width="match_parent"
@@ -70,11 +106,13 @@
                 android:backgroundTint="@color/colorAccent"
                 android:layout_marginTop="16dp" />
 
+            <!-- Lista -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/weightRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp" />
+
         </LinearLayout>
     </ScrollView>
 
@@ -88,4 +126,5 @@
         app:itemIconTint="@color/red"
         app:itemTextColor="@color/red"
         app:menu="@menu/bottom_navigation_menu" />
+
 </RelativeLayout>

@@ -1,7 +1,7 @@
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    id("com.google.gms.google-services")  // Este plugin debe estar aquí
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -31,14 +31,20 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // ✅ Esto es diferente en Kotlin DSL:
+        isCoreLibraryDesugaringEnabled = true
     }
 
+
     kotlinOptions {
-        jvmTarget = "17"  // Asegúrate de que Kotlin use JVM 17.
+        jvmTarget = "17"
     }
 }
 
 dependencies {
+    // ✅ Necesario para usar LocalDate, etc. con minSdk < 26
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
     implementation("com.squareup.okhttp3:okhttp:3.14.6")
     implementation("com.google.code.gson:gson:2.8.8")
     implementation("androidx.appcompat:appcompat:1.6.1")
@@ -47,20 +53,32 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.espresso:espresso-core:3.5.0")
-    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+
+
+            implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth:21.1.0")
     implementation("com.google.firebase:firebase-database:20.1.0")
     implementation("com.google.firebase:firebase-storage:20.2.1")
     implementation("com.google.firebase:firebase-firestore:24.8.1")
-    implementation("com.github.bumptech.glide:glide:4.15.1")
-    annotationProcessor("com.github.bumptech.glide:compiler:4.15.1")
+
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     implementation("com.google.android.gms:play-services-auth:20.6.0")
-    implementation ("com.google.android.material:material:1.4.0")
-    implementation ("androidx.viewpager2:viewpager2:1.0.0")
-    implementation ("androidx.recyclerview:recyclerview:1.2.1")
-    implementation ("androidx.cardview:cardview:1.0.0")
+    implementation("androidx.viewpager2:viewpager2:1.0.0")
+    implementation("androidx.recyclerview:recyclerview:1.2.1")
+    implementation("androidx.cardview:cardview:1.0.0")
 
+    implementation("com.squareup.okhttp3:okhttp:5.0.0-alpha.14")
+
+    // CameraX
+    implementation("androidx.camera:camera-core:1.3.3")
+    implementation("androidx.camera:camera-camera2:1.3.3")
+    implementation("androidx.camera:camera-lifecycle:1.3.3")
+    implementation("androidx.camera:camera-view:1.3.3")
+
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
 }

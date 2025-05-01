@@ -27,6 +27,7 @@ public class Exercise implements Serializable {
     private int series = 3; // Valor por defecto
     private List<String> images = new ArrayList<>();
     private List<String> imageGallery = new ArrayList<>();
+    private boolean fromInternal = false; // Por defecto es false
     // Constructor vacío requerido por Firebase
     public Exercise() {
     }
@@ -39,7 +40,7 @@ public class Exercise implements Serializable {
         this.exerciseType = exerciseType;
         this.musclesWorked = musclesWorked;
         this.loadIntensity = loadIntensity;
-        this.image = image;
+        setImage(image);
         this.description = description;
         this.movementType = movementType;
         this.synergistMuscles = (synergistMuscles != null) ? new ArrayList<>(synergistMuscles) : new ArrayList<>();
@@ -89,7 +90,13 @@ public class Exercise implements Serializable {
     public void setSeries(int series) {
         this.series = series;
     }
+    public boolean isFromInternal() {
+        return fromInternal;
+    }
 
+    public void setFromInternal(boolean fromInternal) {
+        this.fromInternal = fromInternal;
+    }
     // 🔹 Método auxiliar para obtener la lista de músculos como objetos Muscle
     public List<Muscle> getSynergistMuscleObjects() {
         List<Muscle> muscleObjects = new ArrayList<>();
@@ -129,6 +136,11 @@ public class Exercise implements Serializable {
     }
 
     public void setEquipmentType(String equipmentType) {
+        if (equipmentType == null) {
+            this.equipmentType = "desconocido"; // Valor por defecto si viene nulo
+            return;
+        }
+
         if (equipmentType.equals("mancuernas") || equipmentType.equals("barra") || equipmentType.equals("cable")) {
             this.equipmentType = equipmentType;
         } else {
@@ -136,17 +148,23 @@ public class Exercise implements Serializable {
         }
     }
 
+
     public String getExerciseType() {
         return exerciseType;
     }
-
     public void setExerciseType(String exerciseType) {
+        if (exerciseType == null || exerciseType.trim().isEmpty()) {
+            this.exerciseType = "desconocido";
+            return;
+        }
+
         if (exerciseType.equals("fuerza") || exerciseType.equals("hipertrofia")) {
             this.exerciseType = exerciseType;
         } else {
             this.exerciseType = "desconocido";
         }
     }
+
 
     public String getMusclesWorked() {
         return musclesWorked;
@@ -177,12 +195,18 @@ public class Exercise implements Serializable {
         return movementType;
     }
     public void setMovementType(String movementType) {
+        if (movementType == null || movementType.trim().isEmpty()) {
+            this.movementType = "desconocido";
+            return;
+        }
+
         if (movementType.equals("multiarticular") || movementType.equals("aislado")) {
             this.movementType = movementType;
         } else {
             this.movementType = "desconocido";
         }
     }
+
     public List<String> getImageGallery() {
         return imageGallery;
     }

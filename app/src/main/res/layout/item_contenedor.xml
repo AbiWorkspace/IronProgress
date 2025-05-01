@@ -98,7 +98,7 @@
                     android:maxWidth="60dp"
                     android:maxLines="2"
                     android:minWidth="50dp"
-                    android:text="Carga Anterior"
+                    android:text="Carga anterior"
                     android:textAlignment="viewStart"
                     android:textColor="#FFFFFF"
                     android:textSize="14sp"

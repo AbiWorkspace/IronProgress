@@ -26,7 +26,7 @@ public class UserExercise extends Exercise implements Serializable {
     private double lastLoad;
     @PropertyName("name")
     private String exerciseName;
-
+    private boolean isFromInternal;
     // Constructor que copia todos los campos de Exercise al nuevo UserExercise
     public UserExercise(Exercise exercise) {
         // 1) Llamada a super(...) como PRIMERA instrucción
@@ -52,7 +52,7 @@ public class UserExercise extends Exercise implements Serializable {
         Log.d("UserExercise", "        exerciseType=" + exercise.getExerciseType());
         Log.d("UserExercise", "        musclesWorked=" + exercise.getMusclesWorked());
         Log.d("UserExercise", "        loadIntensity=" + exercise.getLoadIntensity());
-        Log.d("UserExercise", "        image=" + exercise.getImage());
+
         Log.d("UserExercise", "        description=" + exercise.getDescription());
         Log.d("UserExercise", "        movementType=" + exercise.getMovementType());
 
@@ -63,6 +63,7 @@ public class UserExercise extends Exercise implements Serializable {
 
         // 4) Asignamos el "name" al campo exerciseName (que es el que se sube como "name" en Firebase)
         this.setExerciseName(exercise.getName());
+        this.setImages(exercise.getImages());
 
         // 5) Inicializamos campos propios de UserExercise
         this.isCompleted = false;
@@ -72,6 +73,9 @@ public class UserExercise extends Exercise implements Serializable {
         this.series = 3;  // Valor por defecto
         this.dayName = "";
         this.exerciseSeriesList = new ArrayList<>();
+        this.setFromInternal(exercise.isFromInternal());
+        Log.d("UserExercise", ">>> [CONSTRUCTOR] isFromInternal() = " + this.isFromInternal());
+
 
         // 6) Logs finales con los valores de este UserExercise
         Log.d("UserExercise", ">>> [CONSTRUCTOR] Campos finales del UserExercise:");
@@ -112,6 +116,13 @@ public class UserExercise extends Exercise implements Serializable {
         return super.getName();
     }
 
+    public boolean isFromInternal() {
+        return isFromInternal;
+    }
+
+    public void setFromInternal(boolean fromInternal) {
+        isFromInternal = fromInternal;
+    }
     public String getFamiliarity() {
         Log.d("UserExercise", "getFamiliarity() llamado: " + familiarity);
         return familiarity;

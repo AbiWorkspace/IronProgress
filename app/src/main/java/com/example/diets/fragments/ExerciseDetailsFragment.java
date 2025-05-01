@@ -27,6 +27,7 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
+
 public class ExerciseDetailsFragment extends Fragment {
 
     private static final String TAG = "ExerciseDetailsFragment";

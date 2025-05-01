@@ -19,11 +19,13 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
 import com.example.diets.activitys.ViewPagerActivity;
+import com.example.diets.adapters.SeriesAdapter;
 import com.example.diets.adapters.TrainingDetailAdapter;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.ExerciseSeries;
@@ -32,10 +34,16 @@ import com.example.diets.model.TrainingDay;
 import com.example.diets.model.UserExercise;
 import com.example.diets.fragments.SelectExercisesFragment.OnExercisesSelectedListener;
 import com.example.diets.viewmodel.TrainingDetailViewModel;
+import com.google.common.reflect.TypeToken;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.*;
+import com.google.gson.Gson;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,6 +61,8 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
     private Chronometer chronometerTraining;
     private ImageView btnBackToPrevious;
     private Button btnFinishWorkout;
+    private boolean isFromInternal = false;
+    private String exerciseIndex; // 🔑 ID del ejercicio de Firebase
 
     /* Datos y adaptador */
     private TrainingDetailAdapter adapter;
@@ -74,6 +84,16 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
     /* Movimiento y sinergias */
     private MovementPattern movementPatternDelDia;
     private List<String> musculosSinergicosDelDia;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (getArguments() != null) {
+            exerciseIndex = getArguments().getString("exerciseIndex");
+            dayKey = getArguments().getString("dayKey");
+            isFromInternal = getArguments().getBoolean("isFromInternal", false); // ✅ NUEVO
+        }
+    }
 
     @Nullable
     @Override
@@ -118,98 +138,124 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                     .child("userExercises");
 
             dayExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
                     exercises = new ArrayList<>();
 
-                    FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-                    if (user == null) {
-                        Log.e(TAG, "❌ Usuario no autenticado.");
-                        return;
-                    }
-
-                    String userId = user.getUid();
+                    // Leemos también /userExercises globales para el lastLoad...
                     DatabaseReference globalExercisesRef = FirebaseDatabase.getInstance()
                             .getReference("users")
                             .child(userId)
                             .child("userExercises");
 
                     globalExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot globalSnapshot) {
+                        @Override public void onDataChange(@NonNull DataSnapshot globalSnapshot) {
                             for (DataSnapshot exerciseSnap : snapshot.getChildren()) {
                                 UserExercise ue = new UserExercise();
 
-                                String nombreEjercicio = exerciseSnap.child("name").getValue(String.class);
-                                ue.setName(nombreEjercicio);
+                                // Nombre
+                                String nombre = exerciseSnap.child("name").getValue(String.class);
+                                ue.setName(nombre);
 
-                                // Buscar en userExercises (globales) el nodo que coincide por nombre
-                                boolean foundMatch = false;
-                                for (DataSnapshot globalSnap : globalSnapshot.getChildren()) {
-                                    String nombreGlobal = globalSnap.child("name").getValue(String.class);
-                                    if (nombreEjercicio != null && nombreEjercicio.equals(nombreGlobal)) {
+                                Boolean interno = exerciseSnap.child("isFromInternal")
+                                        .getValue(Boolean.class);
+                                ue.setFromInternal(interno != null && interno);
 
-                                        // Recolectar último peso desde seriesData
-                                        DataSnapshot seriesDataSnap = globalSnap.child("seriesData");
-                                        double lastWeight = 0.0;
+                                // Series / reps / rpe / weight / image
+                                ue.setSeries(exerciseSnap.child("series").getValue(Integer.class) != null
+                                        ? exerciseSnap.child("series").getValue(Integer.class) : 3);
+                                ue.setReps(exerciseSnap.child("reps").getValue(Integer.class) != null
+                                        ? exerciseSnap.child("reps").getValue(Integer.class) : 8);
+                                ue.setRpe(exerciseSnap.child("rpe").getValue(Double.class) != null
+                                        ? exerciseSnap.child("rpe").getValue(Double.class) : 7.0);
+                                ue.setWeight(exerciseSnap.child("weight").getValue(Double.class) != null
+                                        ? exerciseSnap.child("weight").getValue(Double.class) : 0.0);
+                                ue.setImage(exerciseSnap.child("image").getValue(String.class));
 
-                                        for (DataSnapshot serieSnap : seriesDataSnap.getChildren()) {
-                                            Double weight = serieSnap.child("weight").getValue(Double.class);
-                                            Log.d(TAG, "📦 Serie encontrada para " + nombreEjercicio + ": peso = " + weight);
-                                            if (weight != null) lastWeight = weight;
+                                // último peso (lastLoad) buscándolo en la rama global:
+                                double lastLoad = 0;
+                                for (DataSnapshot gSnap : globalSnapshot.getChildren()) {
+                                    String gName = gSnap.child("name").getValue(String.class);
+                                    if (nombre != null && nombre.equalsIgnoreCase(gName)) {
+                                        for (DataSnapshot s : gSnap.child("seriesData").getChildren()) {
+                                            Double w = s.child("weight").getValue(Double.class);
+                                            if (w != null) lastLoad = w;
                                         }
-
-                                        ue.setLastLoad(lastWeight);
-                                        Log.d(TAG, "TrainingDetailFragment - onDataChange: Carga previa recuperada desde seriesData para "
-                                                + ue.getName() + " → " + ue.getLastLoad());
-
-                                        foundMatch = true;
                                         break;
                                     }
                                 }
-
-                                if (!foundMatch) {
-                                    Log.w(TAG, "⚠ No se encontró seriesData para " + nombreEjercicio + ", usando carga 0.0");
-                                    ue.setLastLoad(0.0);
-                                }
-
-                                // Asignar series, reps, rpe, etc.
-                                ue.setSeries(exerciseSnap.child("series").getValue(Integer.class) != null
-                                        ? exerciseSnap.child("series").getValue(Integer.class)
-                                        : 3);
-                                ue.setReps(exerciseSnap.child("reps").getValue(Integer.class) != null
-                                        ? exerciseSnap.child("reps").getValue(Integer.class)
-                                        : 8);
-                                ue.setRpe(exerciseSnap.child("rpe").getValue(Double.class) != null
-                                        ? exerciseSnap.child("rpe").getValue(Double.class)
-                                        : 7.0);
-                                ue.setWeight(exerciseSnap.child("weight").getValue(Double.class) != null
-                                        ? exerciseSnap.child("weight").getValue(Double.class)
-                                        : 0.0);
-
-                                // Imagen, si existe
-                                String imageBase64 = exerciseSnap.child("image").getValue(String.class);
-                                ue.setImage(imageBase64 != null ? imageBase64 : "");
+                                ue.setLastLoad(lastLoad);
 
                                 exercises.add(ue);
                             }
 
-                            Log.d(TAG, "✔ Total ejercicios cargados con lastLoad desde seriesData: " + exercises.size());
+                            adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises, dayKey, getContext());
 
-                            adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises, dayKey);
                             recyclerViewExercises.setAdapter(adapter);
-                        }
+                            for (UserExercise ue : exercises) {
+                                String exerciseName = ue.getName();
 
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-                            Log.e(TAG, "❌ Error al leer userExercises globales: " + error.getMessage());
+                                // 🔍 Buscar la key real desde la rama global
+                                for (DataSnapshot gSnap : globalSnapshot.getChildren()) {
+                                    String gName = gSnap.child("name").getValue(String.class);
+                                    if (exerciseName.equalsIgnoreCase(gName)) {
+                                        String firebaseKey = gSnap.getKey();
+
+                                        // ✅ Guardar la key para uso en el adaptador
+                                        adapter.setFirebaseKey(exerciseName, firebaseKey);
+
+                                        // ✅ Esperar que se renderice el RecyclerView antes de acceder al seriesAdapter
+                                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                                            SeriesAdapter sa = adapter.getSeriesAdapterPorNombre(exerciseName);
+                                            if (sa != null) {
+                                                sa.cargarUltimaSerieDesdeFirebase(firebaseKey, getContext());
+                                            } else {
+                                                Log.w(TAG, "⚠️ Adapter nulo al intentar cargar series para " + exerciseName);
+                                            }
+                                        }, 150); // ⏳ Ajusta el delay si es necesario
+
+                                        break;
+                                    }
+                                }
+                            }
+
+
+                            ItemTouchHelper.Callback callback = new ItemTouchHelper.SimpleCallback(
+                                    ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+
+                                @Override
+                                public boolean onMove(@NonNull RecyclerView recyclerView,
+                                                      @NonNull RecyclerView.ViewHolder viewHolder,
+                                                      @NonNull RecyclerView.ViewHolder target) {
+                                    int fromPosition = viewHolder.getAdapterPosition();
+                                    int toPosition = target.getAdapterPosition();
+                                    adapter.onItemMove(fromPosition, toPosition); // ✅ este método es el que acabamos de definir
+                                    return true;
+                                }
+
+                                @Override
+                                public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+                                    // No usado aquí
+                                }
+
+                                @Override
+                                public boolean isLongPressDragEnabled() {
+                                    return true;
+                                }
+                            };
+
+                            ItemTouchHelper touchHelper = new ItemTouchHelper(callback);
+                            touchHelper.attachToRecyclerView(recyclerViewExercises);
+
+
+
+                        }
+                        @Override public void onCancelled(@NonNull DatabaseError e) {
+                            Log.e(TAG, "❌ Error al leer userExercises globales: " + e.getMessage());
                         }
                     });
                 }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    Log.e(TAG, "❌ Error al cargar ejercicios de Firebase: " + error.getMessage());
+                @Override public void onCancelled(@NonNull DatabaseError e) {
+                    Log.e(TAG, "❌ Error al cargar ejercicios de Firebase: " + e.getMessage());
                 }
             });
 
@@ -268,156 +314,56 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         return view;
     }
 
-
-    // ****************************************************************
-    // Implementación de la interfaz OnExercisesSelectedListener:
-    // Llamado cuando se agregan ejercicios en ExerciseSelectionDialog/CreatedExercisesFragment
-    // ****************************************************************
     @Override
     public void onExercisesSelected(List<Exercise> exercisesRecibidos, TrainingDay trainingDay) {
-        Log.d(TAG, "TrainingDetailFragment - onExercisesSelected: Recibidos "
-                + exercisesRecibidos.size() + " ejercicios desde el selector.");
+        Log.d(TAG, "onExercisesSelected: Recibidos " + exercisesRecibidos.size() + " ejercicios.");
 
-        for (Exercise exercise : exercisesRecibidos) {
-            Log.d(TAG, "➕ Intentando añadir ejercicio: " + exercise.getName());
+        // ① Marco TODOS como “internos”
+        for (Exercise ex : exercisesRecibidos) {
+            ex.setFromInternal(true);
+        }
 
-            // ✅ Validación de duplicado
+        // ② Ahora guardo: el método incluirá isFromInternal en Firebase
+        guardarEjerciciosEnFirebase(exercisesRecibidos, trainingDay.getDayTitle());
+
+        // ③ Refresco UI
+        for (Exercise ex : exercisesRecibidos) {
             boolean yaExiste = false;
-            for (UserExercise existente : exercises) {
-                if (existente.getName().equalsIgnoreCase(exercise.getName())) {
+            for (UserExercise u : exercises) {
+                if (u.getName().equalsIgnoreCase(ex.getName())) {
                     yaExiste = true;
                     break;
                 }
             }
-
             if (yaExiste) {
-                Log.w(TAG, "⚠ El ejercicio '" + exercise.getName() + "' ya está en la lista. No se añadirá duplicado.");
-                Toast.makeText(getContext(), "Este ejercicio ya está agregado: " + exercise.getName(), Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(),
+                        "Este ejercicio ya está agregado: " + ex.getName(),
+                        Toast.LENGTH_SHORT).show();
                 continue;
             }
-
-            // Si no existe, lo añadimos normalmente
-            UserExercise userExercise = new UserExercise(exercise);
-            userExercise.setSeries(3);
-            exercises.add(userExercise);
-
+            UserExercise ue = new UserExercise(ex);
+            exercises.add(ue);
             adapter.notifyItemInserted(exercises.size() - 1);
             recyclerViewExercises.smoothScrollToPosition(exercises.size() - 1);
         }
-
-        guardarEjerciciosEnFirebase(exercisesRecibidos, trainingDay.getDayTitle());
-    }
-
-    // ****************************************************************
-    // Guarda una lista de nuevos ejercicios en "userMovementPatterns/<dayKey>/userExercises"
-    // usando índices incrementales en vez de push().
-    // ****************************************************************
-    /**
-     * Guarda la lista de ejercicios nuevos tanto en la rama del día (index 0,1,2…)
-     * como en la colección global /userExercises si aún no existen allí.
-     */
-    private void guardarEjerciciosEnFirebase(List<Exercise> exercisesNuevos, String dayKey) {
-
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Log.e(TAG, "❌ Usuario no autenticado. No se guardarán ejercicios en Firebase.");
-            return;
-        }
-
-        String userId = user.getUid();
-
-        DatabaseReference dayExercisesRef = FirebaseDatabase.getInstance()
-                .getReference("users")
-                .child(userId)
-                .child("userMovementPatterns")
-                .child(dayKey)
-                .child("userExercises");
-
-        DatabaseReference globalExercisesRef = FirebaseDatabase.getInstance()
-                .getReference("users")
-                .child(userId)
-                .child("userExercises");
-
-    /* =========================================================
-       1⃣  Lee UNA VEZ los nombres que ya existen en la rama global
-       ========================================================= */
-        globalExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot globalSnap) {
-
-                //  ➡  Conjunto de nombres para evitar duplicados en /userExercises
-                Set<String> nombresGlobales = new HashSet<>();
-                for (DataSnapshot snap : globalSnap.getChildren()) {
-                    String n = snap.child("name").getValue(String.class);
-                    if (n != null) nombresGlobales.add(n);
-                }
-
-            /* =========================================================
-               2⃣  Lee cuántos ejercicios hay ya guardados en el DÍA
-               ========================================================= */
-                dayExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot daySnap) {
-                        long indice = daySnap.getChildrenCount();   // arranca en 0‑based
-
-                    /* =====================================================
-                       3⃣  Recorre los ejercicios recibidos y los escribe
-                       ===================================================== */
-                        for (Exercise ex : exercisesNuevos) {
-
-                            // --- Datos a grabar (usa tu utilitario si lo prefieres) ---
-                            Map<String, Object> exerciseData = new HashMap<>();
-                            exerciseData.put("name",             ex.getName());
-                            exerciseData.put("description",      ex.getDescription());
-                            exerciseData.put("equipmentType",    ex.getEquipmentType());
-                            exerciseData.put("exerciseType",     ex.getExerciseType());
-                            exerciseData.put("loadIntensity",    ex.getLoadIntensity());
-                            exerciseData.put("movementType",     ex.getMovementType());
-                            exerciseData.put("image",            ex.getImage() != null ? ex.getImage() : "");
-                            exerciseData.put("musclesWorked",    ex.getMusclesWorked());
-                            exerciseData.put("synergistMuscles", ex.getSynergistMuscles());
-                            exerciseData.put("series",           3);        // valor por defecto
-
-                            /* ---- 3.a) RAMA DEL DÍA -------------------------------- */
-                            String childKey = String.valueOf(indice);
-                            dayExercisesRef.child(childKey).setValue(exerciseData)
-                                    .addOnSuccessListener(aVoid ->
-                                            Log.d(TAG, "✅ Guardado en " + dayKey
-                                                    + " con key=" + childKey + " → " + ex.getName()))
-                                    .addOnFailureListener(e ->
-                                            Log.e(TAG, "❌ Error al guardar en " + dayKey, e));
-                            indice++;
-
-                            /* ---- 3.b) RAMA GLOBAL (/userExercises) ---------------- */
-                            if (!nombresGlobales.contains(ex.getName())) {
-                                globalExercisesRef.push().setValue(exerciseData)
-                                        .addOnSuccessListener(aVoid ->
-                                                Log.d(TAG, "✅ Añadido a /userExercises → " + ex.getName()))
-                                        .addOnFailureListener(e ->
-                                                Log.e(TAG, "❌ Error al añadir a /userExercises", e));
-                            } else {
-                                Log.d(TAG, "↪ " + ex.getName()
-                                        + " ya existe en /userExercises, no se duplica.");
-                            }
-                        }
-                    }
-
-                    @Override public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e(TAG, "❌ Error al leer ejercicios del día: " + error.getMessage());
-                    }
-                });
-            }
-
-            @Override public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "❌ Error al leer ejercicios globales: " + error.getMessage());
-            }
-        });
     }
 
 
-    // ****************************************************************
-    // Método legacy (por si se usa en otra parte)
-    // ****************************************************************
+
+    public static ExerciseDetailsDialogFragment newInstance(String exerciseId, String dayKey, boolean isFromInternal) {
+        ExerciseDetailsDialogFragment fragment = new ExerciseDetailsDialogFragment();
+        Bundle args = new Bundle();
+        args.putString("exerciseIndex", exerciseId);
+        args.putString("dayKey", dayKey);
+        args.putBoolean("isFromInternal", isFromInternal); // ✅ NUEVO
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+
+
+
+
     public void addSelectedExercise(Exercise exercise, TrainingDay day) {
         Log.d(TAG, "addSelectedExercise: Recibido ejercicio → " + exercise.getName());
 
@@ -589,8 +535,19 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
             Log.d(TAG, "TrainingDetailFragment - finishWorkout: Mostrando diálogo por series incompletas.");
             showIncompleteSeriesDialog(seriesPorEjercicio);
         } else {
-            guardarSeriesYFinalizar(seriesPorEjercicio);
+            new AlertDialog.Builder(requireContext())
+                    .setTitle("¿Actualizar rutina?")
+                    .setMessage("¿Deseas que el número de series se actualice en tu rutina según los cambios hechos hoy?")
+                    .setPositiveButton("Sí, actualizar", (dialog, which) -> {
+                        actualizarConteoSeriesEnFirebase(); // ✅ actualiza series en userMovementPatterns
+                        guardarSeriesYFinalizar(seriesPorEjercicio);
+                    })
+                    .setNegativeButton("No actualizar", (dialog, which) -> {
+                        guardarSeriesYFinalizar(seriesPorEjercicio);
+                    })
+                    .show();
         }
+
     }
 
     // ===========================================================================
@@ -662,116 +619,13 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
 
         btnGuardar.setOnClickListener(v -> {
             Log.d(TAG, "TrainingDetailFragment - showIncompleteSeriesDialog: Usuario confirmó guardado incompleto.");
-            guardarSeriesYFinalizar(seriesPorEjercicio);
+
+            // NUEVO: reindexar antes de guardar series
+            borrarYReindexarEjerciciosEnFirebase(adapter.getPendingDeletionExercises(), () -> {
+                guardarSeriesYFinalizar(seriesPorEjercicio);
+            });
+
             dialog.dismiss();
-        });
-
-        dialog.show();
-    }
-
-    /**
-     * Guarda las series completadas globalmente (users/<uid>/userExercises)
-     * y finaliza el flujo de entrenamiento.
-     */
-    private void guardarSeriesYFinalizar(Map<String, List<ExerciseSeries>> seriesPorEjercicio) {
-        Log.d(TAG, "TrainingDetailFragment - guardarSeriesYFinalizar: Iniciando guardado de series...");
-
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) return;
-
-        DatabaseReference baseRef = FirebaseDatabase.getInstance()
-                .getReference("users")
-                .child(user.getUid())
-                .child("userExercises");
-
-        for (Map.Entry<String, List<ExerciseSeries>> entry : seriesPorEjercicio.entrySet()) {
-            String nombreEjercicio = entry.getKey();
-            List<ExerciseSeries> nuevasSeries = entry.getValue();
-
-            baseRef.orderByChild("name").equalTo(nombreEjercicio)
-                    .addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
-                            for (DataSnapshot snap : snapshot.getChildren()) {
-                                String key = snap.getKey();
-                                DatabaseReference seriesRef = baseRef.child(key).child("seriesData");
-
-                                // Añadir series completadas a la data existente
-                                seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                                    @Override
-                                    public void onDataChange(@NonNull DataSnapshot snapshotPrevias) {
-                                        List<Map<String, Object>> todasLasSeries = new ArrayList<>();
-
-                                        if (snapshotPrevias.exists()) {
-                                            for (DataSnapshot s : snapshotPrevias.getChildren()) {
-                                                todasLasSeries.add((Map<String, Object>) s.getValue());
-                                            }
-                                        }
-
-                                        for (ExerciseSeries serie : nuevasSeries) {
-                                            if (serie.isCompleted()) {
-                                                Map<String, Object> nueva = new HashMap<>();
-                                                nueva.put("seriesNumber", todasLasSeries.size() + 1);
-                                                nueva.put("reps", serie.getReps());
-                                                nueva.put("weight", serie.getWeight());
-                                                nueva.put("rpe", serie.getRpe());
-                                                todasLasSeries.add(nueva);
-                                            }
-                                        }
-
-                                        seriesRef.setValue(todasLasSeries)
-                                                .addOnSuccessListener(aVoid ->
-                                                        Log.d(TAG, "✅ Series guardadas para " + nombreEjercicio))
-                                                .addOnFailureListener(e ->
-                                                        Log.e(TAG, "❌ Error al guardar series", e));
-                                    }
-
-                                    @Override
-                                    public void onCancelled(@NonNull DatabaseError error) {
-                                        Log.e(TAG, "❌ Error al leer series previas", error.toException());
-                                    }
-                                });
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-                            Log.e(TAG, "❌ Error al consultar ejercicio en Firebase", error.toException());
-                        }
-                    });
-        }
-
-        // Actualizar campo "series" en userMovementPatterns/dayKey/userExercises/<exerciseKey>/series
-        actualizarConteoSeriesEnFirebase();
-        seriesSaved = true;
-
-        // Mostrar diálogo final de entrenamiento completado
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_training_finished, null);
-        AlertDialog dialog = new AlertDialog.Builder(requireContext())
-                .setView(dialogView)
-                .create();
-
-        TextView title = dialogView.findViewById(R.id.txtDialogTitle);
-        TextView message = dialogView.findViewById(R.id.txtDialogMessage);
-        Button btnAceptar = dialogView.findViewById(R.id.btnAceptarDialog);
-
-        title.setText("Entrenamiento finalizado");
-        message.setText("Has completado tu entrenamiento en " + formatElapsedTime(pauseOffset) + ".");
-
-        btnAceptar.setOnClickListener(v -> {
-            dialog.dismiss();
-
-            // Por si acaso, volver a actualizar
-            actualizarConteoSeriesEnFirebase();
-            seriesSaved = true;
-
-            // Regresar al Dashboard tras 1 segundo
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                Log.d(TAG, "🏁 Redirigiendo al DashboardWorkoutFragment tras guardado.");
-                ViewPagerActivity activity = (ViewPagerActivity) requireActivity();
-                Bundle data = new Bundle();
-                activity.switchToDashboardWorkoutFragment(data);
-            }, 1000);
         });
 
         dialog.show();
@@ -795,7 +649,10 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
             for (UserExercise exercise : exercises) {
                 final String exerciseName = exercise.getName();
                 final List<ExerciseSeries> listaSeries = adapter.getSeriesListForExercise(exerciseName);
-                final int seriesCount = (listaSeries != null) ? listaSeries.size() : 0;
+                final int seriesCount = (listaSeries != null && !listaSeries.isEmpty())
+                        ? listaSeries.size()
+                        : exercise.getSeries();  // Mantener el valor original si no hay series creadas
+
 
                 exercisesRef.orderByChild("name").equalTo(exerciseName)
 
@@ -830,10 +687,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
 
-    /**
-     * Elimina de Firebase los ejercicios marcados como borrados localmente y luego reindexa
-     * los ejercicios restantes (0, 1, 2, ...). Al finalizar, ejecuta el callback onComplete.
-     */
+
     private void borrarYReindexarEjerciciosEnFirebase(List<UserExercise> exercisesToDelete, Runnable onComplete) {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) {
@@ -858,10 +712,10 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                 return;
             }
 
-            // 2) Reindexar subiendo únicamente los ejercicios "exercises" que queden vivos en el adapter
-            List<UserExercise> remainingExercises = adapter.getExercises();
-            // => estos ya no incluyen los localmente borrados (que están en pendingDeletion)
+            // 2) Reindexar subiendo los ejercicios que permanecen en el adapter
+            List<UserExercise> remainingExercises = adapter.getExercises(); // 🔄 ya está reordenado
 
+            Log.d(TAG, "📦 Reindexando ejercicios en nuevo orden:");
             for (int i = 0; i < remainingExercises.size(); i++) {
                 UserExercise ex = remainingExercises.get(i);
 
@@ -872,15 +726,18 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                 exerciseData.put("exerciseType", ex.getExerciseType());
                 exerciseData.put("loadIntensity", ex.getLoadIntensity());
                 exerciseData.put("movementType", ex.getMovementType());
-                exerciseData.put("image", (ex.getImage() != null ? ex.getImage() : ""));
+                exerciseData.put("image", ex.getImage() != null ? ex.getImage() : "");
                 exerciseData.put("musclesWorked", ex.getMusclesWorked());
                 exerciseData.put("synergistMuscles", ex.getSynergistMuscles());
                 exerciseData.put("series", ex.getSeries());
                 exerciseData.put("weight", ex.getWeight());
                 exerciseData.put("reps", ex.getReps());
                 exerciseData.put("rpe", ex.getRpe());
+                exerciseData.put("isFromInternal", ex.isFromInternal()); // ✅ persistimos si es interno
 
                 String newIndexKey = String.valueOf(i);
+                Log.d(TAG, "🔢 Posición " + i + ": " + ex.getName() + " (isFromInternal=" + ex.isFromInternal() + ")");
+
                 userExercisesRef.child(newIndexKey).setValue(exerciseData)
                         .addOnSuccessListener(aVoid ->
                                 Log.d(TAG, "✅ Reindex: agregado " + ex.getName() + " con key=" + newIndexKey))
@@ -888,11 +745,212 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                                 Log.e(TAG, "❌ Error al reindexar " + ex.getName() + " con key=" + newIndexKey, e));
             }
 
-            Log.d(TAG, "borrarYReindexarEjerciciosEnFirebase: Reindexación finalizada con éxito.");
+            Log.d(TAG, "✅ Reindexación finalizada exitosamente.");
             if (onComplete != null) onComplete.run();
         });
     }
-    // ===============================================================================================
-    // == FIN MOD NUEVA FUNCIONALIDAD ================================================================
-    // ===============================================================================================
+
+    private void guardarSeriesYFinalizar(Map<String, List<ExerciseSeries>> seriesPorEjercicio) {
+        Log.d(TAG, "TrainingDetailFragment - guardarSeriesYFinalizar: Iniciando guardado de series...");
+
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) return;
+
+        DatabaseReference baseRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(user.getUid())
+                .child("userExercises");
+
+        for (Map.Entry<String, List<ExerciseSeries>> entry : seriesPorEjercicio.entrySet()) {
+            String nombreEjercicio = entry.getKey();
+            List<ExerciseSeries> nuevasSeries = entry.getValue();
+
+            baseRef.orderByChild("name").equalTo(nombreEjercicio)
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                            for (DataSnapshot snap : snapshot.getChildren()) {
+                                String key = snap.getKey();
+                                DatabaseReference exerciseRef = baseRef.child(key);
+                                DatabaseReference seriesRef = exerciseRef.child("seriesData");
+
+                                seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                                    @Override
+                                    public void onDataChange(@NonNull DataSnapshot snapshotPrevias) {
+                                        List<Map<String, Object>> todasLasSeries = new ArrayList<>();
+
+                                        if (snapshotPrevias.exists()) {
+                                            for (DataSnapshot s : snapshotPrevias.getChildren()) {
+                                                todasLasSeries.add((Map<String, Object>) s.getValue());
+                                            }
+                                        }
+
+                                        int nuevasCompletadas = 0;
+                                        for (ExerciseSeries serie : nuevasSeries) {
+                                            if (serie.isCompleted()) {
+                                                Map<String, Object> nueva = new HashMap<>();
+                                                nueva.put("seriesNumber", todasLasSeries.size() + 1);
+                                                nueva.put("reps", serie.getReps());
+                                                nueva.put("weight", serie.getWeight());
+                                                nueva.put("rpe", serie.getRpe());
+                                                todasLasSeries.add(nueva);
+                                                nuevasCompletadas++;
+                                            }
+                                        }
+
+                                        if (nuevasCompletadas > 0) {
+                                            Log.d(TAG, "✅ " + nuevasCompletadas + " nuevas series completadas para " + nombreEjercicio +
+                                                    " (Total: " + todasLasSeries.size() + ")");
+
+                                            // Guardar series
+                                            seriesRef.setValue(todasLasSeries)
+                                                    .addOnSuccessListener(aVoid ->
+                                                            Log.d(TAG, "📤 Series guardadas para " + nombreEjercicio))
+                                                    .addOnFailureListener(e ->
+                                                            Log.e(TAG, "❌ Error al guardar series", e));
+
+                                            // Actualizar campo "series"
+                                            exerciseRef.child("series").setValue(todasLasSeries.size())
+                                                    .addOnSuccessListener(aVoid ->
+                                                            Log.d(TAG, "🔥 Actualizado campo 'series' para " + nombreEjercicio + ": " + todasLasSeries.size()))
+                                                    .addOnFailureListener(e ->
+                                                            Log.e(TAG, "❌ Error al actualizar campo 'series'", e));
+
+                                        } else {
+                                            Log.w(TAG, "⚠️ No se completó ninguna serie para " + nombreEjercicio + ". No se actualiza 'series'.");
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onCancelled(@NonNull DatabaseError error) {
+                                        Log.e(TAG, "❌ Error al leer series previas", error.toException());
+                                    }
+                                });
+                            }
+                        }
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError error) {
+                            Log.e(TAG, "❌ Error al consultar ejercicio en Firebase", error.toException());
+                        }
+                    });
+        }
+
+        seriesSaved = true;
+
+        // Mostrar diálogo final
+        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_training_finished, null);
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setView(dialogView)
+                .create();
+
+        TextView title = dialogView.findViewById(R.id.txtDialogTitle);
+        TextView message = dialogView.findViewById(R.id.txtDialogMessage);
+        Button btnAceptar = dialogView.findViewById(R.id.btnAceptarDialog);
+
+        title.setText("Entrenamiento finalizado");
+        message.setText("Has completado tu entrenamiento en " + formatElapsedTime(pauseOffset) + ".");
+
+        btnAceptar.setOnClickListener(v -> {
+            dialog.dismiss();
+
+            actualizarConteoSeriesEnFirebase();  // También actualiza en userMovementPatterns
+            seriesSaved = true;
+
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                Log.d(TAG, "🏁 Redirigiendo al DashboardWorkoutFragment tras guardado.");
+                ViewPagerActivity activity = (ViewPagerActivity) requireActivity();
+                Bundle data = new Bundle();
+                activity.switchToDashboardWorkoutFragment(data);
+            }, 1000);
+        });
+
+        dialog.show();
+    }
+    private void guardarEjerciciosEnFirebase(List<Exercise> exercisesNuevos, String dayKey) {
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            Log.e(TAG, "❌ Usuario no autenticado. No se guardarán ejercicios en Firebase.");
+            return;
+        }
+        String userId = user.getUid();
+
+        DatabaseReference dayExercisesRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(userId)
+                .child("userMovementPatterns")
+                .child(dayKey)
+                .child("userExercises");
+
+        DatabaseReference globalExercisesRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(userId)
+                .child("userExercises");
+
+        // 1⃣ Leemos los nombres ya existentes en /userExercises
+        globalExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override public void onDataChange(@NonNull DataSnapshot globalSnap) {
+                Set<String> nombresGlobales = new HashSet<>();
+                for (DataSnapshot snap : globalSnap.getChildren()) {
+                    String n = snap.child("name").getValue(String.class);
+                    if (n != null) nombresGlobales.add(n);
+                }
+
+                // 2⃣ Leemos cuántos ejercicios ya hay en la rama del día
+                dayExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override public void onDataChange(@NonNull DataSnapshot daySnap) {
+                        long index = daySnap.getChildrenCount();
+
+                        // 3⃣ Recorremos y escribimos cada Exercise
+                        for (Exercise ex : exercisesNuevos) {
+                            Map<String,Object> exerciseData = new HashMap<>();
+                            exerciseData.put("name",             ex.getName());
+                            exerciseData.put("description",      ex.getDescription());
+                            exerciseData.put("equipmentType",    ex.getEquipmentType());
+                            exerciseData.put("exerciseType",     ex.getExerciseType());
+                            exerciseData.put("loadIntensity",    ex.getLoadIntensity());
+                            exerciseData.put("movementType",     ex.getMovementType());
+                            exerciseData.put("image",            ex.getImage() != null ? ex.getImage() : "");
+                            exerciseData.put("musclesWorked",    ex.getMusclesWorked());
+                            exerciseData.put("synergistMuscles", ex.getSynergistMuscles());
+                            // ← ahora usamos el valor real de series
+                            exerciseData.put("series",           ex.getSeries());
+                            // ← y persistimos la bandera interna
+                            exerciseData.put("isFromInternal",   ex.isFromInternal());
+
+                            // 3.a) Guardar en userMovementPatterns/<day>/userExercises
+                            String childKey = String.valueOf(index++);
+                            dayExercisesRef.child(childKey)
+                                    .setValue(exerciseData)
+                                    .addOnSuccessListener(a ->
+                                            Log.d(TAG, "✅ Guardado en " + dayKey
+                                                    + " key=" + childKey + " → " + ex.getName()))
+                                    .addOnFailureListener(e ->
+                                            Log.e(TAG, "❌ Error al guardar en " + dayKey, e));
+
+                            // 3.b) Si no existía en /userExercises, lo añadimos
+                            if (!nombresGlobales.contains(ex.getName())) {
+                                globalExercisesRef.push()
+                                        .setValue(exerciseData)
+                                        .addOnSuccessListener(a ->
+                                                Log.d(TAG, "✅ Añadido a /userExercises → " + ex.getName()))
+                                        .addOnFailureListener(e ->
+                                                Log.e(TAG, "❌ Error al añadir a /userExercises", e));
+                            } else {
+                                Log.d(TAG, "↪ " + ex.getName() + " ya existe en /userExercises");
+                            }
+                        }
+                    }
+                    @Override public void onCancelled(@NonNull DatabaseError e) {
+                        Log.e(TAG, "❌ Error al leer ejercicios del día: " + e.getMessage());
+                    }
+                });
+            }
+            @Override public void onCancelled(@NonNull DatabaseError e) {
+                Log.e(TAG, "❌ Error al leer ejercicios globales: " + e.getMessage());
+            }
+        });
+    }
+
+
 }

@@ -21,6 +21,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -153,20 +154,45 @@ public class AddExerciseDialogFragment extends DialogFragment {
         }
 
         Exercise newExercise = new Exercise();
+
+        // 🔍 Establecer como ejercicio de almacenamiento interno
+
+
         newExercise.setName(exerciseName);
+        newExercise.setFromInternal(true);
+        Log.d("AddExerciseDialogFragment", "📌 Creando ejercicio - isFromInternal(): " + newExercise.isFromInternal());
         newExercise.setEquipmentType(equipmentTypeSpinner.getSelectedItem().toString());
         newExercise.setExerciseType(exerciseTypeSpinner.getSelectedItem().toString());
-        newExercise.setMusclesWorked(musclesWorkedSpinner.getSelectedItem().toString());
+
+        Object selectedMuscle = musclesWorkedSpinner.getSelectedItem();
+        if (selectedMuscle == null) {
+            Toast.makeText(getContext(), "Selecciona al menos un músculo trabajado", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        newExercise.setMusclesWorked(selectedMuscle.toString());
+
         newExercise.setDescription(descriptionEditText.getText().toString());
         newExercise.setMovementType(movementTypeSpinner.getSelectedItem().toString());
 
-        /* patrón de movimiento */
+        // 🔄 Agregar patrón de movimiento
         MovementPattern selectedPattern = new MovementPattern();
         selectedPattern.setName(movementPatternSpinner.getSelectedItem().toString());
         newExercise.getMovementPatterns().add(selectedPattern);
 
-        /* >>> MOD: guardar todas las imágenes seleccionadas <<< */
+        // 🖼️ Agregar imágenes
         newExercise.setImages(imagesBase64);
+
+        // 🧪 LOG resumen del ejercicio antes de guardar
+        Log.d("AddExerciseDialogFragment", "🧾 Resumen ejercicio nuevo:");
+        Log.d("AddExerciseDialogFragment", "🔢 Nombre: " + newExercise.getName());
+        Log.d("AddExerciseDialogFragment", "🏋️ Equipo: " + newExercise.getEquipmentType());
+        Log.d("AddExerciseDialogFragment", "⚙️ Tipo: " + newExercise.getExerciseType());
+        Log.d("AddExerciseDialogFragment", "💪 Músculo: " + newExercise.getMusclesWorked());
+        Log.d("AddExerciseDialogFragment", "📝 Descripción: " + newExercise.getDescription());
+        Log.d("AddExerciseDialogFragment", "🔁 Movimiento: " + newExercise.getMovementType());
+        Log.d("AddExerciseDialogFragment", "📊 Patrón: " + selectedPattern.getName());
+
+        Log.d("AddExerciseDialogFragment", "📌 ¿Desde almacenamiento interno? " + newExercise.isFromInternal());
 
         saveExerciseToInternalStorage(newExercise);
 
@@ -356,7 +382,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
 
     private String encodeImageToBase64(Bitmap bitmap) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream);
+        bitmap.compress(Bitmap.CompressFormat.PNG, 30, byteArrayOutputStream);
         byte[] byteArray = byteArrayOutputStream.toByteArray();
         return Base64.encodeToString(byteArray, Base64.DEFAULT);
     }
