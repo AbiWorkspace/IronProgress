@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -173,7 +174,17 @@ public class MainActivity extends AppCompatActivity {
                     User user = new User();
                     user.setGoal(goal);
                     user.setTrainingFormCompleted(trainingFormCompleted);
-                    user.setUserMovementPatterns(userMovementPatternList);
+                    Map<String, UserMovementPattern> userMovementPatternMap = new HashMap<>();
+                    for (UserMovementPattern pattern : userMovementPatternList) {
+                        String id = pattern.getId() != null && !pattern.getId().isEmpty()
+                                ? pattern.getId()
+                                : UUID.randomUUID().toString(); // Generar ID si no hay
+
+                        userMovementPatternMap.put(id, pattern);
+                    }
+                    user.setUserMovementPatterns(userMovementPatternMap);
+
+
 
                     Log.d(TAG, "✅ Datos del usuario obtenidos correctamente.");
 

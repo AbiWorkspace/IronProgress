@@ -4,7 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="24dp"
+    android:padding="0dp"
+    android:layout_margin="0dp"
     android:background="@drawable/bg_dialog_rounded">
 
     <!-- 🔥 Fila: Título + Estrella -->

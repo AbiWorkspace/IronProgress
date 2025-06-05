@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  res/values/themes_overlay.xml  -->
+<resources>
+
+    <!-- Overlay REAL que usamos en los diálogos Material‑3 -->
+    <style name="ThemeOverlay.Diets.Material3Bridge">
+        <!-- …los tres TextAppearance… -->
+    </style>
+
+    <!-- Alias para mantener compatibilidad con referencias antiguas -->
+    <style name="ThemeOverlay.Diets"
+        parent="ThemeOverlay.Diets.Material3Bridge"/>
+    <!-- ^––– ¡Sin más contenido! -->
+</resources>

@@ -4,9 +4,14 @@ import static android.content.ContentValues.TAG;
 
 import android.util.Log;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.google.firebase.database.IgnoreExtraProperties;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@IgnoreExtraProperties
 public class User {
     // Properties
     private String id;
@@ -35,9 +40,8 @@ public class User {
 
 
     // Nuevas propiedades para ejercicios y patrones de movimiento del usuario
-    private List<UserExercise> userExercises;
-    private List<UserMovementPattern> userMovementPatterns;
-
+    private Map<String, UserExercise> userExercises;
+    private Map<String, UserMovementPattern> userMovementPatterns;
     // Constructor sin argumentos requerido por Firebase
     public User() {
         this.firstTime = true;
@@ -45,14 +49,14 @@ public class User {
         this.proteinToday = 0.0;
         this.fatToday = 0.0;
         this.carbToday = 0.0;
-        this.latitude = 0.0; // Inicialización predeterminada
-        this.longitude = 0.0; // Inicialización predeterminada
-        this.profilePhotoUrl = "default"; // Inicialización predeterminada
-        this.userExercises = new ArrayList<>(); // Inicialización de la lista
-        this.userMovementPatterns = new ArrayList<>(); // Inicialización de la lista
-        this.trainingFormCompleted = false; // Inicialización predeterminada
-
+        this.latitude = 0.0;
+        this.longitude = 0.0;
+        this.profilePhotoUrl = "default";
+        this.userExercises = new HashMap<>(); // cambio aquí 👈
+        this.userMovementPatterns = new HashMap<>(); // cambio aquí 👈
+        this.trainingFormCompleted = false;
     }
+
 
     // Constructor con argumentos
     public User(String firstName, String lastName, String email, String password, int age, double weight, double height, String gender, String activityLevel, String goal) {
@@ -74,24 +78,29 @@ public class User {
         this.latitude = 0.0; // Inicialización predeterminada
         this.longitude = 0.0; // Inicialización predeterminada
         this.profilePhotoUrl = "default"; // Inicialización predeterminada
-        this.userExercises = new ArrayList<>(); // Inicialización de la lista
-        this.userMovementPatterns = new ArrayList<>(); // Inicialización de la lista
+        this.userExercises = new HashMap<>();
+        this.userMovementPatterns = new HashMap<>();
+
         this.trainingFormCompleted = false; // Inicialización predeterminada
 
     }
 
-    // Getters y Setters para las nuevas propiedades
-    public List<UserExercise> getUserExercises() {
+    public Map<String, UserExercise> getUserExercises() {
         return userExercises;
     }
 
-    public void setUserExercises(List<UserExercise> userExercises) {
+    public void setUserExercises(Map<String, UserExercise> userExercises) {
         this.userExercises = userExercises;
     }
 
-    public List<UserMovementPattern> getUserMovementPatterns() {
+    public Map<String, UserMovementPattern> getUserMovementPatterns() {
         return userMovementPatterns;
     }
+
+    public void setUserMovementPatterns(Map<String, UserMovementPattern> userMovementPatterns) {
+        this.userMovementPatterns = userMovementPatterns;
+    }
+
     public boolean isTrainingFormCompleted() {
         return trainingFormCompleted;
     }
@@ -99,9 +108,7 @@ public class User {
     public void setTrainingFormCompleted(boolean trainingFormCompleted) {
         this.trainingFormCompleted = trainingFormCompleted;
     }
-    public void setUserMovementPatterns(List<UserMovementPattern> userMovementPatterns) {
-        this.userMovementPatterns = userMovementPatterns;
-    }
+
 
     // Resto de los getters y setters...
     public String getId() {
@@ -419,6 +426,13 @@ public class User {
     public double calculateCarbs() {
         // Ejemplo: 4 gramos de carbohidratos por kilogramo de peso corporal
         return weight * 4;
+    }
+    public boolean isCutting() {
+        return goal != null && goal.toLowerCase().contains("perder");
+    }
+
+    public boolean isBulking() {
+        return goal != null && goal.toLowerCase().contains("ganar");
     }
 
     public double[] calculateMacros(double weight, String goal, double calories) {

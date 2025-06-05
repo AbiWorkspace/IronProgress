@@ -32,6 +32,18 @@
     </style>
 
 
+    <style name="SectionHeader">
+        <item name="android:textColor">#E63946</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:layout_marginTop">16dp</item>
+    </style>
+
+    <style name="SectionBody">
+        <item name="android:textColor">#DDDDDD</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:layout_marginTop">4dp</item>
+    </style>
 
     <!-- Estilo para Spinner -->
     <style name="Widget.MaterialComponents.Spinner.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
@@ -58,6 +70,9 @@
         <item name="android:textColorPrimary">#FFFFFF</item>
         <item name="android:textColorSecondary">#CCCCCC</item>
         <item name="android:background">?attr/colorSurface</item>
+    </style>
+    <style name="PopupMenuWhiteText" parent="Widget.AppCompat.PopupMenu.Overflow">
+        <item name="android:textColor">#FFFFFF</item>
     </style>
 
 

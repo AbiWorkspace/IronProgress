@@ -1,11 +1,13 @@
 package com.example.diets.fragments; // Cambio lógico en el paquete
 
 import android.os.Bundle;
+import android.text.Html;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -19,9 +21,21 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.diets.R;
+import com.example.diets.adapters.SearchResultAdapter;
 import com.example.diets.dialogs.BarcodeScannerDialog;
 import com.example.diets.dialogs.GramsInputDialog;
+import com.example.diets.dialogs.RecipeDialog;
 import com.example.diets.network.OkHttpSingleton;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+import com.google.mlkit.common.model.DownloadConditions;
+import com.google.mlkit.nl.translate.TranslateLanguage;
+import com.google.mlkit.nl.translate.Translation;
+import com.google.mlkit.nl.translate.Translator;
+import com.google.mlkit.nl.translate.TranslatorOptions;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -43,15 +57,19 @@ public class FoodSearchFragment extends Fragment {
 
     private static final String TAG = "FoodSearchFragment";
 
-    private final List<FoodResult> resultObjects = new ArrayList<>();
-    private final List<String> foodResults = new ArrayList<>();
+
+    public boolean isRecipe = false;
 
     private EditText searchFoodEditText;
     private ListView foodResultsListView;
-    private ArrayAdapter<String> adapter;
+    private final List<FoodResult> resultObjects = new ArrayList<>();
+    private SearchResultAdapter adapter;
+
     private Consumer<FoodResult> onFoodSelected;
     private String currentFilterType = ""; // etiqueta/tag seleccionada
     private String currentFilterTagType = ""; // tagtype_0 como "labels", "ingredients_analysis", etc.
+    private final List<FoodResult> productResults = new ArrayList<>();
+    private final List<FoodResult> recipeResults = new ArrayList<>();
 
     public void setOnFoodSelected(Consumer<FoodResult> listener) {
         Log.d(TAG, "FoodSearchFragment - setOnFoodSelected: Listener establecido");
@@ -97,45 +115,82 @@ public class FoodSearchFragment extends Fragment {
         foodResultsListView = view.findViewById(R.id.foodResultsListView);
         ImageButton searchButton = view.findViewById(R.id.searchButton);
 
-        adapter = new ArrayAdapter<>(requireContext(),
-                R.layout.item_food_result,
-                R.id.textFoodResult,
-                foodResults);
+        adapter = new SearchResultAdapter(requireContext(), resultObjects);
+        foodResultsListView.setAdapter(adapter);
+
 
         foodResultsListView.setAdapter(adapter);
 
         searchFoodEditText.setOnEditorActionListener((v, actionId, event) -> {
-            String query = searchFoodEditText.getText().toString().trim();
-            Log.d(TAG, "FoodSearchFragment - onEditorAction: Búsqueda por teclado → " + query);
-            if (!query.isEmpty()) searchFood(query);
-            return true;
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {          // ⬅️ solo esta acción
+                lanzarBusqueda();
+                return true;
+            }
+            return false;
         });
+        searchButton.setOnClickListener(v -> lanzarBusqueda());
 
-        searchButton.setOnClickListener(v -> {
-            String query = searchFoodEditText.getText().toString().trim();
-            Log.d(TAG, "FoodSearchFragment - onClick: Búsqueda por botón → " + query);
-            if (!query.isEmpty()) searchFood(query);
-        });
+        foodResultsListView.setOnItemClickListener((parent, vw, pos, id) -> {
+            FoodResult sel = resultObjects.get(pos);
 
-        foodResultsListView.setOnItemClickListener((parent, v, position, id) -> {
-            if (onFoodSelected == null || position >= resultObjects.size()) return;
+            /* ===================================================== */
+            /* ================   CASO  RECETA   ==================== */
+            /* ===================================================== */
+            if (sel.isRecipe()) {
 
-            FoodResult selected = resultObjects.get(position);
-            GramsInputDialog dialog = GramsInputDialog.newInstance(
-                    selected,
-                    result -> {
-                        if (onFoodSelected != null) {
-                            onFoodSelected.accept(result);
-                        }
+                /* ①  Preparamos el diálogo y le conectamos el listener  */
+                RecipeDialog dialog = RecipeDialog.newInstance(sel);
+                dialog.setOnGramsConfirmedListener(result -> {
+                    Log.d(TAG, "[FoodSearch] ✅ onGramsConfirmed (recipe) → " + result.name);
+                    if (onFoodSelected != null) onFoodSelected.accept(result);   // <-- redirige al Dashboard
+                });
+
+        /* ②  Mostrar directamente si ya tenemos todos los datos
+              o esperar a que se completen los detalles de TheMealDB */
+                Runnable showDialog = () ->
+                        dialog.show(getParentFragmentManager(), "RecipeDialog");
+
+                if ("Spoonacular".equals(sel.brand) || sel.hasFullDetails()) {
+                    showDialog.run();
+                }
+
+                return;   // 👉 terminamos (no seguimos con producto)
+            }
+
+            /* ===================================================== */
+            /* ================   CASO  PRODUCTO   ================== */
+            /* ===================================================== */
+            GramsInputDialog.newInstance(sel, result -> {
+                // ✅ Detectar si es receta por ingredientes
+                if (result.ingredients != null && !result.ingredients.isEmpty()) {
+                    Log.d(TAG, "✅ Es receta, abriendo showRecipeDialog");
+
+                    Fragment parentFragment = getParentFragment();
+                    if (parentFragment instanceof DashboardFragment) {
+                        ((DashboardFragment) parentFragment).showRecipeDialog(result);
+                    } else {
+                        Log.w(TAG, "⚠️ Parent fragment no es DashboardFragment");
                     }
-            );
-            dialog.show(getParentFragmentManager(), "GramsInputDialog");
+
+                    return; // ⛔️ No continuar con flujo normal
+                }
+
+                // ✅ Si no es receta, se continúa con flujo normal
+                if (onFoodSelected != null) {
+                    onFoodSelected.accept(result);
+                }
+            }).show(getParentFragmentManager(), "GramsInputDialog");
+
 
         });
+
+
+
 
 
         return view;
     }
+
     private Map<String, String[]> getAvailableFilters() {
         Map<String, String[]> filters = new LinkedHashMap<>();
         filters.put("Todos", new String[]{"", ""});
@@ -151,10 +206,15 @@ public class FoodSearchFragment extends Fragment {
         return filters;
     }
 
+
+
+    private void lanzarBusqueda() {
+        String q = searchFoodEditText.getText().toString().trim();
+        if (!q.isEmpty()) searchFood(q);
+    }
     private void searchFoodByBarcode(String barcode) {
         Log.d(TAG, "searchFoodByBarcode: " + barcode);
 
-        foodResults.clear();
         resultObjects.clear();
         adapter.notifyDataSetChanged();
 
@@ -190,10 +250,8 @@ public class FoodSearchFragment extends Fragment {
                 if (name.isEmpty() || kcal <= 0)
                     throw new Exception("Datos insuficientes");
 
-                // 🔥 Crear el objeto alimento
                 FoodResult food = new FoodResult(name, kcal, 0, brand, img, protein, carbs, fat);
 
-                // 🔥 intentar leer porción estándar
                 String servingStr = p.optString("serving_size", "");
                 if (servingStr.endsWith("g") || servingStr.endsWith(" g")) {
                     try {
@@ -202,7 +260,6 @@ public class FoodSearchFragment extends Fragment {
                     } catch (NumberFormatException ignore) {}
                 }
 
-                foodResults.add(name + " (" + kcal + " kcal/100g)");
                 resultObjects.add(food);
 
                 if (isAdded()) requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
@@ -216,15 +273,211 @@ public class FoodSearchFragment extends Fragment {
             }
         }).start();
     }
-
-
     private void searchFood(String query) {
-        Log.d(TAG, "searchFood: Iniciando búsqueda → " + query);
+        Log.d(TAG, "🔍 searchFood → " + query);
 
-        foodResults.clear();
+        // limpiar listas y UI
         resultObjects.clear();
         adapter.notifyDataSetChanged();
+        fetchProductsFromOpenFoodFacts(query);
+        /* 1) RECETAS (Spoonacular) */
+        fetchRecipesFromSpoonacular(query);
 
+
+
+    }
+    private void fetchRecipesFromSpoonacular(String query) {
+        new Thread(() -> {
+            try {
+                final String apiKey = "04e23d7cf29c4324bbba0799fdbfba61";
+                String url = "https://api.spoonacular.com/recipes/complexSearch" +
+                        "?query=" + URLEncoder.encode(query, "UTF-8") +
+                        "&number=30" +
+                        "&addRecipeNutrition=true" +   // 👈 ESTO incluye macros
+                        "&instructionsRequired=true" +
+                        "&fillIngredients=true" +
+                        "&apiKey=" + apiKey;
+
+                Log.d(TAG, "🌐 Spoonacular RECIPES → " + url);
+
+                OkHttpClient client = OkHttpSingleton.get();
+                Response rsp = client.newCall(new Request.Builder().url(url).build()).execute();
+                Log.d(TAG, "↩️ HTTP " + rsp.code());
+
+                if (!rsp.isSuccessful()) throw new IOException("HTTP " + rsp.code());
+
+                JSONArray results = new JSONObject(rsp.body().string()).optJSONArray("results");
+                Log.d(TAG, "🍽 recetas recibidas: " + (results != null ? results.length() : 0));
+                if (results == null || results.length() == 0) return;
+
+                for (int i = 0; i < results.length(); i++) {
+                    JSONObject r = results.getJSONObject(i);
+
+                    String id = r.optString("id", "");
+                    String name = r.optString("title", "Receta sin nombre");
+                    String img = r.optString("image", "");
+                    String instr = r.optString("instructions", "");
+
+                    if (instr.isEmpty()) {
+                        JSONArray analyzed = r.optJSONArray("analyzedInstructions");
+                        if (analyzed != null && analyzed.length() > 0) {
+                            JSONArray steps = analyzed.getJSONObject(0).optJSONArray("steps");
+                            if (steps != null) {
+                                StringBuilder sb = new StringBuilder();
+                                for (int s = 0; s < steps.length(); s++) {
+                                    JSONObject st = steps.getJSONObject(s);
+                                    sb.append(st.optInt("number"))
+                                            .append(". ")
+                                            .append(st.optString("step"))
+                                            .append("\n");
+                                }
+                                instr = sb.toString().trim();
+                            }
+                        }
+                    }
+                    if (!instr.isEmpty()) {
+                        instr = Html.fromHtml(instr, Html.FROM_HTML_MODE_LEGACY).toString();
+                    }
+
+                    // 🔸 Ingredientes
+                    List<String> ings = new ArrayList<>();
+                    JSONArray extIng = r.optJSONArray("extendedIngredients");
+                    if (extIng != null) {
+                        for (int j = 0; j < extIng.length(); j++) {
+                            String ing = extIng.getJSONObject(j).optString("original", "");
+                            if (!ing.isEmpty()) ings.add(ing);
+                        }
+                    }
+
+                    // 🔸 Macros
+                    double kcal = -1, protein = -1, carbs = -1, fat = -1;
+                    JSONObject nutrition = r.optJSONObject("nutrition");
+                    if (nutrition != null) {
+                        JSONArray nutrients = nutrition.optJSONArray("nutrients");
+                        if (nutrients != null) {
+                            for (int n = 0; n < nutrients.length(); n++) {
+                                JSONObject nut = nutrients.getJSONObject(n);
+                                String nutName = nut.optString("name", "").toLowerCase(Locale.ROOT);
+                                double amount = nut.optDouble("amount", -1);
+                                String unit = nut.optString("unit", "").toLowerCase(Locale.ROOT);
+
+                                if (amount < 0 || unit.isEmpty()) continue;
+
+                                switch (nutName) {
+                                    case "calories":
+                                        kcal = amount;
+                                        break;
+                                    case "protein":
+                                        if (unit.equals("g")) protein = amount;
+                                        break;
+                                    case "fat":
+                                        if (unit.equals("g")) fat = amount;
+                                        break;
+                                    case "carbohydrates":
+                                        if (unit.equals("g")) carbs = amount;
+                                        break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (kcal <= 0) {
+                        Log.w(TAG, "⚠️ Receta ignorada (sin kcal): " + name);
+                        continue;
+                    }
+
+                    // Garantiza que no vayan nulos
+                    protein = Math.max(0, protein);
+                    carbs = Math.max(0, carbs);
+                    fat = Math.max(0, fat);
+
+                    FoodResult rec = new FoodResult(id, name, kcal, "Spoonacular", img, instr, ings);
+                    rec.type = "receta";
+                    rec.protein = protein;
+                    rec.carbs = carbs;
+                    rec.fat = fat;
+                    rec.idMeal = id;
+
+                    Log.d(TAG, String.format(Locale.getDefault(),
+                            "✅ Receta: %s | kcal=%.0f | P=%.1f | C=%.1f | F=%.1f",
+                            name, kcal, protein, carbs, fat));
+
+                    translateRecipeFields(rec, () -> {
+                        resultObjects.add(rec);
+                        if (isAdded()) {
+                            requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
+                        }
+                    });
+                }
+
+            } catch (Exception e) {
+                Log.e(TAG, "❌ Error recetas Spoonacular", e);
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() ->
+                            Toast.makeText(getContext(), "Error al buscar recetas en Spoonacular", Toast.LENGTH_SHORT).show());
+                }
+            }
+        }).start();
+    }
+
+
+    private void translateRecipeFields(FoodResult recipe, Runnable onDone) {
+        TranslatorOptions opts = new TranslatorOptions.Builder()
+                .setSourceLanguage(TranslateLanguage.ENGLISH)
+                .setTargetLanguage(TranslateLanguage.SPANISH)
+                .build();
+        Translator translator = Translation.getClient(opts);
+
+        DownloadConditions cond = new DownloadConditions.Builder()
+                .requireWifi()
+                .build();
+
+        translator.downloadModelIfNeeded(cond)
+                .addOnSuccessListener(unused -> {
+                    List<String> translatedIngredients = new ArrayList<>();
+
+                    // Traducir nombre
+                    translator.translate(recipe.name)
+                            .addOnSuccessListener(translatedName -> recipe.name = translatedName);
+
+                    // Traducir instrucciones
+                    translator.translate(recipe.instructions)
+                            .addOnSuccessListener(translatedInstr -> recipe.instructions = translatedInstr);
+
+                    // Traducir ingredientes uno a uno
+                    for (String ing : recipe.ingredients) {
+                        translator.translate(ing)
+                                .addOnSuccessListener(translated -> {
+                                    translatedIngredients.add(translated);
+                                    if (translatedIngredients.size() == recipe.ingredients.size()) {
+                                        recipe.ingredients = translatedIngredients;
+                                        onDone.run();
+                                        translator.close();
+                                    }
+                                })
+                                .addOnFailureListener(e -> {
+                                    translatedIngredients.add(ing); // fallback
+                                    if (translatedIngredients.size() == recipe.ingredients.size()) {
+                                        recipe.ingredients = translatedIngredients;
+                                        onDone.run();
+                                        translator.close();
+                                    }
+                                });
+                    }
+
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "⚠️ Traducción fallida, se mantiene en EN");
+                    onDone.run();
+                    translator.close();
+                });
+    }
+
+
+
+
+
+    private void fetchProductsFromOpenFoodFacts(String query) {
         new Thread(() -> {
             try {
                 String baseUrl = "https://world.openfoodfacts.org/cgi/search.pl";
@@ -262,30 +515,16 @@ public class FoodSearchFragment extends Fragment {
                 JSONObject json = new JSONObject(res.body().string());
                 JSONArray products = json.optJSONArray("products");
 
-                if (products == null || products.length() == 0) {
-                    if (isAdded()) requireActivity().runOnUiThread(() ->
-                            Toast.makeText(getContext(),
-                                    "No se encontraron alimentos para esa búsqueda.",
-                                    Toast.LENGTH_SHORT).show());
-                    return;
-                }
-
-                List<FoodResult> direct = new ArrayList<>();
-                List<FoodResult> related = new ArrayList<>();
+                if (products == null || products.length() == 0) return;
 
                 String q = query.toLowerCase(Locale.ROOT);
-
                 for (int i = 0; i < products.length(); i++) {
                     JSONObject p = products.getJSONObject(i);
-
                     String name = p.optString("product_name_es", p.optString("product_name", ""));
                     String nameLower = name.toLowerCase(Locale.ROOT);
 
-                    // Filtrar productos que expresamente son "sin huevo", "egg-free", etc.
                     if (nameLower.contains("sin " + q) || nameLower.contains("without " + q) ||
-                            nameLower.contains("egg-free") || nameLower.contains("sin huevo")) {
-                        continue;
-                    }
+                            nameLower.contains("egg-free") || nameLower.contains("sin huevo")) continue;
 
                     String brand = p.optString("brands", "Sin marca");
                     String imageUrl = p.optString("image_front_url", "");
@@ -299,18 +538,18 @@ public class FoodSearchFragment extends Fragment {
                     double fat = n.optDouble("fat_100g", 0);
                     if (kcal <= 0) continue;
 
-                    // Evaluar coincidencia en categorías e ingredientes
-                    JSONArray catArr = p.optJSONArray("categories_tags");
-                    String categories = catArr != null ? catArr.toString().toLowerCase(Locale.ROOT) : "";
                     String ingredientsText = p.optString("ingredients_text", "").toLowerCase(Locale.ROOT);
 
-                    boolean strongMatch = nameLower.contains(q) || nameLower.contains("egg") || nameLower.contains("eggs");
-                    boolean relatedMatch = categories.contains(q) || categories.contains("egg") ||
-                            ingredientsText.contains(q) || ingredientsText.contains("egg");
+                    boolean strongMatch = nameLower.contains(q);
+                    boolean relatedMatch = ingredientsText.contains(q);
 
                     if (!strongMatch && !relatedMatch) continue;
 
-                    FoodResult food = new FoodResult(name, kcal, 0, brand, imageUrl, protein, carbs, fat);
+                    FoodResult food = new FoodResult(
+                            name, kcal, 0, brand, imageUrl, protein, carbs, fat);
+
+                    /* NUEVO  ✅ */
+                    food.type = "producto";     // asegura que siempre sea tratado como producto
 
                     String servingStr = p.optString("serving_size", "");
                     if (servingStr.endsWith("g") || servingStr.endsWith(" g")) {
@@ -320,89 +559,19 @@ public class FoodSearchFragment extends Fragment {
                         } catch (NumberFormatException ignore) {}
                     }
 
-                    if (strongMatch) {
-                        direct.add(food);
-                    } else {
-                        related.add(food);
-                    }
-                }
-
-                resultObjects.addAll(direct);
-                resultObjects.addAll(related);
-                for (FoodResult f : direct) {
-                    foodResults.add(f.name + " (" + f.kcalPer100g + " kcal/100g)");
-                }
-                for (FoodResult f : related) {
-                    foodResults.add(f.name + " (" + f.kcalPer100g + " kcal/100g)");
+                    resultObjects.add(food);
                 }
 
                 if (isAdded()) requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
 
-
             } catch (Exception e) {
-                Log.e(TAG, "❌ Error buscando alimento", e);
+                Log.e(TAG, "❌ Error buscando producto", e);
                 if (isAdded()) requireActivity().runOnUiThread(() ->
-                        Toast.makeText(getContext(),
-                                "Error de conexión. Intenta de nuevo.",
-                                Toast.LENGTH_SHORT).show());
+                        Toast.makeText(getContext(), "Error al buscar productos.", Toast.LENGTH_SHORT).show());
             }
         }).start();
     }
 
-
-    private void parseAndPopulate(String jsonStr) throws Exception {
-        JSONObject json = new JSONObject(jsonStr);
-        JSONArray products = json.optJSONArray("products");
-
-        if (products == null || products.length() == 0) {
-            if (isAdded()) requireActivity().runOnUiThread(() ->
-                    Toast.makeText(getContext(),
-                            "No se encontraron alimentos para esa búsqueda.",
-                            Toast.LENGTH_SHORT).show());
-            return;
-        }
-
-        for (int i = 0; i < products.length(); i++) {
-            JSONObject p = products.getJSONObject(i);
-            String name = p.optString("product_name_es", p.optString("product_name", ""));
-            String brand = p.optString("brands", "Sin marca");
-            String imageUrl = p.optString("image_front_url", "");
-
-            JSONObject n = p.optJSONObject("nutriments");
-
-            if (name.isEmpty() || n == null) {
-                Log.w(TAG, "parseAndPopulate: Producto sin nombre o sin 'nutriments', omitido.");
-                continue;
-            }
-
-            double kcal = n.optDouble("energy-kcal_100g", -1);
-            double protein = n.optDouble("proteins_100g", 0);
-            double carbs = n.optDouble("carbohydrates_100g", 0);
-            double fat = n.optDouble("fat_100g", 0);
-
-            if (kcal <= 0) {
-                Log.w(TAG, "parseAndPopulate: Producto con kcal <= 0, omitido → " + name);
-                continue;
-            }
-
-            // 🔥 Crear el objeto alimento
-            FoodResult food = new FoodResult(name, kcal, 0, brand, imageUrl, protein, carbs, fat);
-
-            // 🔥 intentar leer porción estándar
-            String servingStr = p.optString("serving_size", "");
-            if (servingStr.endsWith("g") || servingStr.endsWith(" g")) {
-                try {
-                    double g = Double.parseDouble(servingStr.replace("g", "").trim());
-                    food.portions.add(new FoodResult.Portion("Porción estándar", g));
-                } catch (NumberFormatException ignore) {}
-            }
-
-            foodResults.add(name + " (" + kcal + " kcal/100g)");
-            resultObjects.add(food);
-        }
-
-        if (isAdded()) requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
-    }
 
     public static class FoodResult implements java.io.Serializable {
 
@@ -416,6 +585,7 @@ public class FoodSearchFragment extends Fragment {
             }
         }
 
+        public String idMeal = "";
         public String name;
         public double kcalPer100g;
         public double grams;
@@ -424,10 +594,48 @@ public class FoodSearchFragment extends Fragment {
         public double protein;
         public double carbs;
         public double fat;
+        public String type = "producto"; // 🔥 "producto" o "receta"
         public List<Portion> portions = new ArrayList<>();
+        public String instructions = "";
+        public List<String> ingredients = new ArrayList<>();
 
-        public FoodResult() {
-            // Constructor vacío para asignaciones posteriores
+        public FoodResult() {}
+
+        public FoodResult(String idMeal,
+                          String name,
+                          double kcalPer100g,
+                          String brand,
+                          String imageUrl,
+                          String instructions,
+                          List<String> ingredients) {
+            this.idMeal = idMeal;
+            this.name = name;
+            this.kcalPer100g = kcalPer100g;
+            this.brand = brand;
+            this.imageUrl = imageUrl;
+            this.instructions = instructions;
+            this.ingredients = ingredients;
+            this.type = "receta";
+        }
+
+        public FoodResult(String name,
+                          double kcalPer100g,
+                          double grams,
+                          String brand,
+                          String imageUrl,
+                          double protein,
+                          double carbs,
+                          double fat,
+                          String type) {
+            this.name = name;
+            this.kcalPer100g = kcalPer100g;
+            this.grams = grams;
+            this.brand = brand;
+            this.imageUrl = imageUrl;
+            this.protein = protein;
+            this.carbs = carbs;
+            this.fat = fat;
+            this.type = type;
         }
 
         public FoodResult(String name,
@@ -438,14 +646,25 @@ public class FoodSearchFragment extends Fragment {
                           double protein,
                           double carbs,
                           double fat) {
-            this.name = name;
-            this.kcalPer100g = kcalPer100g;
-            this.grams = grams;
-            this.brand = brand;
-            this.imageUrl = imageUrl;
-            this.protein = protein;
-            this.carbs = carbs;
-            this.fat = fat;
+            this(name, kcalPer100g, grams, brand, imageUrl, protein, carbs, fat, "producto");
+        }
+        public boolean hasFullDetails() {
+            return !TextUtils.isEmpty(instructions) && !ingredients.isEmpty();
+        }
+
+
+        public static FoodResult fromSearch(JSONObject meal) {
+            String id = meal.optString("idMeal");
+            String name = meal.has("strMealES") && !meal.isNull("strMealES")
+                    ? meal.optString("strMealES")
+                    : meal.optString("strMeal");
+
+            String image = meal.optString("strMealThumb");
+            return new FoodResult(id, name, 250, "TheMealDB", image, "", new ArrayList<>());
+        }
+
+        public boolean isRecipe() {
+            return "receta".equalsIgnoreCase(type);
         }
     }
 

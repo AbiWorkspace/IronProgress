@@ -12,5 +12,6 @@
     <string name="default_notification_channel_id">default_channel</string>
     <string name="default_web_client_id">tu-cliente-web-id.apps.googleusercontent.com</string>
     <string name="barcode_search">Buscar por código de barras</string>
+    <string name="fav">Marcar como favorito</string>
 
 </resources>

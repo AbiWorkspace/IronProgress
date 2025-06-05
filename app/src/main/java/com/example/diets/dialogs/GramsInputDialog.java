@@ -75,13 +75,18 @@ public class GramsInputDialog extends DialogFragment {
         super.onStart();
         Dialog dialog = getDialog();
         if (dialog != null && dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            // Esto es lo ÚNICO que importa: fondo transparente global
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+
             WindowManager.LayoutParams params = dialog.getWindow().getAttributes();
             params.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.90);
             params.height = WindowManager.LayoutParams.WRAP_CONTENT;
             dialog.getWindow().setAttributes(params);
         }
     }
+
+
+
     public void setOnFavoriteStatusChangedListener(FavoritesFoodFragment.OnFavoriteStatusChangedListener listener) {
         this.favoriteStatusListener = listener;
     }

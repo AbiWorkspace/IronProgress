@@ -11,43 +11,50 @@ import com.example.diets.R;
 import com.example.diets.model.WeightRecord;
 
 import java.util.List;
+import java.util.Locale;
 
-public class WeightAdapter extends RecyclerView.Adapter<WeightAdapter.WeightViewHolder> {
+public class WeightAdapter
+        extends RecyclerView.Adapter<WeightAdapter.WeightViewHolder> {
 
-    private final List<WeightRecord> weightRecords;
+    public interface OnEditRequested {
+        void onEdit(WeightRecord record, int position);
+    }
 
-    public WeightAdapter(List<WeightRecord> weightRecords) {
-        this.weightRecords = weightRecords;
+    private final List<WeightRecord> data;
+    private final OnEditRequested listener;
+
+    public WeightAdapter(List<WeightRecord> data, OnEditRequested l) {
+        this.data = data;
+        this.listener = l;
     }
 
     @NonNull
     @Override
-    public WeightViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_weight_record, parent, false);
-        return new WeightViewHolder(view);
+    public WeightViewHolder onCreateViewHolder(@NonNull ViewGroup p, int vType) {
+        View v = LayoutInflater.from(p.getContext())
+                .inflate(R.layout.item_weight_record, p, false);
+        return new WeightViewHolder(v);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull WeightViewHolder holder, int position) {
-        WeightRecord record = weightRecords.get(position);
-        holder.weightText.setText("Peso: " + record.getWeight() + " kg");
-        holder.dateText.setText("Fecha: " + record.getDate());
+    public void onBindViewHolder(@NonNull WeightViewHolder h, int pos) {
+        WeightRecord r = data.get(pos);
+        h.weightText.setText(String.format(Locale.getDefault(),"%.1f kg", r.getWeight()));
+        h.kcalText.setText(String.format(Locale.getDefault(),"%.0f kcal", r.getCalories()));
+        h.dateText.setText(r.getDate());
+
+        h.itemView.setOnClickListener(v -> listener.onEdit(r, pos));
     }
 
-    @Override
-    public int getItemCount() {
-        return weightRecords.size();
-    }
+    @Override public int getItemCount() { return data.size(); }
 
     static class WeightViewHolder extends RecyclerView.ViewHolder {
-        TextView weightText, dateText;
-
-        public WeightViewHolder(@NonNull View itemView) {
-            super(itemView);
-            weightText = itemView.findViewById(R.id.weightText);
-            dateText = itemView.findViewById(R.id.dateText);
+        TextView weightText, kcalText, dateText;
+        WeightViewHolder(@NonNull View v) {
+            super(v);
+            weightText = v.findViewById(R.id.weightText);
+            kcalText   = v.findViewById(R.id.kcalText);
+            dateText   = v.findViewById(R.id.dateText);
         }
     }
-
-
 }

@@ -5,7 +5,7 @@
     android:background="@color/backgroundDark"
     android:padding="16dp">
 
-
+    <!-- Scroll principal -->
     <ScrollView
         android:id="@+id/scrollContainer"
         android:layout_width="match_parent"
@@ -16,7 +16,9 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="32dp"
+            android:clipToPadding="false">
 
             <!-- Título -->
             <TextView
@@ -24,32 +26,38 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Gestión del Peso"
-                android:textSize="24sp"
+                android:textSize="26sp"
                 android:textColor="@color/white"
                 android:textStyle="bold"
-                android:gravity="center" />
+                android:gravity="center"
+                android:layout_marginBottom="16dp" />
 
-            <!-- Peso -->
+            <!-- Campo de peso -->
             <EditText
                 android:id="@+id/weightInput"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="Ingresa tu peso (kg)"
                 android:inputType="numberDecimal"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:backgroundTint="@color/dark_gray"
+                android:background="@drawable/edittext_background"
+                android:padding="12dp"
                 android:textColor="@color/white"
                 android:textColorHint="@color/hintColor" />
 
-            <!-- Botón fecha -->
+            <!-- Botón seleccionar fecha -->
             <Button
                 android:id="@+id/selectDateButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Seleccionar Fecha"
+                android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:backgroundTint="@color/colorAccent"
-                android:layout_marginTop="8dp" />
+                android:layout_marginTop="12dp"
+                android:paddingHorizontal="24dp"
+                android:paddingVertical="10dp" />
 
             <!-- Fecha seleccionada -->
             <TextView
@@ -58,23 +66,42 @@
                 android:layout_height="wrap_content"
                 android:text="Fecha seleccionada: "
                 android:textColor="@color/white"
+                android:textSize="14sp"
                 android:layout_marginTop="8dp" />
 
-            <!-- ───── NUEVOS INDICADORES SEMANALES ───── -->
+            <!-- Indicadores -->
+            <View android:layout_height="1dp" android:layout_width="match_parent" android:background="@color/dark_gray" android:layout_marginTop="16dp" />
+
             <TextView
                 android:id="@+id/avgCalText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Calorías medias 7d: —"
+                android:text="Calorías medias (7 días): —"
                 android:textColor="@color/white"
                 android:textSize="16sp"
-                android:layout_marginTop="8dp" />
+                android:layout_marginTop="12dp" />
+
+            <TextView
+                android:id="@+id/avgCalPrevText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Calorías semana previa: —"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
 
             <TextView
                 android:id="@+id/avgWeightText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Peso medio 7d: —"
+                android:text="Peso medio (7 días): —"
+                android:textColor="@color/white"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/predictedText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Peso esperado: —"
                 android:textColor="@color/white"
                 android:textSize="16sp" />
 
@@ -83,39 +110,43 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="—"
-                android:textColor="@color/white"
+                android:textColor="@color/colorAccent"
                 android:textStyle="bold"
                 android:textSize="18sp"
-                android:layout_marginBottom="8dp" />
-            <!-- ──────────────────────────────────────── -->
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp" />
 
-            <!-- Gráfica -->
+            <!-- Gráfica de peso -->
             <com.github.mikephil.charting.charts.LineChart
                 android:id="@+id/weightChart"
                 android:layout_width="match_parent"
                 android:layout_height="300dp"
-                android:layout_marginTop="16dp" />
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
 
-            <!-- Guardar -->
+            <!-- Botón guardar peso -->
             <Button
                 android:id="@+id/saveWeightButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Guardar Peso"
+                android:textAllCaps="false"
                 android:textColor="@color/white"
                 android:backgroundTint="@color/colorAccent"
-                android:layout_marginTop="16dp" />
+                android:layout_marginTop="12dp"
+                android:paddingVertical="10dp" />
 
-            <!-- Lista -->
+            <!-- Lista histórica -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/weightRecyclerView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp" />
-
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="32dp" />
         </LinearLayout>
     </ScrollView>
 
+    <!-- Bottom Navigation -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
@@ -123,8 +154,7 @@
         android:layout_alignParentBottom="true"
         android:background="@color/backgroundDark"
         android:elevation="8dp"
-        app:itemIconTint="@color/red"
-        app:itemTextColor="@color/red"
+        app:itemIconTint="@color/colorAccent"
+        app:itemTextColor="@color/colorAccent"
         app:menu="@menu/bottom_navigation_menu" />
-
 </RelativeLayout>

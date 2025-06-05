@@ -10,7 +10,7 @@
     android:layout_marginHorizontal="12dp"
     android:elevation="4dp">
 
-    <!-- Cabecera de título y botón eliminar -->
+    <!-- Título + botón menú -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -40,8 +40,7 @@
             android:tint="#E63946" />
     </LinearLayout>
 
-    <!-- ⬇️ Mover el resumen nutricional AQUÍ, fuera del layout horizontal -->
-    <!-- Resumen nutricional distribuido horizontalmente -->
+    <!-- Resumen nutricional -->
     <LinearLayout
         android:id="@+id/nutritionSummaryContainer"
         android:layout_width="match_parent"
@@ -95,18 +94,43 @@
             android:gravity="end" />
     </LinearLayout>
 
+    <!-- Etiqueta productos -->
+    <TextView
+        android:id="@+id/labelProductos"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Productos"
+        android:textStyle="bold"
+        android:paddingTop="8dp"
+        android:textColor="#FFFFFF" />
 
-
-    <!-- Contenedor de alimentos -->
+    <!-- Recycler productos -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerFoodItems"
+        android:id="@+id/rvProducts"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="4dp"
         android:nestedScrollingEnabled="false" />
 
+    <!-- Etiqueta recetas -->
+    <TextView
+        android:id="@+id/labelRecetas"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Recetas"
+        android:textStyle="bold"
+        android:paddingTop="8dp"
+        android:textColor="#FFFFFF" />
 
-    <!-- Botón para añadir alimentos -->
+    <!-- Recycler recetas -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvRecipes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:nestedScrollingEnabled="false" />
+
+    <!-- Botón añadir alimento -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

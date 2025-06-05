@@ -12,26 +12,25 @@ public final class OkHttpSingleton {
 
     /** Cliente único y reutilizable para toda la app */
     private static final OkHttpClient INSTANCE = new OkHttpClient.Builder()
-            /* ─ timeouts más holgados ─ */
-            .connectTimeout(15, TimeUnit.SECONDS)   // abrir socket
-            .readTimeout(45,   TimeUnit.SECONDS)    // recibir cada bloque
-            .callTimeout(50,   TimeUnit.SECONDS)    // toda la llamada
+            .connectTimeout(15, TimeUnit.SECONDS)   // ⏱ abrir conexión
+            .readTimeout(45, TimeUnit.SECONDS)      // ⏱ esperar respuesta
+            .callTimeout(50, TimeUnit.SECONDS)      // ⏱ tiempo total permitido
 
-            /* ─ reintento en fallos transitorios + back-off exponencial ─ */
-            .addInterceptor(new RetryInterceptor(3, 1_000)) // 3 intentos, 1 s → 2 s → 4 s
+            .addInterceptor(new RetryInterceptor(3, 1000)) // 🔁 Reintentos con back-off (1s, 2s, 4s)
 
-            /* ─ encabezado User-Agent en cada request ─ */
-            .addInterceptor(chain -> chain.proceed(
-                    chain.request()
-                            .newBuilder()
-                            .header("User-Agent", "IronProgressApp/1.0 (Android)")
-                            .build()))
+            .addInterceptor(chain -> {
+                Request request = chain.request()
+                        .newBuilder()
+                        .header("User-Agent", "IronProgressApp/1.0 (Android)")
+                        .build();
+                return chain.proceed(request);
+            })
 
-            /* mantener reintentos de OkHttp por error IO */
             .retryOnConnectionFailure(true)
             .build();
 
     public static OkHttpClient get() { return INSTANCE; }
+
     private OkHttpSingleton() {}
 }
 
@@ -56,12 +55,16 @@ class RetryInterceptor implements Interceptor {
             } catch (IOException e) {
                 lastException = e;
                 tryCount++;
+
                 if (tryCount >= maxRetries) break;
 
-                long sleep = baseDelayMs * (1L << (tryCount - 1)); // 1s, 2s, 4s…
-                try { Thread.sleep(sleep); } catch (InterruptedException ignored) {}
+                long sleep = baseDelayMs * (1L << (tryCount - 1)); // 1s, 2s, 4s
+                try {
+                    Thread.sleep(sleep);
+                } catch (InterruptedException ignored) {}
             }
         }
-        throw lastException != null ? lastException : new IOException("Unknown network error");
+
+        throw lastException != null ? lastException : new IOException("❌ Error de red desconocido tras múltiples intentos.");
     }
 }
