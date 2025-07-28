@@ -1,6 +1,10 @@
 package com.example.diets.model;
 
 import android.util.Log;
+
+import androidx.annotation.NonNull;
+
+import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.Exclude;
 import com.google.firebase.database.PropertyName;
@@ -28,6 +32,11 @@ public class UserExercise extends Exercise implements Serializable {
     private String exerciseName;
     private boolean isFromInternal;
     // Constructor que copia todos los campos de Exercise al nuevo UserExercise
+    private boolean sugerenciasAplicadas = false;
+    public boolean isSugerenciasAplicadas()      { return sugerenciasAplicadas; }
+    public void     setSugerenciasAplicadas(boolean v){ sugerenciasAplicadas = v; }
+
+
     public UserExercise(Exercise exercise) {
         // 1) Llamada a super(...) como PRIMERA instrucción
         super(
@@ -39,11 +48,12 @@ public class UserExercise extends Exercise implements Serializable {
                 exercise.getLoadIntensity(),
                 exercise.getImage(),
                 exercise.getDescription(),
-                exercise.getMovementType(),
+                exercise.getMovementType(),   // ← AQUÍ
                 safeConvertToList(exercise.getSynergistMuscles()),
                 safeConvertToList(exercise.getGoals()),
                 safeConvertToMovementPatternList(exercise.getMovementPatterns())
         );
+
 
         // 2) Luego podemos hacer logs acerca de 'exercise'
         Log.d("UserExercise", ">>> [CONSTRUCTOR] Recibimos un Exercise con:");
@@ -132,7 +142,29 @@ public class UserExercise extends Exercise implements Serializable {
         Log.d("UserExercise", "setFamiliarity() llamado: " + familiarity);
         this.familiarity = familiarity;
     }
+    public void hydrateFromSnapshot(@NonNull DataSnapshot snap) {
 
+        // Campos simples -------------------------------------------------------
+        setDescription      (snap.child("description")   .getValue(String.class));
+        setEquipmentType    (snap.child("equipmentType") .getValue(String.class));
+        setExerciseType     (snap.child("exerciseType")  .getValue(String.class));
+        setLoadIntensity    (snap.child("loadIntensity") .getValue(String.class));
+        setMovementType     (snap.child("movementType")  .getValue(String.class));
+        setMusclesWorked    (snap.child("musclesWorked") .getValue(String.class));
+        setImage            (snap.child("image")         .getValue(String.class));
+
+        // Lista de músculos sinérgicos ----------------------------------------
+        List<String> sinergias = new ArrayList<>();
+        for (DataSnapshot m : snap.child("synergistMuscles").getChildren()) {
+            String s = m.getValue(String.class);
+            if (s != null) sinergias.add(s);
+        }
+        setSynergistMuscles(sinergias);
+
+        // IMPORTANTE: el nombre se serializa con la key "name"
+        // - Asegúrate de que el campo exerciseName queda lleno.
+        setExerciseName(snap.child("name").getValue(String.class));
+    }
     public double getWeight() {
         Log.d("UserExercise", "getWeight() llamado: " + weight);
         return weight;
@@ -229,8 +261,14 @@ public class UserExercise extends Exercise implements Serializable {
         Log.e("UserExercise", "safeConvertToList() - Objeto no reconocido, devolviendo lista vacía.");
         return new ArrayList<>();
     }
+    private String firebaseKey;
+
+    public String getFirebaseKey() { return firebaseKey; }
+    public void setFirebaseKey(String firebaseKey) { this.firebaseKey = firebaseKey; }
 
     private static List<MovementPattern> safeConvertToMovementPatternList(Object obj) {
+
+        /* 1⃣  Caso habitual: lista de mapas -------------------------------------------------- */
         if (obj instanceof List) {
             List<MovementPattern> movementPatterns = new ArrayList<>();
             for (Object item : (List<?>) obj) {
@@ -238,10 +276,32 @@ public class UserExercise extends Exercise implements Serializable {
                     movementPatterns.add(mapToMovementPattern((Map<String, Object>) item));
                 }
             }
-            Log.d("UserExercise", "safeConvertToMovementPatternList() - Lista convertida con tamaño: " + movementPatterns.size());
+            Log.d("UserExercise",
+                    "safeConvertToMovementPatternList() - Lista convertida con tamaño: "
+                            + movementPatterns.size());
             return movementPatterns;
         }
-        Log.e("UserExercise", "safeConvertToMovementPatternList() - Objeto no reconocido, devolviendo lista vacía.");
+
+        /* 2⃣  NUEVO: el campo vino como String (“Dominante de rodilla”, etc.) --------------- */
+        if (obj instanceof String) {
+            String name = ((String) obj).trim();
+            if (!name.isEmpty()) {
+                MovementPattern mp = new MovementPattern();
+                mp.setName(name);
+
+                List<MovementPattern> list = new ArrayList<>();
+                list.add(mp);
+
+                Log.d("UserExercise",
+                        "safeConvertToMovementPatternList() - Convertido desde String: "
+                                + name);
+                return list;
+            }
+        }
+
+        /* 3⃣  Fallback ---------------------------------------------------------------------- */
+        Log.e("UserExercise",
+                "safeConvertToMovementPatternList() - Objeto no reconocido, devolviendo lista vacía.");
         return new ArrayList<>();
     }
 

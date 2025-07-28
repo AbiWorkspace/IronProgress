@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/favoritesDialogContainer"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -38,8 +39,8 @@
             android:layout_height="wrap_content"
             android:src="@drawable/ic_search"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:tint="#E63946"
-            android:contentDescription="Buscar alimento favorito" />
+            android:contentDescription="Buscar alimento favorito"
+            app:tint="#E63946" />
     </LinearLayout>
 
     <!-- Lista de favoritos -->

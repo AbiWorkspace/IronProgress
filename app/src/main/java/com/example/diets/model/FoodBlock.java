@@ -4,65 +4,74 @@ import android.util.Log;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class FoodBlock {
 
     private static final String TAG = "FoodBlock";
 
+    /* ---------- CAMPOS ---------- */
     private String title;
-    private List<FoodItem> items;
+    private final List<FoodItem> items = new ArrayList<>();
 
-    // 🔧 Constructor vacío requerido por Gson
-    public FoodBlock() {
+    /* ---------- CONSTRUCTORES ---------- */
+    public FoodBlock() {           // requerido por Gson / Firebase
         Log.d(TAG, "Constructor vacío llamado");
-        this.items = new ArrayList<>();
     }
-
     public FoodBlock(String title) {
         this.title = title;
-        this.items = new ArrayList<>();
         Log.d(TAG, "Constructor con título: " + title);
     }
 
-    public void removeItem(FoodItem item) {
-        if (item == null) {
-            Log.w(TAG, "removeItem: intento de eliminar un item null");
-            return;
+    /* ---------- CRUD ITEMS ---------- */
+    public void addItem(FoodItem it) {
+        if (it == null) return;
+        items.add(it);
+        Log.d(TAG, "addItem: " + it.getName() + " añadido");
+    }
+    public void removeItem(FoodItem it) {
+        if (it == null) return;
+        items.remove(it);
+    }
+
+    /* ---------- GET / SET ---------- */
+    public String getTitle()                { return title; }
+    public void   setTitle(String t)        { this.title = t; }
+    public List<FoodItem> getItems()        { return items; }
+
+    /* ===========================================================
+       MÉTODO NECESARIO PARA EL ADAPTER --> CLONA PROFUNDAMENTE  */
+    public FoodBlock deepCopy(String suffix) {
+        FoodBlock clone = new FoodBlock(this.title + " " + suffix);
+
+        for (FoodItem it : this.items) {
+            FoodItem copy = new FoodItem(
+                    it.getName(),
+                    it.getGrams(),
+                    it.getKcalPer100g(),
+                    it.getProteinPer100g(),
+                    it.getCarbsPer100g(),
+                    it.getFatPer100g(),
+                    it.getImageUrl()
+            );
+            copy.setRecipe(it.isRecipe());
+            copy.setIngredients(it.getIngredients());
+            copy.setInstructions(it.getInstructions());
+            copy.setChecked(it.isChecked());
+            clone.addItem(copy);
         }
-        boolean removed = items.remove(item);
-        Log.d(TAG, "removeItem: " + item.getName() + " → " + (removed ? "eliminado" : "no encontrado"));
+        return clone;
     }
 
-    public void addItem(FoodItem item) {
-        if (item == null) {
-            Log.w(TAG, "addItem: intento de agregar un item null");
-            return;
-        }
-        if (items == null) {
-            Log.w(TAG, "addItem: lista estaba null, inicializando");
-            items = new ArrayList<>();
-        }
-        items.add(item);
-        Log.d(TAG, "addItem: " + item.getName() + " añadido");
+    /* ---------- EQUALS & HASHCODE (para DiffUtil) ---------- */
+    @Override public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof FoodBlock)) return false;
+        FoodBlock fb = (FoodBlock) o;
+        return Objects.equals(title, fb.title) &&
+                Objects.equals(items, fb.items);
     }
-
-    public String getTitle() {
-        Log.d(TAG, "getTitle: " + title);
-        return title;
-    }
-
-    public void setTitle(String title) {
-        Log.d(TAG, "setTitle: " + title);
-        this.title = title;
-    }
-
-    public List<FoodItem> getItems() {
-        Log.d(TAG, "getItems: cantidad=" + (items != null ? items.size() : "null"));
-        return items;
-    }
-
-    public void setItems(List<FoodItem> items) {
-        Log.d(TAG, "setItems: asignando lista con " + (items != null ? items.size() : 0) + " elementos");
-        this.items = items;
+    @Override public int hashCode() {
+        return Objects.hash(title, items);
     }
 }

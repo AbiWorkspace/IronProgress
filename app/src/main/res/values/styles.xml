@@ -74,12 +74,23 @@
     <style name="PopupMenuWhiteText" parent="Widget.AppCompat.PopupMenu.Overflow">
         <item name="android:textColor">#FFFFFF</item>
     </style>
+    <!-- Tema oscuro para pop-ups: fondo gris y texto blanco -->
+    <!-- Tema oscuro para pop-ups -->
+    <style name="PopupMenu.Dark" parent="ThemeOverlay.AppCompat.Dark">
+        <!-- Fondo -->
+        <item name="android:popupBackground">#2F2F2F</item>
+        <!-- Color del texto de los items -->
+        <item name="android:textColor">#FFFFFF</item>
+        <!-- Si usas íconos en el menú y quieres un tinte blanco (opcional) -->
+        <!-- <item name="android:iconTint">#FFFFFF</item> -->
+    </style>
+
 
 
     <style name="CustomAlertDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
         <item name="android:textColor">#FFFFFF</item>
         <item name="android:backgroundTint">#E63946</item>
     </style>
-
+    <string name="fullscreen_image">Imagen en pantalla completa</string>
 </resources>
 

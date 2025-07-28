@@ -25,50 +25,64 @@ import com.google.firebase.database.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class ExerciseSelectionDialogFragment extends DialogFragment implements ExercisesAdapter.OnExerciseSelectionChangedListener {
+public class ExerciseSelectionDialogFragment extends DialogFragment
+        implements ExercisesAdapter.OnExerciseSelectionChangedListener {
 
+    /* ---------- CONSTANTES ---------- */
     private static final String TAG = "ExerciseSelectionDialog";
+
+    /* ---------- UI ---------- */
     private RecyclerView recyclerView;
-    private Button doneButton;
-    private List<Exercise> exercises = new ArrayList<>();
-    private List<Exercise> selectedExercises = new ArrayList<>();
-    private DatabaseReference mDatabase;
+    private Button       doneButton;
+
+    /* ---------- DATOS ---------- */
+    private final List<Exercise> exercises         = new ArrayList<>();
+    private final List<Exercise> selectedExercises = new ArrayList<>();
+
+    private DatabaseReference     dbRef;            // nodo /exercises
+    private ValueEventListener    exercisesListener;
+
     private ExercisesAdapter adapter;
-    private TrainingDay trainingDay;
+    private TrainingDay      trainingDay;
     private SelectExercisesFragment.OnExercisesSelectedListener listener;
 
-    public void setOnExercisesSelectedListener(SelectExercisesFragment.OnExercisesSelectedListener listener) {
-        this.listener = listener;
+    /* ---------- SETTERS ---------- */
+    public void setOnExercisesSelectedListener(SelectExercisesFragment.OnExercisesSelectedListener l) {
+        this.listener = l;
     }
+
+    /* ---------- CICLO DE VIDA ---------- */
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_exercise_selection_dialog, container, false);
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+    public void onViewCreated(@NonNull View v, @Nullable Bundle s) {
+        super.onViewCreated(v, s);
 
-        recyclerView = view.findViewById(R.id.recyclerView);
-        doneButton = view.findViewById(R.id.doneButton);
-        mDatabase = FirebaseDatabase.getInstance().getReference();
+        recyclerView = v.findViewById(R.id.recyclerView);
+        doneButton   = v.findViewById(R.id.doneButton);
 
-        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
+        dbRef = FirebaseDatabase.getInstance().getReference("exercises");
+
+        /* ---------- Recuperar argumentos ---------- */
         Bundle args = getArguments();
         if (args != null) {
             trainingDay = (TrainingDay) args.getSerializable("trainingDay");
-            if (trainingDay != null) {
-                loadExercises(trainingDay.getMovementPatterns());
-            }
+            if (trainingDay != null) loadExercises(trainingDay.getMovementPatterns());
         }
 
-        doneButton.setOnClickListener(v -> {
+        doneButton.setOnClickListener(btn -> {
             if (listener != null && trainingDay != null) {
                 listener.onExercisesSelected(selectedExercises, trainingDay);
-                Log.d(TAG, "✅ Ejercicios seleccionados enviados: " + selectedExercises.size());
+                Log.d(TAG, "✅ Enviados " + selectedExercises.size() + " ejercicios.");
             } else {
                 Log.w(TAG, "⚠ Listener o TrainingDay es nulo.");
             }
@@ -76,37 +90,49 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
         });
     }
 
-    private void loadExercises(List<MovementPattern> movementPatterns) {
-        Log.d(TAG, "🔄 Iniciando carga optimizada de ejercicios...");
-        Set<String> normalizedPatternMuscles = new HashSet<>();
-        for (MovementPattern pattern : movementPatterns) {
-            if (pattern.getMusclesWorked() != null)
-                for (String m : pattern.getMusclesWorked())
-                    normalizedPatternMuscles.add(normalizeMuscleName(m));
-            if (pattern.getSynergistMuscles() != null)
-                for (String m : pattern.getSynergistMuscles())
-                    normalizedPatternMuscles.add(normalizeMuscleName(m));
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // 🔒 Evitar callbacks tardíos a un fragment destruido
+        if (exercisesListener != null) dbRef.removeEventListener(exercisesListener);
+        adapter = null;
+    }
+
+    /* ---------- CARGA DE EJERCICIOS ---------- */
+
+    private void loadExercises(List<MovementPattern> patterns) {
+        Log.d(TAG, "🔄 Cargando ejercicios…");
+
+        /* Musculatura del día normalizada */
+        Set<String> patternMuscles = new HashSet<>();
+        for (MovementPattern p : patterns) {
+            if (p.getMusclesWorked() != null)
+                p.getMusclesWorked().forEach(m -> patternMuscles.add(norm(m)));
+            if (p.getSynergistMuscles() != null)
+                p.getSynergistMuscles().forEach(m -> patternMuscles.add(norm(m)));
         }
 
-        mDatabase.child("exercises").addListenerForSingleValueEvent(new ValueEventListener() {
+        exercisesListener = new ValueEventListener() {
             @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (!snapshot.exists()) {
-                    Log.e(TAG, "❌ No hay ejercicios en Firebase.");
+            public void onDataChange(@NonNull DataSnapshot snap) {
+                if (!isAdded()) {                         // ⛑️  Fragment todavía vivo?
+                    Log.w(TAG, "Callback recibido tras cerrarse el diálogo → ignorado.");
                     return;
                 }
 
                 List<Exercise> filtered = new ArrayList<>();
-                for (DataSnapshot child : snapshot.getChildren()) {
-                    Map<String, Object> dataMap = (Map<String, Object>) child.getValue();
-                    if (dataMap == null) continue;
-                    Exercise ex = mapToExercise(dataMap);
-                    Set<String> exMuscles = getAllNormalizedMuscles(ex);
-                    if (!Collections.disjoint(normalizedPatternMuscles, exMuscles)) {
+                for (DataSnapshot child : snap.getChildren()) {
+                    Map<String, Object> map = (Map<String, Object>) child.getValue();
+                    if (map == null) continue;
+                    Exercise ex = mapToExercise(map);
+
+                    /* Filtrado rápido */
+                    if (!Collections.disjoint(patternMuscles, getAllMuscles(ex))) {
                         filtered.add(ex);
                     }
                 }
 
+                /* Refrescar UI */
                 requireActivity().runOnUiThread(() -> {
                     exercises.clear();
                     exercises.addAll(filtered);
@@ -115,125 +141,115 @@ public class ExerciseSelectionDialogFragment extends DialogFragment implements E
             }
 
             @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "❌ Error Firebase: " + error.getMessage());
+            public void onCancelled(@NonNull DatabaseError err) {
+                if (isAdded())
+                    Log.e(TAG, "❌ Firebase error: " + err.getMessage());
             }
-        });
+        };
+
+        dbRef.addListenerForSingleValueEvent(exercisesListener);
     }
 
-    private Set<String> getAllNormalizedMuscles(Exercise exercise) {
-        Set<String> result = new HashSet<>();
-        result.addAll(extractMuscleList(exercise.getMusclesWorked()));
-        for (Object item : exercise.getSynergistMuscles()) {
-            if (item instanceof Map) {
-                Object name = ((Map<?, ?>) item).get("name");
-                if (name != null) result.add(normalizeMuscleName(name.toString()));
-            } else if (item instanceof String) {
-                result.add(normalizeMuscleName((String) item));
-            }
-        }
-        return result;
-    }
-
-    private Exercise mapToExercise(Map<String, Object> dataMap) {
-        Exercise ex = new Exercise();
-        ex.setName((String) dataMap.getOrDefault("name", ""));
-        ex.setEquipmentType((String) dataMap.getOrDefault("equipmentType", ""));
-        ex.setExerciseType((String) dataMap.getOrDefault("exerciseType", ""));
-        ex.setLoadIntensity((String) dataMap.getOrDefault("loadIntensity", ""));
-        ex.setDescription((String) dataMap.getOrDefault("description", ""));
-        ex.setMovementType((String) dataMap.getOrDefault("movementType", ""));
-
-        Object musclesWorkedData = dataMap.get("musclesWorked");
-        if (musclesWorkedData instanceof String) {
-            ex.setMusclesWorked((String) musclesWorkedData);
-        } else {
-            ex.setMusclesWorked("");
-        }
-
-        // ✅ Aquí está la clave para que funcione:
-        ex.setImage((String) dataMap.getOrDefault("image", ""));
-
-        ex.setSynergistMuscles(extractMuscleNames(dataMap.get("synergistMuscles")));
-        return ex;
-    }
-
-
-    private List<String> extractMuscleNames(Object obj) {
-        List<String> names = new ArrayList<>();
-        if (obj instanceof List) {
-            for (Object item : (List<?>) obj) {
-                if (item instanceof Map) {
-                    Object name = ((Map<?, ?>) item).get("name");
-                    if (name != null) names.add(name.toString());
-                }
-            }
-        }
-        return names;
-    }
-
-    private List<String> extractMuscleList(String str) {
-        if (str == null || str.isEmpty()) return new ArrayList<>();
-        return Arrays.stream(str.split(","))
-                .map(String::trim)
-                .map(this::normalizeMuscleName)
-                .collect(Collectors.toList());
-    }
-
-    private String normalizeMuscleName(String input) {
-        if (input == null) return "";
-        return input.trim().toLowerCase()
-                .replaceAll("[áÁ]", "a")
-                .replaceAll("[éÉ]", "e")
-                .replaceAll("[íÍ]", "i")
-                .replaceAll("[óÓ]", "o")
-                .replaceAll("[úÚüÜ]", "u")
-                .replaceAll("[^a-zñ]", "");
-    }
+    /* ---------- ADAPTADOR ---------- */
 
     private void setupRecyclerView() {
-        List<String> selectedNames = selectedExercises.stream()
-                .map(Exercise::getName)
-                .collect(Collectors.toList());
+        List<String> preselected = selectedExercises.stream()
+                .map(Exercise::getName).toList();
 
-        adapter = new ExercisesAdapter(exercises, selectedNames, exercise -> {
-            addExerciseToSelection(exercise);
-            showExerciseDetails(exercise);
-        }, this);
+        adapter = new ExercisesAdapter(
+                exercises,
+                preselected,
+                // Click rápido → detalles + toggle
+                ex -> { addExerciseToSelection(ex); showExerciseDetails(ex); },
+                this         // listener de selección para checkboxes
+        );
 
         recyclerView.setAdapter(adapter);
         adapter.notifyDataSetChanged();
-        Log.d(TAG, "✅ RecyclerView configurado.");
+        Log.d(TAG, "✅ RecyclerView listo (" + exercises.size() + " ítems).");
     }
 
-    private void showExerciseDetails(Exercise exercise) {
-        ExerciseDetailsFragment detailsFragment = ExerciseDetailsFragment.newInstance(exercise);
+    /* ---------- OPERACIONES ---------- */
+
+    private void addExerciseToSelection(Exercise ex) {
+        if (selectedExercises.contains(ex)) {
+            selectedExercises.remove(ex);
+            Log.d(TAG, "➖ Eliminado: " + ex.getName());
+        } else {
+            selectedExercises.add(ex);
+            Log.d(TAG, "➕ Añadido: " + ex.getName());
+        }
+        if (adapter != null) adapter.notifyDataSetChanged();
+    }
+
+    private void showExerciseDetails(Exercise ex) {
+        ExerciseDetailsFragment d = ExerciseDetailsFragment.newInstance(ex);
         getParentFragmentManager().beginTransaction()
-                .replace(fragment_container, detailsFragment)
+                .replace(R.id.fragment_container, d)
                 .addToBackStack(null)
                 .commit();
     }
 
-    public void addExerciseToSelection(Exercise exercise) {
-        if (!selectedExercises.contains(exercise)) {
-            selectedExercises.add(exercise);
-            Log.d(TAG, "✅ Ejercicio añadido: " + exercise.getName());
-        } else {
-            selectedExercises.remove(exercise);
-            Log.d(TAG, "❌ Ejercicio eliminado: " + exercise.getName());
+    /* ---------- INTERFAZ DEL ADAPTADOR ---------- */
+
+    @Override public void onExerciseSelected  (Exercise ex) { addExerciseToSelection(ex); }
+    @Override public void onExerciseDeselected(Exercise ex) { addExerciseToSelection(ex); }
+
+    /* ---------- UTILIDADES ---------- */
+
+    private Exercise mapToExercise(Map<String, Object> m) {
+        Exercise ex = new Exercise();
+        ex.setName         ((String) m.getOrDefault("name", ""));
+        ex.setEquipmentType((String) m.getOrDefault("equipmentType", ""));
+        ex.setExerciseType ((String) m.getOrDefault("exerciseType", ""));
+        ex.setLoadIntensity((String) m.getOrDefault("loadIntensity", ""));
+        ex.setDescription  ((String) m.getOrDefault("description", ""));
+        ex.setMovementType ((String) m.getOrDefault("movementType", ""));
+        ex.setImage        ((String) m.getOrDefault("image", ""));
+
+        /* musclesWorked puede venir como String */
+        Object worked = m.get("musclesWorked");
+        ex.setMusclesWorked(worked instanceof String ? (String) worked : "");
+
+        ex.setSynergistMuscles(extractSynergistNames(m.get("synergistMuscles")));
+        return ex;
+    }
+
+    private List<String> extractSynergistNames(Object obj) {
+        List<String> out = new ArrayList<>();
+        if (obj instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof Map<?,?> map) {
+                    Object n = map.get("name");
+                    if (n != null) out.add(n.toString());
+                }
+            }
         }
-        adapter.notifyDataSetChanged();
+        return out;
     }
 
-    @Override
-    public void onExerciseSelected(Exercise exercise) {
-        addExerciseToSelection(exercise);
+    private Set<String> getAllMuscles(Exercise ex) {
+        Set<String> set = new HashSet<>(splitAndNorm(ex.getMusclesWorked()));
+        ex.getSynergistMuscles().forEach(m -> set.add(norm(m)));
+        return set;
     }
 
-    @Override
-    public void onExerciseDeselected(Exercise exercise) {
-        selectedExercises.remove(exercise);
-        adapter.notifyDataSetChanged();
-        Log.d(TAG, "❌ Ejercicio deseleccionado: " + exercise.getName());
+    private List<String> splitAndNorm(String csv) {
+        if (csv == null || csv.isEmpty()) return Collections.emptyList();
+        return Arrays.stream(csv.split(","))
+                .map(String::trim)
+                .map(this::norm)
+                .collect(Collectors.toList());
+    }
+
+    private String norm(String s) {
+        if (s == null) return "";
+        return s.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[áàä]", "a")
+                .replaceAll("[éèë]", "e")
+                .replaceAll("[íìï]", "i")
+                .replaceAll("[óòö]", "o")
+                .replaceAll("[úùü]", "u")
+                .replaceAll("[^a-zñ]", "");
     }
 }

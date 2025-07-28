@@ -10,6 +10,9 @@ public class ExerciseSeries {
     private double rpe;    // ✅ Debe ser double (no int)
     private boolean isCompleted; // ✅ Nuevo atributo para indicar si la serie está completada
     private Double previousLoad;
+    private long date;          // Epoch millis
+    public long  getDate()  { return date; }
+    public void  setDate(long d){ this.date = d; }
 
     // 🔥 Constructor vacío requerido por Firebase
     public ExerciseSeries() {
@@ -39,43 +42,35 @@ public class ExerciseSeries {
 
     // 🔥 Getters y Setters con logs
     public int getSeriesNumber() {
-        Log.d(TAG, "ExerciseSeries - getSeriesNumber: Obteniendo número de serie: " + seriesNumber);
         return seriesNumber;
     }
 
     public void setSeriesNumber(int seriesNumber) {
-        Log.d(TAG, "ExerciseSeries - setSeriesNumber: Modificando número de serie a: " + seriesNumber);
         this.seriesNumber = seriesNumber;
     }
 
     public int getReps() {
-        Log.d(TAG, "ExerciseSeries - getReps: Obteniendo reps: " + reps);
         return reps;
     }
 
     public void setReps(int reps) {
         this.reps = validateReps(reps);
-        Log.d(TAG, "ExerciseSeries - setReps: Modificando reps a: " + this.reps);
     }
 
     public double getWeight() {
-        Log.d(TAG, "ExerciseSeries - getWeight: Obteniendo peso: " + weight);
         return weight;
     }
 
     public void setWeight(double weight) {
         this.weight = validateWeight(weight);
-        Log.d(TAG, "ExerciseSeries - setWeight: Modificando peso a: " + this.weight);
     }
 
     public double getRpe() {
-        Log.d(TAG, "ExerciseSeries - getRpe: Obteniendo RPE: " + rpe);
         return rpe;
     }
 
     public void setRpe(double rpe) {
         this.rpe = validateRpe(rpe);
-        Log.d(TAG, "ExerciseSeries - setRpe: Modificando RPE a: " + this.rpe);
     }
 
     public boolean isCompleted() {
@@ -84,7 +79,7 @@ public class ExerciseSeries {
     }
 
     public void setCompleted(boolean completed) {
-        Log.d(TAG, "ExerciseSeries - setCompleted: Modificando estado de completado a: " + completed);
+
         this.isCompleted = completed;
     }
 

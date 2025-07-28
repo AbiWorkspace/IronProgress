@@ -11,6 +11,7 @@ import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.OptIn;
 import androidx.camera.core.*;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
@@ -42,6 +43,7 @@ public class BarcodeScannerDialog extends DialogFragment {
         return d;
     }
 
+    @OptIn(markerClass = androidx.camera.core.ExperimentalGetImage.class)
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inf,

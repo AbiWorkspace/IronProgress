@@ -9,6 +9,9 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
+import android.widget.ImageView;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -23,11 +26,6 @@ import com.example.diets.fragments.FoodSearchFragment;
 import com.example.diets.model.FoodBlock;
 import com.example.diets.model.FoodItem;
 
-import android.widget.CheckBox;
-import android.widget.EditText;
-import android.widget.ImageView;
-import android.widget.TextView;
-
 import java.util.List;
 import java.util.Locale;
 
@@ -41,28 +39,34 @@ public class RecipeItemAdapter extends RecyclerView.Adapter<RecipeItemAdapter.Re
     private final FoodItemAdapter.OnFoodItemChangedListener listener;
     private final FoodBlock foodBlock;
 
-    public RecipeItemAdapter(List<FoodItem> items, Context context, DashboardFragment parent,
-                             FoodItemAdapter.OnFoodItemChangedListener listener, FoodBlock foodBlock) {
+    public RecipeItemAdapter(List<FoodItem> items,
+                             Context context,
+                             DashboardFragment parent,
+                             FoodItemAdapter.OnFoodItemChangedListener listener,
+                             FoodBlock foodBlock) {
         this.items = items;
         this.context = context;
         this.parent = parent;
         this.listener = listener;
         this.foodBlock = foodBlock;
+        Log.d(TAG, "Constructor: recetas=" + items.size());
     }
 
+    // ───────────────────────────────── ViewHolder
     public static class RecipeViewHolder extends RecyclerView.ViewHolder {
         ImageView img;
-        TextView name;
-        TextView kcal;
-
-        public RecipeViewHolder(@NonNull View itemView) {
+        TextView  name, kcal;
+        CheckBox  chk;
+        RecipeViewHolder(@NonNull View itemView) {
             super(itemView);
-            img = itemView.findViewById(R.id.foodItemImage);
+            img  = itemView.findViewById(R.id.foodItemImage);
             name = itemView.findViewById(R.id.foodItemName);
             kcal = itemView.findViewById(R.id.foodItemCalories);
+            chk  = itemView.findViewById(R.id.foodItemCheck);
         }
     }
 
+    // ───────────────────────────────── Adapter base
     @NonNull
     @Override
     public RecipeViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -81,32 +85,30 @@ public class RecipeItemAdapter extends RecyclerView.Adapter<RecipeItemAdapter.Re
         Glide.with(context)
                 .load(item.getImageUrl())
                 .placeholder(R.drawable.ic_placeholder)
+                .error(R.drawable.ic_placeholder)
+                .centerCrop()
                 .into(holder.img);
 
-        // --- CHECKBOX CONTROL PARA RECETAS ---
-        CheckBox cb = holder.itemView.findViewById(R.id.foodItemCheck);
-        cb.setChecked(item.isChecked());
-        cb.setOnCheckedChangeListener((b, c) -> {
-            Log.d(TAG, "onBindViewHolder: Check cambiado para receta " + item.getName() + " → " + c);
+        // --- CHECKBOX ---
+        holder.chk.setChecked(item.isChecked());
+        holder.chk.setOnCheckedChangeListener((b, c) -> {
             item.setChecked(c);
             if (listener != null) listener.onFoodItemChanged();
         });
 
-
+        // --- Click para editar gramos ---
         holder.itemView.setOnClickListener(v -> {
-            Log.d(TAG, "onClick: Mostrando RecipeDialog para → " + item.getName());
-
             FoodSearchFragment.FoodResult result = new FoodSearchFragment.FoodResult();
-            result.name = item.getName();
-            result.grams = item.getGrams();
-            result.kcalPer100g = item.getKcalPer100g();
-            result.protein = item.getProteinPer100g();
-            result.carbs = item.getCarbsPer100g();
-            result.fat = item.getFatPer100g();
-            result.imageUrl = item.getImageUrl();
-            result.ingredients = item.getIngredients();
+            result.name         = item.getName();
+            result.grams        = item.getGrams();
+            result.kcalPer100g  = item.getKcalPer100g();
+            result.protein      = item.getProteinPer100g();
+            result.carbs        = item.getCarbsPer100g();
+            result.fat          = item.getFatPer100g();
+            result.imageUrl     = item.getImageUrl();
+            result.ingredients  = item.getIngredients();
             result.instructions = item.getInstructions();
-            result.type = "receta";
+            result.type         = "receta";
 
             RecipeDialog dialog = RecipeDialog.newInstance(result);
             dialog.setOnGramsConfirmedListener(updated -> {
@@ -118,11 +120,29 @@ public class RecipeItemAdapter extends RecyclerView.Adapter<RecipeItemAdapter.Re
         });
     }
 
-
     @Override
-    public int getItemCount() {
-        return items.size();
+    public int getItemCount() { return items.size(); }
+
+    // ───────────────────────────────── API pública
+    /** Permite actualizar la lista sin recrear el adaptador. */
+    public void setItems(List<FoodItem> newItems) {
+        items.clear();
+        items.addAll(newItems);
+        notifyDataSetChanged();
     }
+
+    public void deleteItem(int position) {
+        if (position < 0 || position >= items.size()) return;
+
+        FoodItem removed = items.remove(position);
+        foodBlock.removeItem(removed);
+
+        notifyItemRemoved(position);
+        notifyItemRangeChanged(position, items.size());
+        if (listener != null) listener.onFoodItemChanged();
+    }
+
+    // ───────────────────────────────── Swipe
     public static class SwipeToDeleteCallback extends ItemTouchHelper.SimpleCallback {
 
         private final RecipeItemAdapter adapter;
@@ -136,61 +156,40 @@ public class RecipeItemAdapter extends RecyclerView.Adapter<RecipeItemAdapter.Re
             this.background = new ColorDrawable(Color.parseColor("#D32F2F"));
         }
 
-        @Override
-        public boolean onMove(@NonNull RecyclerView recyclerView,
-                              @NonNull RecyclerView.ViewHolder viewHolder,
-                              @NonNull RecyclerView.ViewHolder target) {
-            return false;
-        }
+        @Override public boolean onMove(@NonNull RecyclerView r,
+                                        @NonNull RecyclerView.ViewHolder v,
+                                        @NonNull RecyclerView.ViewHolder t) { return false; }
 
         @Override
         public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
             int position = viewHolder.getBindingAdapterPosition();
-            if (position != RecyclerView.NO_POSITION) {
-                adapter.deleteItem(position);
-            } else {
-                adapter.notifyDataSetChanged();
-            }
+            if (position != RecyclerView.NO_POSITION) adapter.deleteItem(position);
+            else adapter.notifyDataSetChanged();
         }
 
         @Override
-        public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView,
-                                @NonNull RecyclerView.ViewHolder viewHolder,
-                                float dX, float dY, int actionState, boolean isCurrentlyActive) {
+        public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView r,
+                                @NonNull RecyclerView.ViewHolder v,
+                                float dX, float dY, int state, boolean active) {
 
-            View itemView = viewHolder.itemView;
-            int itemHeight = itemView.getHeight();
+            View itemView = v.itemView;
 
-            // Fondo
+            // Fondo rojo
             background.setBounds(itemView.getRight() + (int) dX, itemView.getTop(),
                     itemView.getRight(), itemView.getBottom());
             background.draw(c);
 
             // Ícono
-            int iconMargin = (itemHeight - icon.getIntrinsicHeight()) / 2;
-            int iconTop = itemView.getTop() + iconMargin;
-            int iconLeft = itemView.getRight() - iconMargin - icon.getIntrinsicWidth();
-            int iconRight = itemView.getRight() - iconMargin;
-            int iconBottom = iconTop + icon.getIntrinsicHeight();
-
-            icon.setBounds(iconLeft, iconTop, iconRight, iconBottom);
+            int margin = (itemView.getHeight() - icon.getIntrinsicHeight()) / 2;
+            int top    = itemView.getTop() + margin;
+            int left   = itemView.getRight() - margin - icon.getIntrinsicWidth();
+            icon.setBounds(left, top,
+                    left + icon.getIntrinsicWidth(),
+                    top  + icon.getIntrinsicHeight());
             icon.setTint(Color.WHITE);
             icon.draw(c);
 
-            super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
+            super.onChildDraw(c, r, v, dX, dY, state, active);
         }
     }
-    public void deleteItem(int position) {
-        if (position < 0 || position >= items.size()) return;
-
-        FoodItem removed = items.remove(position);
-        if (foodBlock.getItems() != items) {
-            foodBlock.removeItem(removed);
-        }
-
-        notifyItemRemoved(position);
-        notifyItemRangeChanged(position, items.size());
-        if (listener != null) listener.onFoodItemChanged();
-    }
-
 }

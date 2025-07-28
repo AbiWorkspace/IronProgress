@@ -57,6 +57,7 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Comparator;
@@ -69,13 +70,26 @@ public class WeightFragment extends Fragment {
     /* -------------------------------------------------- */
     /* ------------------- CONSTANTES ------------------- */
     /* -------------------------------------------------- */
+    private static final String KEY_WAITING_PROGRESS = "waiting_progress";
+    private static final String KEY_WAITING_DATE = "waiting_date"; // la fecha del último ajuste en epochDay
+    private static final int WAIT_DAYS_AFTER_ADJUST = 7;
+
     private static final String LOG_PREFIX = "WeigntFragment";           // para filtrar en Logcat
     private static final String PREF_STATS = "WeightStats";
     private static final String KEY_MISMATCH_WEEKS   = "mismatchWeeks";
-    private static final String KEY_WAITING_PROGRESS = "waitingProgress";
+
+    private static final String KEY_LAST_ADJ_DATE    = "lastAdjustmentDate";
     private static final String PREFS_NAME = "FoodPrefs";
     private static final DateTimeFormatter SP_DATE =
             DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.getDefault());
+    /* ---------- Utils fechas ---------- */
+    private static final DateTimeFormatter DF_IN = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static long daysBetween(LocalDate a, LocalDate b){
+        return java.time.temporal.ChronoUnit.DAYS.between(a, b);
+    }
+    private static LocalDate parseDDMMYYYY(String d){
+        return LocalDate.parse(d, DF_IN);
+    }
 
     /* -------------------------------------------------- */
     /* ----------------- ATRIBUTOS UI ------------------- */
@@ -88,7 +102,7 @@ public class WeightFragment extends Fragment {
     private LineChart weightChart;
 
     /* -------------------------------------------------- */
-    /* ----------------- DATOS & FIREBASE --------------- */
+    /* ----------------- DATOS & FIREBASE --------------- */
     /* -------------------------------------------------- */
     private final List<WeightRecord> weightRecords = new ArrayList<>();
     private WeightAdapter weightAdapter;
@@ -123,12 +137,23 @@ public class WeightFragment extends Fragment {
         selectDateButton.setOnClickListener(btn -> showDatePickerDialog());
         saveWeightButton.setOnClickListener(btn -> saveWeightRecord());
 
+
         /* ---------- Recycler ---------- */
         weightAdapter = new WeightAdapter(weightRecords,
                 (rec, pos) -> showEditDialog(rec, pos));
-        weightRecyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+
+        LinearLayoutManager lm = new LinearLayoutManager(
+                getContext(), LinearLayoutManager.VERTICAL, true); // reverseLayout = true
+        lm.setStackFromEnd(true);          // mantiene el “ancla” al comienzo
+
+        weightRecyclerView.setLayoutManager(lm);
         weightRecyclerView.setAdapter(weightAdapter);
-        attachSwipeToDelete();                 // 👈 NUEVO
+
+        /* desactiva el nested-scroll también por código para cubrir todos los casos */
+        weightRecyclerView.setNestedScrollingEnabled(false);
+
+        attachSwipeToDelete();
+
 
         /* ---------- Descarga metas y registros ---------- */
         FirebaseDatabase.getInstance()
@@ -144,7 +169,7 @@ public class WeightFragment extends Fragment {
     }
 
     /**
-     * Habilita swipe‑to‑delete a la DERECHA con fondo rojo e ícono 🗑️
+     * Habilita swipe-to-delete a la DERECHA con fondo rojo e ícono 🗑️
      */
     private void attachSwipeToDelete() {
         ItemTouchHelper.SimpleCallback cb = new ItemTouchHelper.SimpleCallback(0,
@@ -170,7 +195,6 @@ public class WeightFragment extends Fragment {
                 weightRecords.remove(pos);
                 weightAdapter.notifyItemRemoved(pos);
 
-                // 3️⃣ refrescar gráfica y estadísticas
                 // 3️⃣ refrescar gráfica y estadísticas
                 if (isAdded() && getContext() != null) updateChart();
 
@@ -226,7 +250,7 @@ public class WeightFragment extends Fragment {
     }
 
     /* -------------------------------------------------- */
-    /* ---------------- GENERAR DATE PICKER ------------- */
+    /* ---------------- GENERAR DATE PICKER ------------- */
     /* -------------------------------------------------- */
     private void showDatePickerDialog() {
         Log.d(LOG_PREFIX, "[showDatePickerDialog] ► abierto");
@@ -276,7 +300,7 @@ public class WeightFragment extends Fragment {
                 if (record.getId()!=null)
                     databaseReference.child(record.getId()).setValue(record);
                 Log.d(LOG_PREFIX, "[showEditDialog] guardado id=" + record.getId());
-// 3️⃣ refrescar gráfica y estadísticas
+                // 3️⃣ refrescar gráfica y estadísticas
                 if (isAdded() && getContext() != null) updateChart();
                 computeWeeklyStats();
                 d.dismiss();
@@ -298,7 +322,7 @@ public class WeightFragment extends Fragment {
         }
         double num = n*sumXY - sumX*sumY;
         double den = n*sumXX - sumX*sumX;
-        return den==0? 0 : num/den;           // kg / índice‑día
+        return den==0? 0 : num/den;           // kg / índice-día
     }
     private void saveWeightRecord() {
         Log.d(LOG_PREFIX, "[saveWeightRecord] ► inicio");
@@ -315,6 +339,15 @@ public class WeightFragment extends Fragment {
         }
 
         double weight = Double.parseDouble(wStr);
+        if(weight <= 20 || weight > 300) {
+            Toast.makeText(getContext(), "Peso fuera de rango", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        LocalDate date = LocalDate.parse(selectedDate, DF_IN);
+        if(date.isAfter(LocalDate.now())) {
+            Toast.makeText(getContext(), "No puedes registrar fechas futuras", Toast.LENGTH_SHORT).show();
+            return;
+        }
         float kcal = fetchStoredCalories(selectedDate);
         String id = databaseReference.push().getKey();
         WeightRecord rec = new WeightRecord(id, weight, kcal, selectedDate);
@@ -462,129 +495,232 @@ public class WeightFragment extends Fragment {
         weightChart.invalidate();
     }
 
-
-
-
-    /* -------------------------------------------------- */
-    /* --------------- CHART & ESTADÍSTICAS ------------- */
-    /* -------------------------------------------------- */
     private void computeWeeklyStats() {
-        Log.d(LOG_PREFIX,"[computeWeeklyStats] ► inicio regs="+weightRecords.size());
+        Log.d(LOG_PREFIX, "[computeWeeklyStats] ► inicio regs=" + weightRecords.size());
 
-        /* ‑‑‑ Se necesita al menos 14 días para dos semanas completas ‑‑‑ */
-        if(weightRecords.size()<14){
-            Log.d(LOG_PREFIX,"[computeWeeklyStats] ⏸ <14 registros");
+        // --- MODULAR: Bloque de espera tras ajuste ---
+        SharedPreferences p = requireContext().getSharedPreferences(PREF_STATS, Context.MODE_PRIVATE);
+        boolean waiting = p.getBoolean(KEY_WAITING_PROGRESS, false);  // ¿Estamos en espera tras ajuste?
+        long lastAdjustDay = p.getLong(KEY_WAITING_DATE, 0);
+        long today = LocalDate.now().toEpochDay();
+        int daysLeft = 0;
+
+        if (waiting) {
+            long daysSince = today - lastAdjustDay;
+            daysLeft = (int) (WAIT_DAYS_AFTER_ADJUST - daysSince);
+            if (daysLeft > 0) {
+                Log.d(LOG_PREFIX, "⏳ esperando " + daysLeft + " d tras ajuste (último ajuste: " + lastAdjustDay + ", hoy: " + today + ")");
+            } else {
+                Log.d(LOG_PREFIX, "🟢 Fin del periodo de espera. Se reanuda el análisis.");
+                waiting = false;
+                p.edit().putBoolean(KEY_WAITING_PROGRESS, false).apply();
+            }
+        }
+
+        // --- Checar pesajes suficientes en los últimos 14 días ---
+        long last14 = weightRecords.stream()
+                .filter(r -> daysBetween(parseDDMMYYYY(r.getDate()), LocalDate.now()) < 14)
+                .count();
+        Log.d(LOG_PREFIX, "[computeWeeklyStats] Pesajes últimos 14 días: " + last14);
+        if (last14 < 6) {
+            Log.d(LOG_PREFIX, "⏸ Muy pocos pesajes (" + last14 + "/14 d) → no evaluar");
+            // Vacía la UI, para evitar datos basura
+            avgWeightText.setText("Peso medio 7 d: —");
+            avgCalText.setText("Calorías medias 7 d: —");
+            avgCalPrevText.setText("Calorías semana previa: —");
+            predictedText.setText("Peso esperado: —");
+            trendText.setText("—");
             return;
         }
 
-        /* 1️⃣ Orden cronológico ascendente ------------------------------------------------------ */
-        weightRecords.sort(Comparator.comparing(r->{
-            try{return new SimpleDateFormat("dd/MM/yyyy",Locale.getDefault()).parse(r.getDate());}
-            catch(ParseException e){return new Date();}
-        }));
+        // --- Calculo de medias semanales ---
+        List<Double> avgs = computeWeeklyAverages(); // hasta 3 medias
+        Log.d(LOG_PREFIX, "[computeWeeklyStats] medias disponibles: " + avgs.size());
+        if (avgs.size() < 3) {
+            Log.d(LOG_PREFIX, "⏸ Faltan medias (" + avgs.size() + "/3)");
+            avgWeightText.setText("Peso medio 7 d: —");
+            avgCalText.setText("Calorías medias 7 d: —");
+            avgCalPrevText.setText("Calorías semana previa: —");
+            predictedText.setText("Peso esperado: —");
+            trendText.setText("—");
+            return;
+        }
 
-        /* 2️⃣ Sub‑listas de 7 días y estadísticos ------------------------------------------------ */
-        int n = weightRecords.size();
-        List<WeightRecord> week2 = weightRecords.subList(n-7,n);       // semana más reciente
-        List<WeightRecord> week1 = weightRecords.subList(n-14,n-7);    // semana previa
+        double avgW3 = avgs.get(2);   // más reciente
+        double avgW2 = avgs.get(1);
+        double avgW1 = avgs.get(0);
 
-        double avgW2 = week2.stream().mapToDouble(WeightRecord::getWeight).average().orElse(0);
-        double avgW1 = week1.stream().mapToDouble(WeightRecord::getWeight).average().orElse(avgW2);
-        double avgK2 = week2.stream().mapToDouble(WeightRecord::getCalories).average().orElse(0);
-        double avgK1 = week1.stream().mapToDouble(WeightRecord::getCalories).average().orElse(avgK2);
+        // --- Tendencia semanal (peso) ---
+        double kgPerWeek = avgW3 - avgW2;
+        double trendKg7  = kgPerWeek;
+        Log.d(LOG_PREFIX, String.format(Locale.getDefault(), "[computeWeeklyStats] medias: W1=%.2f W2=%.2f W3=%.2f | Δkg=%.2f", avgW1, avgW2, avgW3, kgPerWeek));
 
-        /* 3️⃣ Tendencia REAL – pendiente de regresión 14 d -------------------------------------- */
-        double kgPerDay   = slopeKgPerDay(weightRecords.subList(n-14,n));
-        double trendKg7   = kgPerDay * 7;                // kg/sem según regresión
-        double diffKcal   = (avgK2 - avgK1) * 7;         // superávit / déficit semanal
-        double diffKgPred = diffKcal / 7700.0;           // kg esperados por kcal
+        // --- Calorías medias ---
+        double avgK3 = kcalAverageForRange(-7);
+        double avgK2 = kcalAverageForRange(-14);
+        double avgK1 = kcalAverageForRange(-21);
+        double diffKcal   = (avgK3 - avgK2) * 7;
+        double diffKgPred = diffKcal / 7700.0;
 
-        Log.d(LOG_PREFIX,String.format(Locale.getDefault(),
-                "[computeWeeklyStats] slope=%.4f kg/d  → %.2f kg/sem",kgPerDay,trendKg7));
-        Log.d(LOG_PREFIX,String.format(Locale.getDefault(),
-                "[computeWeeklyStats] kcalΔ=%.0f  kgPred=%.2f",diffKcal,diffKgPred));
+        Log.d(LOG_PREFIX, String.format(Locale.getDefault(),
+                "[computeWeeklyStats] kcal: W1=%.0f W2=%.0f W3=%.0f | diffKcal=%.0f | diffKgPred=%.2f",
+                avgK1, avgK2, avgK3, diffKcal, diffKgPred));
 
-        /* 4️⃣ UI ↴ */
-        avgWeightText .setText(String.format(Locale.getDefault(),
-                "Peso medio 7 d: %.1f kg",avgW2));
-        avgCalText    .setText(String.format(Locale.getDefault(),
-                "Calorías medias 7 d: %.0f kcal",avgK2));
+        // --- UI: SIEMPRE actualizar (aunque esté esperando) ---
+        avgWeightText.setText(String.format(Locale.getDefault(),
+                "Peso medio 7 d: %.1f kg", avgW3));
+        avgCalText.setText(String.format(Locale.getDefault(),
+                "Calorías medias 7 d: %.0f kcal", avgK3));
         avgCalPrevText.setText(String.format(Locale.getDefault(),
-                "Calorías medias semana previa: %.0f kcal",avgK1));
-        predictedText .setText(String.format(Locale.getDefault(),
-                "Δkg esperado (↓/↑): %.2f kg",diffKgPred));
+                "Calorías semana previa: %.0f kcal", avgK2));
+        predictedText.setText(String.format(Locale.getDefault(),
+                "Δkg esperado (↓/↑): %.2f kg", diffKgPred));
 
-        String tr = trendKg7> 0.2? "Subiendo 📈" :
-                trendKg7<-0.2? "Bajando 📉" : "Estable ⚖️";
-        trendText.setText(tr);
+        // --- Mostrar mensaje de espera si corresponde ---
+        if (waiting && daysLeft > 0) {
+            trendText.setText("⏳ Espera: " + daysLeft + " días para próximo ajuste");
+        } else {
+            trendText.setText(trendKg7 > 0.2 ? "Subiendo 📈" :
+                    trendKg7 < -0.2 ? "Bajando 📉" : "Estable ⚖️");
+        }
 
-        /* 5️⃣ Comparar con la META -------------------------------------------------------------- */
+        // --- Comparar con meta ---
         boolean goalDown = userGoal.toLowerCase().contains("perder");
         boolean goalUp   = userGoal.toLowerCase().contains("ganar");
-        boolean goalKeep = !(goalDown||goalUp);
+        boolean goalKeep = !(goalDown || goalUp);
 
-        boolean weightOk = (goalDown && trendKg7<-0.15) ||
-                (goalUp   && trendKg7> 0.15) ||
-                (goalKeep && Math.abs(trendKg7)<0.15);
+        boolean weightOk = (goalDown && kgPerWeek <= -0.5 * avgW3 * 0.01) ||   // -0.5 %/sem
+                (goalUp   && kgPerWeek >= 0.25) ||             // ≥250 g/sem
+                (goalKeep && Math.abs(kgPerWeek) < 0.15);        // ±150 g/sem
 
-        boolean kcalOk   = (goalDown && diffKcal<-350) ||
-                (goalUp   && diffKcal> 350) ||
-                (goalKeep && Math.abs(diffKcal)<350);
+        boolean kcalOk   = (goalDown && diffKcal < -350) ||
+                (goalUp   && diffKcal > 350)  ||
+                (goalKeep && Math.abs(diffKcal) < 350);
 
-        Log.d(LOG_PREFIX,"[computeWeeklyStats] weightOk="+weightOk+" kcalOk="+kcalOk);
+        // --- Mismatch/espera y ajuste ---
+        int mismatch = p.getInt(KEY_MISMATCH_WEEKS, 0);
 
-        /* 6️⃣ Contador de “desajustes” y lógicas de espera -------------------------------------- */
-        SharedPreferences p = requireContext().getSharedPreferences(PREF_STATS, Context.MODE_PRIVATE);
-        int     mismatch = p.getInt   (KEY_MISMATCH_WEEKS ,0);
-        boolean waiting  = p.getBoolean(KEY_WAITING_PROGRESS,false);
-
-        if(weightOk && kcalOk){
-            mismatch = 0; waiting = false;
-            Log.d(LOG_PREFIX,"[computeWeeklyStats] ✔ progreso alineado → reset");
-        }else{
+        if (weightOk && kcalOk) {
+            Log.d(LOG_PREFIX, "✔ Progreso alineado → mismatch=0");
+            mismatch = 0;
+        } else {
             mismatch++;
-            Log.d(LOG_PREFIX,"[computeWeeklyStats] ✖ desajuste ("+mismatch+"/2)");
+            Log.d(LOG_PREFIX, String.format(Locale.getDefault(), "✖ desajuste (mismatch=%d/2) [pesoOK=%b kcalOK=%b]", mismatch, weightOk, kcalOk));
         }
 
-        /* 7️⃣ Ajuste de caloriesToday ----------------------------------------------------------- */
-        if(!waiting && mismatch>=2){
-            Log.d(LOG_PREFIX,"[computeWeeklyStats] ► evaluando ajuste kcal");
-
-            DatabaseReference kcalRef = FirebaseDatabase.getInstance()
-                    .getReference("users").child(userId).child("caloriesToday");
-
-            kcalRef.get().addOnSuccessListener(snap->{
-                if(!snap.exists()) return;
-                double curr = snap.getValue(Double.class);
-                double upd  = curr;                             // por defecto sin cambio
-
-                if(goalDown){                                   // perder
-                    if(trendKg7>-0.15) upd = curr*0.95;
-                }else if(goalUp){                               // ganar
-                    if(trendKg7< 0.15) upd = curr*1.05;
-                }else{                                          // mantener
-                    if(trendKg7> 0.15) upd = curr*0.95;
-                    else if(trendKg7<-0.15) upd = curr*1.05;
-                }
-
-                if(upd!=curr){
-                    kcalRef.setValue(upd);
-                    Log.d(LOG_PREFIX,String.format(Locale.getDefault(),
-                            "[computeWeeklyStats] kcal %,.0f → %,.0f",curr,upd));
-                }else
-                    Log.d(LOG_PREFIX,"[computeWeeklyStats] kcal sin cambio");
-            });
-
-            waiting  = true;    // espera hasta ver progreso
-            mismatch = 0;       // reinicio
+        // --- Si se cumplen los criterios para reajuste y NO estamos en espera ---
+        if (!waiting && mismatch >= 2) {
+            ajustarCaloriasSegunMeta(trendKg7, goalDown, goalUp);
+            waiting = true;
+            mismatch = 0;
+            long adjToday = LocalDate.now().toEpochDay();
+            Log.d(LOG_PREFIX, "🔄 Ajuste de calorías realizado. Esperando " + WAIT_DAYS_AFTER_ADJUST + " días. Fecha inicio espera: " + adjToday);
+            p.edit()
+                    .putBoolean(KEY_WAITING_PROGRESS, true)
+                    .putLong(KEY_WAITING_DATE, adjToday)
+                    .apply();
         }
 
-        /* 8️⃣ Persistir estado ------------------------------------------------------------------ */
+        // --- Guardar estado en prefs ---
         p.edit()
-                .putInt   (KEY_MISMATCH_WEEKS , mismatch)
+                .putInt(KEY_MISMATCH_WEEKS, mismatch)
                 .putBoolean(KEY_WAITING_PROGRESS, waiting)
                 .apply();
-        Log.d(LOG_PREFIX,"[computeWeeklyStats] estado guardado mismatch="+mismatch+" waiting="+waiting);
+
+        Log.d(LOG_PREFIX, "[computeWeeklyStats] ► fin");
+    }
+
+
+
+    /**
+     * Ajusta la meta calórica diaria en Firebase según la tendencia de peso.
+     *
+     * @param trendKg7  pendiente de la media semanal (kg / 7 d)
+     * @param goalDown  true  → meta “perder peso”
+     * @param goalUp    true  → meta “ganar músculo”
+     */
+    private void ajustarCaloriasSegunMeta(double trendKg7,
+                                          boolean goalDown,
+                                          boolean goalUp) {
+
+        DatabaseReference kcalRef = FirebaseDatabase.getInstance()
+                .getReference("users").child(userId).child("caloriesToday");
+
+        kcalRef.get().addOnSuccessListener(snap -> {
+            if (!snap.exists()) return;
+
+            double curr = snap.getValue(Double.class);
+            double upd  = curr;                          // por defecto sin cambio
+
+            /* --- mismas reglas que tenías, encapsuladas --- */
+            if (goalDown) {                              // perder peso
+                if (trendKg7 > -0.15) upd = curr * 0.95;
+            } else if (goalUp) {                         // ganar músculo
+                if (trendKg7 <  0.15) upd = curr * 1.05;
+            } else {                                     // mantener peso
+                if (trendKg7 >  0.15) upd = curr * 0.95;
+                else if (trendKg7 < -0.15) upd = curr * 1.05;
+            }
+
+            /* --- guardar si cambió --- */
+            if (upd != curr) {
+                kcalRef.setValue(upd);
+                Log.d(LOG_PREFIX, String.format(Locale.getDefault(),
+                        "[ajustarCalorias] kcal %,.0f → %,.0f", curr, upd));
+
+                // registra fecha del ajuste (para la espera de ≥7 d)
+                SharedPreferences ps = requireContext()
+                        .getSharedPreferences(PREF_STATS, Context.MODE_PRIVATE);
+                ps.edit()
+                        .putString(KEY_LAST_ADJ_DATE, LocalDate.now().format(SP_DATE))
+                        .apply();
+            } else {
+                Log.d(LOG_PREFIX, "[ajustarCalorias] kcal sin cambio");
+            }
+        });
+    }
+
+
+    /** Calcula kcal promedio en los 7 días terminando en offset (-7,-14,-21). */
+    private double kcalAverageForRange(int offsetFromToday){
+        LocalDate to   = LocalDate.now().plusDays(offsetFromToday);      // inclusive
+        LocalDate from = to.minusDays(7);
+        return weightRecords.stream()
+                .filter(r -> {
+                    LocalDate d = parseDDMMYYYY(r.getDate());
+                    return !d.isBefore(from) && d.isBefore(to);
+                })
+                .mapToDouble(WeightRecord::getCalories)
+                .average()
+                .orElse(0);
+    }
+
+    /**
+     * Devuelve las medias de peso de hasta las 3 últimas semanas.
+     * Cada media se calcula solo si hay ≥3 pesajes en esos 7 días.
+     * La lista resultante queda ordenada: [sem-3, sem-2, sem-1]
+     */
+    private List<Double> computeWeeklyAverages() {
+        List<Double> avgs = new ArrayList<>();
+        int n = weightRecords.size();
+        if (n == 0) return avgs;
+
+        // -- aseguramos orden ASC (antiguo→reciente) --
+        weightRecords.sort(Comparator.comparing(r -> parseDDMMYYYY(r.getDate())));
+
+        for (int start = n - 21; start < n; start += 7) {
+            if (start < 0) continue;
+            int end = Math.min(start + 7, n);
+            List<WeightRecord> slice = weightRecords.subList(start, end);
+            if (slice.size() >= 3) {
+                double avg = slice.stream()
+                        .mapToDouble(WeightRecord::getWeight)
+                        .average()
+                        .orElse(0);
+                avgs.add(avg);
+            }
+        }
+        return avgs;      // 0-3 medias
     }
 
 

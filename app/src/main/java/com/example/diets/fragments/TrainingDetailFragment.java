@@ -19,6 +19,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -30,6 +31,7 @@ import com.example.diets.adapters.TrainingDetailAdapter;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.ExerciseSeries;
 import com.example.diets.model.MovementPattern;
+import com.example.diets.model.ProgresionDinamica;
 import com.example.diets.model.TrainingDay;
 import com.example.diets.model.UserExercise;
 import com.example.diets.fragments.SelectExercisesFragment.OnExercisesSelectedListener;
@@ -51,6 +53,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TrainingDetailFragment extends Fragment implements OnExercisesSelectedListener {
 
@@ -74,6 +77,8 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
     /* Estado para cronómetro */
     private boolean isChronometerRunning = false;
     private long   pauseOffset = 0;
+
+
 
     /* Día actual */
     private String dayKey;
@@ -151,7 +156,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                         @Override public void onDataChange(@NonNull DataSnapshot globalSnapshot) {
                             for (DataSnapshot exerciseSnap : snapshot.getChildren()) {
                                 UserExercise ue = new UserExercise();
-
+                                ue.hydrateFromSnapshot(exerciseSnap);
                                 // Nombre
                                 String nombre = exerciseSnap.child("name").getValue(String.class);
                                 ue.setName(nombre);
@@ -188,7 +193,15 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                                 exercises.add(ue);
                             }
 
-                            adapter = new TrainingDetailAdapter(exercises, recyclerViewExercises, dayKey, getContext());
+                            adapter = new TrainingDetailAdapter(
+                                    exercises,
+                                    recyclerViewExercises,
+                                    dayKey,
+                                    getContext(),
+                                    getChildFragmentManager()   // ← nuevo parámetro
+                            );
+
+                            AtomicInteger pendientes = new AtomicInteger(exercises.size());   // ← AÑADE ESTA LÍNEA
 
                             recyclerViewExercises.setAdapter(adapter);
                             for (UserExercise ue : exercises) {
@@ -198,22 +211,26 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                                 for (DataSnapshot gSnap : globalSnapshot.getChildren()) {
                                     String gName = gSnap.child("name").getValue(String.class);
                                     if (exerciseName.equalsIgnoreCase(gName)) {
-                                        String firebaseKey = gSnap.getKey();
 
-                                        // ✅ Guardar la key para uso en el adaptador
+                                        String firebaseKey = gSnap.getKey();
                                         adapter.setFirebaseKey(exerciseName, firebaseKey);
 
-                                        // ✅ Esperar que se renderice el RecyclerView antes de acceder al seriesAdapter
-                                        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                                            SeriesAdapter sa = adapter.getSeriesAdapterPorNombre(exerciseName);
-                                            if (sa != null) {
-                                                sa.cargarUltimaSerieDesdeFirebase(firebaseKey, getContext());
-                                            } else {
-                                                Log.w(TAG, "⚠️ Adapter nulo al intentar cargar series para " + exerciseName);
+                                        /* ↓↓↓ Cargamos historial; al terminar descontamos ‘pendientes’ */
+                                        SeriesAdapter sa = adapter.getSeriesAdapterPorNombre(exerciseName);
+                                        if (sa != null) {
+                                            sa.cargarUltimasSeriesDesdeFirebase(firebaseKey, getContext(), () -> {
+                                                if (pendientes.decrementAndGet() == 0) {
+                                                    Log.d(TAG, "Historial cargado → ahora sí pedimos sugerencia");
+                                                    pedirRecomendacion();       // ⬅️ llama a ProgresionDinamica
+                                                }
+                                            });
+                                        } else {
+                                            // Fallback si aún no hay SeriesAdapter
+                                            if (pendientes.decrementAndGet() == 0) {
+                                                pedirRecomendacion();
                                             }
-                                        }, 150); // ⏳ Ajusta el delay si es necesario
-
-                                        break;
+                                        }
+                                        break;      // salimos del for gSnap
                                     }
                                 }
                             }
@@ -309,10 +326,21 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         startChronometer();
 
         btnFinishWorkout = view.findViewById(R.id.btnFinishWorkout);
-        btnFinishWorkout.setOnClickListener(v -> finishWorkout());
+        btnFinishWorkout.setOnClickListener(v -> {
+            adapter.commitAllEdits(() -> {
+
+                finishWorkout();        // cierra el entrenamiento y muestra el diálogo
+            });
+        });
 
         return view;
     }
+    private void pedirRecomendacion() {
+        if (adapter != null) {
+            adapter.generarSugerencias();   // o el método que creaste para llamar a ProgresionDinamica
+        }
+    }
+
 
     @Override
     public void onExercisesSelected(List<Exercise> exercisesRecibidos, TrainingDay trainingDay) {
@@ -516,6 +544,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
             return;
         }
 
+        adapter.commitAllEdits();
         Map<String, List<ExerciseSeries>> seriesPorEjercicio = adapter.getAllCompletedSeriesGroupedByExercise();
         boolean haySeriesIncompletas = false;
 
@@ -535,6 +564,22 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
             Log.d(TAG, "TrainingDetailFragment - finishWorkout: Mostrando diálogo por series incompletas.");
             showIncompleteSeriesDialog(seriesPorEjercicio);
         } else {
+
+
+            Map<String, List<ExerciseSeries>> completadasPorEjercicio =
+                    adapter.getAllCompletedSeriesGroupedByExercise();   // ① ya viene filtrado
+
+            int totalCompletadas = 0;
+            for (List<ExerciseSeries> l : completadasPorEjercicio.values())
+                totalCompletadas += l.size();
+
+            if (totalCompletadas == 0) {
+                Toast.makeText(getContext(),
+                        "Marca al menos una serie como completada antes de finalizar",
+                        Toast.LENGTH_SHORT).show();
+                return;                               // ⛔ ¡salimos!
+            }
+
             new AlertDialog.Builder(requireContext())
                     .setTitle("¿Actualizar rutina?")
                     .setMessage("¿Deseas que el número de series se actualice en tu rutina según los cambios hechos hoy?")
@@ -549,6 +594,26 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         }
 
     }
+
+    // ───────────── TrainingDetailFragment.java ─────────────
+    /**
+     * Pinta las series de un ejercicio sin crear la “serie fantasma”.
+     * Se muestra un mensaje o un botón para que el usuario añada la primera serie.
+     */
+    private void mostrarSeries(UserExercise ex) {
+        List<ExerciseSeries> listaSeries = new ArrayList<>();
+
+        // ─── sin paso 2: no buscamos txtSinSeries ───
+
+        SeriesAdapter sa = new SeriesAdapter(
+                listaSeries,
+                ex.getName(),
+                adapter
+        );
+        recyclerViewExercises.setAdapter(sa);
+    }
+
+
 
     // ===========================================================================
     // = INICIO MOD NUEVA FUNCIONALIDAD: Sobrecarga para continuar el flujo     =
@@ -750,8 +815,13 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         });
     }
 
+
+    // ************************************************************************
+// Lógica para guardar las series completadas y cerrar el entrenamiento
+// ************************************************************************
     private void guardarSeriesYFinalizar(Map<String, List<ExerciseSeries>> seriesPorEjercicio) {
-        Log.d(TAG, "TrainingDetailFragment - guardarSeriesYFinalizar: Iniciando guardado de series...");
+
+        Log.d(TAG, "TrainingDetailFragment - guardarSeriesYFinalizar: Iniciando guardado de series…");
 
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) return;
@@ -761,112 +831,123 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                 .child(user.getUid())
                 .child("userExercises");
 
+        // --------------------------------------------------------------------
+        // 1. Subir todas las series completadas a Firebase
+        // --------------------------------------------------------------------
         for (Map.Entry<String, List<ExerciseSeries>> entry : seriesPorEjercicio.entrySet()) {
-            String nombreEjercicio = entry.getKey();
-            List<ExerciseSeries> nuevasSeries = entry.getValue();
+
+            String nombreEjercicio      = entry.getKey();
+            List<ExerciseSeries> nuevas = entry.getValue();
 
             baseRef.orderByChild("name").equalTo(nombreEjercicio)
                     .addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
+
                             for (DataSnapshot snap : snapshot.getChildren()) {
+
                                 String key = snap.getKey();
                                 DatabaseReference exerciseRef = baseRef.child(key);
-                                DatabaseReference seriesRef = exerciseRef.child("seriesData");
+                                DatabaseReference seriesRef   = exerciseRef.child("seriesData");
 
                                 seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                                    @Override
-                                    public void onDataChange(@NonNull DataSnapshot snapshotPrevias) {
-                                        List<Map<String, Object>> todasLasSeries = new ArrayList<>();
+                                    @Override public void onDataChange(@NonNull DataSnapshot prevSnap) {
 
-                                        if (snapshotPrevias.exists()) {
-                                            for (DataSnapshot s : snapshotPrevias.getChildren()) {
-                                                todasLasSeries.add((Map<String, Object>) s.getValue());
+                                        List<Map<String, Object>> todas = new ArrayList<>();
+
+                                        if (prevSnap.exists()) {
+                                            for (DataSnapshot s : prevSnap.getChildren()) {
+                                                todas.add((Map<String, Object>) s.getValue());
                                             }
                                         }
 
                                         int nuevasCompletadas = 0;
-                                        for (ExerciseSeries serie : nuevasSeries) {
+                                        for (ExerciseSeries serie : nuevas) {
                                             if (serie.isCompleted()) {
                                                 Map<String, Object> nueva = new HashMap<>();
-                                                nueva.put("seriesNumber", todasLasSeries.size() + 1);
-                                                nueva.put("reps", serie.getReps());
+                                                nueva.put("seriesNumber", todas.size() + 1);
+                                                nueva.put("reps",   serie.getReps());
                                                 nueva.put("weight", serie.getWeight());
-                                                nueva.put("rpe", serie.getRpe());
-                                                todasLasSeries.add(nueva);
+                                                nueva.put("rpe",    serie.getRpe());
+                                                todas.add(nueva);
                                                 nuevasCompletadas++;
                                             }
                                         }
 
                                         if (nuevasCompletadas > 0) {
-                                            Log.d(TAG, "✅ " + nuevasCompletadas + " nuevas series completadas para " + nombreEjercicio +
-                                                    " (Total: " + todasLasSeries.size() + ")");
 
-                                            // Guardar series
-                                            seriesRef.setValue(todasLasSeries)
-                                                    .addOnSuccessListener(aVoid ->
-                                                            Log.d(TAG, "📤 Series guardadas para " + nombreEjercicio))
-                                                    .addOnFailureListener(e ->
-                                                            Log.e(TAG, "❌ Error al guardar series", e));
+                                            Log.d(TAG, "✅ " + nuevasCompletadas + " nuevas series para "
+                                                    + nombreEjercicio + " (total " + todas.size() + ")");
 
-                                            // Actualizar campo "series"
-                                            exerciseRef.child("series").setValue(todasLasSeries.size())
-                                                    .addOnSuccessListener(aVoid ->
-                                                            Log.d(TAG, "🔥 Actualizado campo 'series' para " + nombreEjercicio + ": " + todasLasSeries.size()))
-                                                    .addOnFailureListener(e ->
-                                                            Log.e(TAG, "❌ Error al actualizar campo 'series'", e));
+                                            // ⬇️ guardar lista completa
+                                            seriesRef.setValue(todas)
+                                                    .addOnSuccessListener(a -> Log.d(TAG, "📤 Series guardadas"))
+                                                    .addOnFailureListener(e -> Log.e(TAG, "❌ Error guardando series", e));
+
+                                            // ⬇️ actualizar campo ‘series’ en el nodo del ejercicio
+                                            exerciseRef.child("series").setValue(todas.size())
+                                                    .addOnSuccessListener(a -> Log.d(TAG, "🔥 Campo 'series' actualizado a "
+                                                            + todas.size()))
+                                                    .addOnFailureListener(e -> Log.e(TAG, "❌ Error actualizando 'series'", e));
 
                                         } else {
-                                            Log.w(TAG, "⚠️ No se completó ninguna serie para " + nombreEjercicio + ". No se actualiza 'series'.");
+                                            Log.w(TAG, "⚠️ No hubo series completadas en " + nombreEjercicio);
                                         }
                                     }
-
-                                    @Override
-                                    public void onCancelled(@NonNull DatabaseError error) {
+                                    @Override public void onCancelled(@NonNull DatabaseError error) {
                                         Log.e(TAG, "❌ Error al leer series previas", error.toException());
                                     }
                                 });
                             }
                         }
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
+                        @Override public void onCancelled(@NonNull DatabaseError error) {
                             Log.e(TAG, "❌ Error al consultar ejercicio en Firebase", error.toException());
                         }
                     });
         }
 
+        // --------------------------------------------------------------------
+        // 2. Marcamos estado como guardado y reseteamos el contador de RIR-target
+        // --------------------------------------------------------------------
         seriesSaved = true;
+        Log.d(TAG, "··· pctCounter reseteado ···");
 
-        // Mostrar diálogo final
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_training_finished, null);
+        // --------------------------------------------------------------------
+        // 3. Mostrar diálogo de “Entrenamiento finalizado”
+        // --------------------------------------------------------------------
+        View dialogView = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_training_finished, null);
         AlertDialog dialog = new AlertDialog.Builder(requireContext())
                 .setView(dialogView)
                 .create();
 
-        TextView title = dialogView.findViewById(R.id.txtDialogTitle);
-        TextView message = dialogView.findViewById(R.id.txtDialogMessage);
-        Button btnAceptar = dialogView.findViewById(R.id.btnAceptarDialog);
+        TextView title       = dialogView.findViewById(R.id.txtDialogTitle);
+        TextView message     = dialogView.findViewById(R.id.txtDialogMessage);
+        Button   btnAceptar  = dialogView.findViewById(R.id.btnAceptarDialog);
 
         title.setText("Entrenamiento finalizado");
-        message.setText("Has completado tu entrenamiento en " + formatElapsedTime(pauseOffset) + ".");
+        message.setText("Has completado tu entrenamiento en "
+                + formatElapsedTime(pauseOffset) + ".");
 
         btnAceptar.setOnClickListener(v -> {
             dialog.dismiss();
 
-            actualizarConteoSeriesEnFirebase();  // También actualiza en userMovementPatterns
-            seriesSaved = true;
+            // Actualiza nº de series en userMovementPatterns
+            actualizarConteoSeriesEnFirebase();
 
+            // Ya estaba marcado como guardado arriba; no es necesario repetir
+            // seriesSaved = true;
+
+            // Volvemos al dashboard tras 1 s para dar tiempo al usuario a ver el diálogo
             new Handler(Looper.getMainLooper()).postDelayed(() -> {
                 Log.d(TAG, "🏁 Redirigiendo al DashboardWorkoutFragment tras guardado.");
-                ViewPagerActivity activity = (ViewPagerActivity) requireActivity();
-                Bundle data = new Bundle();
-                activity.switchToDashboardWorkoutFragment(data);
+                ((ViewPagerActivity) requireActivity())
+                        .switchToDashboardWorkoutFragment(new Bundle());
             }, 1000);
         });
 
         dialog.show();
     }
+
     private void guardarEjerciciosEnFirebase(List<Exercise> exercisesNuevos, String dayKey) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
@@ -950,6 +1031,11 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                 Log.e(TAG, "❌ Error al leer ejercicios globales: " + e.getMessage());
             }
         });
+    }
+    @Override
+    public void onStop() {
+        super.onStop();
+//        if (adapter != null) adapter.detachAllListeners();
     }
 
 

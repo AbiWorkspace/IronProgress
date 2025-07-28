@@ -13,6 +13,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.ViewHolder> {
@@ -23,10 +25,11 @@ public class ExercisesAdapter extends RecyclerView.Adapter<ExercisesAdapter.View
 
     public ExercisesAdapter(List<Exercise> exercises, List<String> selectedExercises, OnExerciseClickListener listener, OnExerciseSelectionChangedListener selectionChangedListener) {
         this.exercises = exercises;
-        this.selectedExercises = selectedExercises;
+        this.selectedExercises = new ArrayList<>(selectedExercises);
         this.listener = listener;
         this.selectionChangedListener = selectionChangedListener;
     }
+
 
     @NonNull
     @Override

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/searchDialogContainer"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -32,6 +33,7 @@
             android:background="@null"
             android:textSize="16sp" />
 
+        <!-- Botón lector de código de barras -->
         <ImageButton
             android:id="@+id/barcodeButton"
             android:layout_width="40dp"
@@ -40,16 +42,28 @@
             android:src="@drawable/ic_barcode"
             android:contentDescription="Buscar por código" />
 
+        <!-- Botón filtro macro (icono embudo) -->
+        <ImageButton
+            android:id="@+id/extraFilterButton"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_filter_menu"
+            android:contentDescription="Filtros macro" app:tint="#E63946" />
+
+        <!-- Botón de búsqueda -->
         <ImageButton
             android:id="@+id/searchButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/ic_search"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:tint="#E63946"
-            android:contentDescription="Buscar alimento" />
+            android:contentDescription="Buscar alimento"
+            app:tint="#E63946" />
 
     </LinearLayout>
+
+    <!-- Spinner filtros rápidos -->
     <Spinner
         android:id="@+id/filterSpinner"
         android:layout_width="match_parent"
@@ -60,12 +74,12 @@
         android:theme="@style/ThemeOverlay.AppCompat.Dark"
         android:textColor="#FFFFFF"/>
 
-
     <!-- Lista de resultados -->
     <ListView
         android:id="@+id/foodResultsListView"
         android:layout_width="match_parent"
-        android:layout_height="800dp"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:layout_marginTop="16dp"
         android:divider="@android:color/darker_gray"
         android:dividerHeight="1dp"
