@@ -128,93 +128,72 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkFirstTimeLogin(String userId) {
         Log.d(TAG, "Verificando primer inicio de sesión para el usuario: " + userId);
-        mDatabase.child("users").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                Log.d(TAG, "onDataChange llamado");
 
-                if (snapshot.exists()) {
-                    Log.d(TAG, "Snapshot existe para el usuario: " + userId);
-
-                    // 🔍 Obtener datos básicos
-                    String goal = snapshot.child("goal").getValue(String.class);
-
-                    boolean trainingFormCompleted = snapshot.child("trainingFormCompleted").getValue(Boolean.class) != null
-                            ? snapshot.child("trainingFormCompleted").getValue(Boolean.class) : false;
-
-                    boolean foodFormCompleted = snapshot.child("firstTime").getValue(Boolean.class) != null
-                            ? snapshot.child("firstTime").getValue(Boolean.class) : false;
-
-                    Log.d(TAG, "📌 trainingFormCompleted: " + trainingFormCompleted);
-                    Log.d(TAG, "📌 foodFormCompleted: " + foodFormCompleted);
-
-                    // 🔥 Deserializar `userMovementPatterns` manualmente
-                    Map<String, MovementPattern> movementPatterns = new HashMap<>();
-                    DataSnapshot movementPatternsSnapshot = snapshot.child("userMovementPatterns");
-
-                    if (movementPatternsSnapshot.exists()) {
-                        for (DataSnapshot patternSnapshot : movementPatternsSnapshot.getChildren()) {
-                            MovementPattern pattern = patternSnapshot.getValue(MovementPattern.class);
-                            if (pattern != null) {
-                                movementPatterns.put(patternSnapshot.getKey(), pattern);
-                            }
+        mDatabase.child("users").child(userId)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        if (!snapshot.exists()) {
+                            Log.e(TAG, "❌ No se encontraron datos del usuario.");
+                            Toast.makeText(MainActivity.this, "Error al obtener datos del usuario", Toast.LENGTH_SHORT).show();
+                            return;
                         }
-                    }
 
-                    // ✅ Convertir `MovementPattern` a `UserMovementPattern`
-                    List<UserMovementPattern> userMovementPatternList = new ArrayList<>();
-                    for (MovementPattern pattern : movementPatterns.values()) {
-                        UserMovementPattern userPattern = new UserMovementPattern();
-                        userPattern.setName(pattern.getName());
-                        userPattern.setUserExercises(new ArrayList<>()); // Inicializamos la lista de ejercicios
-                        userMovementPatternList.add(userPattern);
-                    }
+                        // -------- Campos para formularios (flujo normal) --------
+                        String goal = snapshot.child("goal").getValue(String.class);
 
-                    // ✅ Crear objeto `User` manualmente
-                    User user = new User();
-                    user.setGoal(goal);
-                    user.setTrainingFormCompleted(trainingFormCompleted);
-                    Map<String, UserMovementPattern> userMovementPatternMap = new HashMap<>();
-                    for (UserMovementPattern pattern : userMovementPatternList) {
-                        String id = pattern.getId() != null && !pattern.getId().isEmpty()
-                                ? pattern.getId()
-                                : UUID.randomUUID().toString(); // Generar ID si no hay
+                        boolean trainingFormCompleted = snapshot.child("trainingFormCompleted").getValue(Boolean.class) != null
+                                ? snapshot.child("trainingFormCompleted").getValue(Boolean.class) : false;
 
-                        userMovementPatternMap.put(id, pattern);
-                    }
-                    user.setUserMovementPatterns(userMovementPatternMap);
+                        boolean foodFormCompleted = snapshot.child("firstTime").getValue(Boolean.class) != null
+                                ? snapshot.child("firstTime").getValue(Boolean.class) : false;
 
+                        // --------- Campos para lógica de coach ----------
+                        String role = snapshot.child("role").getValue(String.class);
+                        if (role == null) role = "user"; // por defecto
 
+                        boolean coachCandidate = snapshot.child("coachCandidate").getValue(Boolean.class) != null
+                                ? snapshot.child("coachCandidate").getValue(Boolean.class) : false;
 
-                    Log.d(TAG, "✅ Datos del usuario obtenidos correctamente.");
+                        Log.d(TAG, "role=" + role + "  coachCandidate=" + coachCandidate);
+                        Log.d(TAG, "trainingFormCompleted=" + trainingFormCompleted + "  foodFormCompleted=" + foodFormCompleted);
 
-                    // 🔥 Redirección según tipo de usuario
-                    if (user.isAdmin()) {
-                        Log.d(TAG, "Usuario es administrador, redirigiendo a AdminActivity");
-                        startActivity(new Intent(MainActivity.this, AdminActivity.class));
-                    } else {
-                        Log.d(TAG, "Redirigiendo al dashboard");
+                        // --------- Ruteo según tipo ----------
+                        if ("coach".equalsIgnoreCase(role)) {
+                            // ✅ Coach aprobado: ir a pantalla de coach (lista de usuarios)
+                            Intent i = new Intent(MainActivity.this, UsersListActivity.class);
+                            startActivity(i);
+                            finish();
+                            return;
+                        }
 
-                        // 🔥 Enviar flags de formularios a ViewPagerActivity
+                        if (coachCandidate) {
+                            // 🕒 Solicitó ser coach pero aún no aprobado: pantalla de espera
+                            Intent i = new Intent(MainActivity.this, CoachPendingActivity.class);
+                            startActivity(i);
+                            finish();
+                            return;
+                        }
+
+                        // (opcional) admin si lo manejas en tu objeto User
+                        // if (user.isAdmin()) { ... }
+
+                        // 👤 Usuario normal: flujo habitual al ViewPager
                         Intent intent = new Intent(MainActivity.this, ViewPagerActivity.class);
                         intent.putExtra("trainingFormCompleted", trainingFormCompleted);
                         intent.putExtra("foodFormCompleted", foodFormCompleted);
                         startActivity(intent);
+                        finish();
                     }
-                    finish();
-                } else {
-                    Log.e(TAG, "❌ No se encontraron datos del usuario.");
-                    Toast.makeText(MainActivity.this, "Error al obtener datos del usuario", Toast.LENGTH_SHORT).show();
-                }
-            }
 
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "❌ Error de base de datos: " + error.getMessage());
-                Toast.makeText(MainActivity.this, "Error de base de datos", Toast.LENGTH_SHORT).show();
-            }
-        });
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError error) {
+                        Log.e(TAG, "❌ Error de base de datos: " + error.getMessage());
+                        Toast.makeText(MainActivity.this, "Error de base de datos", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
+
 
 
 }

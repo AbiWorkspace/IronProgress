@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="#2F2F2F"
+    android:layout_marginBottom="10dp">
+
+    <TextView
+        android:id="@+id/txtName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nombre Apellido"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:textSize="16sp"/>
+
+    <TextView
+        android:id="@+id/txtEmail"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="email@dominio.com"
+        android:textColor="#BBBBBB"
+        android:layout_marginTop="2dp"/>
+
+    <TextView
+        android:id="@+id/txtTrain"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Entrenamiento: ✖"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="6dp"/>
+
+    <TextView
+        android:id="@+id/txtFood"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Alimentación: ✖"
+        android:textColor="#FFFFFF"/>
+
+    <Button
+        android:id="@+id/btnOpenDashboard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Abrir dashboard"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#E63946"
+        android:textColor="#FFFFFF"/>
+</LinearLayout>

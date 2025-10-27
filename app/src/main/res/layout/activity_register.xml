@@ -121,6 +121,36 @@
             android:backgroundTint="#E63946"
             android:layout_marginBottom="32dp" />
 
+        <!-- ===== NUEVO: Solicitud de cuenta coach ===== -->
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/chkCoachRequest"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Solicitar cuenta coach"
+            android:textColor="#FFFFFF"
+            android:layout_marginBottom="12dp" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/coachNoteTil"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            app:hintTextColor="@color/hintColor"
+            app:boxBackgroundColor="#2F2F2F"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/coachNoteEditText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Motivo para ser coach (opcional)"
+                android:inputType="textCapSentences"
+                android:textColor="#FFFFFF"
+                android:padding="16dp" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <!-- ===== FIN NUEVO ===== -->
+
         <!-- Botón Registrar -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/registerButton"

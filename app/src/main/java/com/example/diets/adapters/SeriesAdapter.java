@@ -117,10 +117,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
 
         ExerciseSeries actual = seriesList.get(position);
         holder.bind(actual);
-        holder.seriesNumber.setText(String.valueOf(position + 1));
-        holder.repsInput.setText(String.valueOf(actual.getReps()));
-        holder.weightInput.setText(Util.f1(actual.getWeight()));
-        holder.rpeInput.setText(Util.f1(actual.getRpe()));
+
 
         // ------- LÓGICA DEFINITIVA DE CARGA ANTERIOR --------
         int serieNum = actual.getSeriesNumber();
@@ -443,7 +440,10 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
      *  ViewHolder
      * ========================================================= */
     static class SeriesViewHolder extends RecyclerView.ViewHolder {
+        private boolean editingRpe = false;
 
+        private boolean editingReps   = false;
+        private boolean editingWeight = false;
 
         private final TextView  seriesNumber,previousLoad;
         private final EditText  repsInput,weightInput,rpeInput;
@@ -455,38 +455,79 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
 
         private boolean isUpdating=false;
 
-        private final TextWatcher repsWatcher=new SimpleWatcher(){
-            @Override public void afterTextChanged(Editable s){
-                if(isUpdating) return;
-                try{
-                    adapter.seriesList.get(getBindingAdapterPosition())
-                            .setReps(Integer.parseInt(s.toString()));
-                }catch(NumberFormatException ignore){}
-            }};
-        private final TextWatcher weightWatcher=new SimpleWatcher(){
-            @Override public void afterTextChanged(Editable s){
-                if(isUpdating) return;
-                try{
-                    adapter.seriesList.get(getBindingAdapterPosition())
-                            .setWeight(Double.parseDouble(s.toString()));
-                }catch(NumberFormatException ignore){}
-            }};
-        private final TextWatcher rpeWatcher = new SimpleWatcher() {
+        private final TextWatcher repsWatcher = new SimpleWatcher() {
             @Override public void afterTextChanged(Editable s) {
-                if (isUpdating) return;
+                // Solo validar cuando el usuario está editando y no durante el pintado
+                if (isUpdating || !editingReps) return;
 
                 String txt = s.toString().trim();
                 if (txt.isEmpty()) {
-                    rpeInput.setError("RPE requerido (5–10)");
+                    repsInput.setError("Reps requeridas (1–30)");
+                    return;
+                }
+                try {
+                    int v = Integer.parseInt(txt);
+                    if (v < 1 || v > 30) {
+                        repsInput.setError("Reps fuera de rango (1–30)");
+                        return;
+                    }
+                    repsInput.setError(null);
+                    adapter.seriesList.get(getBindingAdapterPosition()).setReps(v);
+                } catch (NumberFormatException e) {
+                    repsInput.setError("Reps inválidas");
+                }
+            }
+        };
+
+        private final TextWatcher weightWatcher = new SimpleWatcher() {
+            @Override public void afterTextChanged(Editable s) {
+                if (isUpdating || !editingWeight) return;
+
+                String txt = s.toString().trim();
+                if (txt.isEmpty()) {
+                    // permitir vacío mientras escribe; limpia error
+                    weightInput.setError(null);
+                    return;
+                }
+                try {
+                    double v = Double.parseDouble(txt);
+                    // Tu filtro ya limita 0–500 con 1 decimal. Refuerza el rango aquí.
+                    if (v < 0 || v > 500) {
+                        weightInput.setError("Peso fuera de rango (0–500)");
+                        return;
+                    }
+                    weightInput.setError(null);
+                    adapter.seriesList.get(getBindingAdapterPosition()).setWeight(v);
+                } catch (NumberFormatException e) {
+                    weightInput.setError("Peso inválido");
+                }
+            }
+        };
+
+        private final TextWatcher rpeWatcher = new SimpleWatcher() {
+            @Override public void afterTextChanged(Editable s) {
+                // No validar cuando el adaptador está pintando o si el usuario NO está editando
+                if (isUpdating || !editingRpe) return;
+
+                String txt = s.toString().trim();
+                if (txt.isEmpty()) {                 // permite que borre para volver a escribir
+                    rpeInput.setError(null);
                     return;
                 }
                 try {
                     float r = Float.parseFloat(txt);
-                    if (r < 5f || r > 10f) {
-                        rpeInput.setError("RPE debe estar entre 5 y 10");
-                        // No guardes el valor inválido en el modelo
+
+                    // ⚠️ Mostrar error cuando el usuario escribe 0 o fuera de rango
+                    if (r == 0f) {
+                        rpeInput.setError("RPE no puede ser 0");
                         return;
                     }
+                    if (r < 5f || r > 10f) {
+                        rpeInput.setError("RPE debe estar entre 5 y 10");
+                        return;
+                    }
+
+                    // OK
                     rpeInput.setError(null);
                     adapter.seriesList.get(getBindingAdapterPosition()).setRpe(r);
                 } catch (NumberFormatException ignore) {
@@ -494,6 +535,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
                 }
             }
         };
+
+
 
 
 
@@ -539,43 +582,83 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         }
 
         void bind(ExerciseSeries s){
-            isUpdating=true;
+            isUpdating = true;
 
+            // Quitar listeners y onChecked para evitar rebotes
+            repsInput.removeTextChangedListener(repsWatcher);
+            weightInput.removeTextChangedListener(weightWatcher);
+            rpeInput.removeTextChangedListener(rpeWatcher);
+            checkSeriesCompleted.setOnCheckedChangeListener(null);
+
+            // Reiniciar flags de edición para esta fila
+            editingReps = false;
+            editingWeight = false;
+            editingRpe = false;
+
+            // Pintar encabezados/datos
             seriesNumber.setText(String.valueOf(s.getSeriesNumber()));
-            previousLoad.setText(
-                    s.getPreviousLoad() != null ? "" + Util.f1(s.getPreviousLoad())
-                            : "N/A");
+            Double prev = s.getPreviousLoad();
+            previousLoad.setText(prev != null ? Util.f1(prev) : "N/A");
 
-            repsInput   .removeTextChangedListener(repsWatcher);
-            weightInput .removeTextChangedListener(weightWatcher);
-            rpeInput    .removeTextChangedListener(rpeWatcher);
+            // Mostrar valores del modelo (sin ocultar números)
+            Integer reps = s.getReps();
+            repsInput.setText(reps != null ? String.valueOf(reps) : "0");
 
-            repsInput  .setText(String.valueOf(s.getReps()));
-            weightInput.setText(s.getWeight() > 0 ? Util.f1(s.getWeight()) : "");
-            rpeInput   .setText(s.getRpe()    > 0 ? Util.f1(s.getRpe())    : "");
+            Double weight = s.getWeight();
+            weightInput.setText(weight != null ? Util.f1(weight) : "0");
 
+            Number rNum = s.getRpe();
+            float rpe = (rNum == null) ? 0f : rNum.floatValue();
+            rpeInput.setText(Util.f1(rpe)); // si es 0, se ve 0
+
+            // Limpiar errores visibles al pintar
+            repsInput.setError(null);
+            weightInput.setError(null);
+            rpeInput.setError(null);
+
+            // Check completada
             checkSeriesCompleted.setChecked(s.isCompleted());
+            checkSeriesCompleted.setOnCheckedChangeListener((btn, checked) -> {
+                if (isUpdating) return;
+                s.setCompleted(checked);
+                Log.d("SeriesAdapter","Serie " + s.getSeriesNumber() + " completada = " + checked);
+            });
 
+            // Activar validación SOLO mientras el usuario edita cada campo
+            repsInput.setOnFocusChangeListener((v, hasFocus) -> {
+                editingReps = hasFocus;
+                if (!hasFocus && repsInput.getError() != null) {
+                    // opcional: limpiar error al salir
+                    // repsInput.setError(null);
+                }
+            });
+
+            weightInput.setOnFocusChangeListener((v, hasFocus) -> {
+                editingWeight = hasFocus;
+                if (!hasFocus && weightInput.getError() != null) {
+                    // opcional: limpiar error al salir
+                    // weightInput.setError(null);
+                }
+            });
+
+            rpeInput.setOnFocusChangeListener((v, hasFocus) -> {
+                editingRpe = hasFocus;
+                if (!hasFocus && rpeInput.getError() != null) {
+                    // opcional: limpiar error al salir
+                    // rpeInput.setError(null);
+                }
+            });
+
+            // Volver a añadir watchers (una sola vez)
             repsInput.addTextChangedListener(repsWatcher);
             weightInput.addTextChangedListener(weightWatcher);
             rpeInput.addTextChangedListener(rpeWatcher);
 
-
-            checkSeriesCompleted.setOnCheckedChangeListener(null); // quita viejo
-            checkSeriesCompleted.setChecked(s.isCompleted());
-            checkSeriesCompleted.setOnCheckedChangeListener((btn, checked) -> {
-                if (isUpdating) return;          // evita rebote por reciclado
-                s.setCompleted(checked);
-                Log.d("SeriesAdapter",
-                        "Serie " + s.getSeriesNumber() + " completada = " + checked);
-            });
-
-            repsInput  .addTextChangedListener(repsWatcher);
-            weightInput.addTextChangedListener(weightWatcher);
-            rpeInput   .addTextChangedListener(rpeWatcher);
-
-            isUpdating=false;
+            isUpdating = false;
         }
+
+
+
 
         /* ----------------------------------------------------- */
         private abstract static class SimpleWatcher implements TextWatcher{
