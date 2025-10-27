@@ -481,6 +481,11 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                     textBestSeries.setTextColor(Color.parseColor("#BBBBBB"));
                 }
 
+                if (textRM != null) {
+                    textRM.setText("RM Estimado: " + String.format("%.2f", bestRm) + " kg");
+                }
+
+
                 drawProgressChart(allSeriesData);
             }
             @Override public void onCancelled(@NonNull DatabaseError error) {

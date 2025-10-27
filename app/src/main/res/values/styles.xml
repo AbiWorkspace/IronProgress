@@ -86,6 +86,20 @@
     </style>
 
 
+    <style name="CustomAlertDialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <!-- Fondo del diálogo -->
+        <item name="android:background">#1C1C1C</item>
+        <!-- Título -->
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <!-- Mensaje e inputs -->
+        <item name="android:textColorSecondary">#BBBBBB</item>
+        <!-- Botones -->
+        <item name="colorAccent">#E63946</item>
+        <item name="android:buttonBarPositiveButtonStyle">@style/CustomAlertDialogButton</item>
+        <item name="android:buttonBarNegativeButtonStyle">@style/CustomAlertDialogButton</item>
+    </style>
+
+
 
     <style name="CustomAlertDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
         <item name="android:textColor">#FFFFFF</item>

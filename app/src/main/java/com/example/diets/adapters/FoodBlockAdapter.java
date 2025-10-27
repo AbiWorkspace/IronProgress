@@ -66,35 +66,42 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
     }
 
     // ───────────────────────────────── ViewHolder
+    // ───────────────────────────────── ViewHolder
     static class BlockViewHolder extends RecyclerView.ViewHolder {
-        // UI
-        final EditText   foodTitle;
+
+        /* UI */
+        final EditText    foodTitle;
         final RecyclerView rvProducts, rvRecipes;
         final ImageButton addFoodItemButton, menuButton;
-        final TextView   nutritionKcal, nutritionProtein, nutritionCarbs, nutritionFat;
-        final TextView   labelRecetas, labelProductos;
+        final TextView    nutritionKcal, nutritionProtein,
+                nutritionCarbs, nutritionFat;
+        final TextView    labelRecetas, labelProductos;
 
-        // Referencias para optimizar
+        /* Referencias para optimizar */
         FoodItemAdapter   productsAdapter;
-        ItemTouchHelper   productsHelper;
         RecipeItemAdapter recipesAdapter;
-        ItemTouchHelper   recipesHelper;
+        ItemTouchHelper   productsHelper, recipesHelper;
+
+        /* 🆕 bloque actualmente asociado a este ViewHolder
+           (para detectar cuándo se recicla) */
+        FoodBlock currentBlock;
 
         BlockViewHolder(@NonNull View v) {
             super(v);
-            foodTitle          = v.findViewById(R.id.foodTitle);
-            rvProducts         = v.findViewById(R.id.rvProducts);
-            rvRecipes          = v.findViewById(R.id.rvRecipes);
-            addFoodItemButton  = v.findViewById(R.id.addFoodItemButton);
-            menuButton         = v.findViewById(R.id.menuButton);
-            nutritionKcal      = v.findViewById(R.id.nutritionKcal);
-            nutritionProtein   = v.findViewById(R.id.nutritionProtein);
-            nutritionCarbs     = v.findViewById(R.id.nutritionCarbs);
-            nutritionFat       = v.findViewById(R.id.nutritionFat);
-            labelRecetas       = v.findViewById(R.id.labelRecetas);
-            labelProductos     = v.findViewById(R.id.labelProductos);
+            foodTitle         = v.findViewById(R.id.foodTitle);
+            rvProducts        = v.findViewById(R.id.rvProducts);
+            rvRecipes         = v.findViewById(R.id.rvRecipes);
+            addFoodItemButton = v.findViewById(R.id.addFoodItemButton);
+            menuButton        = v.findViewById(R.id.menuButton);
+            nutritionKcal     = v.findViewById(R.id.nutritionKcal);
+            nutritionProtein  = v.findViewById(R.id.nutritionProtein);
+            nutritionCarbs    = v.findViewById(R.id.nutritionCarbs);
+            nutritionFat      = v.findViewById(R.id.nutritionFat);
+            labelRecetas      = v.findViewById(R.id.labelRecetas);
+            labelProductos    = v.findViewById(R.id.labelProductos);
         }
     }
+
 
     // ───────────────────────────────── Métodos base
     @NonNull
@@ -107,29 +114,42 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
 
     @Override
     public void onBindViewHolder(@NonNull BlockViewHolder h, int position) {
+
         Log.d(TAG, "🟢 onBindViewHolder → pos " + position);
         FoodBlock block = foodBlocks.get(position);
+        Log.d(TAG, String.format("block[%d] → '%s' con %d items",
+                position, block.getTitle(), block.getItems().size()));
 
-        /* ---------- Título ---------- */
+        /*────────────────────────────  TÍTULO  ────────────────────────────*/
         h.foodTitle.setText(block.getTitle());
-        h.foodTitle.setFilters(new InputFilter[]{ new InputFilter.LengthFilter(MAX_TITLE_CHARS) });
+        h.foodTitle.setFilters(new InputFilter[]{new InputFilter.LengthFilter(MAX_TITLE_CHARS)});
         h.foodTitle.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) {
                 block.setTitle(h.foodTitle.getText().toString());
-                Log.d(TAG, "🔄 Título actualizado → " + block.getTitle());
+                Log.d(TAG, String.format("block[%d] 🔄 Título actualizado → %s",
+                        position, block.getTitle()));
             }
         });
 
-        /* ---------- Separar recetas y productos ---------- */
+        /*────────────────────  SEPARAR RECETAS / PRODUCTOS  ───────────────*/
         List<FoodItem> recetas   = new ArrayList<>();
         List<FoodItem> productos = new ArrayList<>();
-        for (FoodItem i : block.getItems()) {
-            if (i.isRecipe()) recetas.add(i); else productos.add(i);
+        for (FoodItem it : block.getItems()) {
+            if (it.isRecipe()) recetas.add(it);
+            else               productos.add(it);
         }
-        Log.d(TAG, "block '" + block.getTitle() + "' productos=" + productos.size() + ", recetas=" + recetas.size());
+        Log.d(TAG, String.format(
+                "block[%d] '%s': productos=%d, recetas=%d",
+                position, block.getTitle(), productos.size(), recetas.size()));
 
-        /* ---------- Recycler Productos ---------- */
-        if (h.productsAdapter == null) {
+    /*────────────────────────  ADAPTERS (anti-reciclado) ───────────────
+      Si el ViewHolder se reutiliza para OTRO bloque, los callbacks que
+      capturaban la referencia del bloque antiguo quedarían mal.  Para
+      evitarlo, cuando detectamos que el bloque ha cambiado
+      (h.currentBlock != block) se crean nuevos adapters y helpers.       */
+        if (h.currentBlock != block) {
+
+            /* -------- Productos -------- */
             h.productsAdapter = new FoodItemAdapter(productos, ctx, parentFragment,
                     () -> {
                         updateNutritionSummary(h, block);
@@ -139,17 +159,14 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
 
             h.rvProducts.setLayoutManager(new LinearLayoutManager(ctx));
             h.rvProducts.setAdapter(h.productsAdapter);
-            h.rvProducts.setRecycledViewPool(POOL_PRODUCTS);          // ⬅️ pool exclusivo
+            h.rvProducts.setRecycledViewPool(POOL_PRODUCTS);
 
+            if (h.productsHelper != null) h.productsHelper.attachToRecyclerView(null);
             h.productsHelper = new ItemTouchHelper(
                     new FoodItemAdapter.SwipeToDeleteCallback(ctx, h.productsAdapter));
             h.productsHelper.attachToRecyclerView(h.rvProducts);
-        } else {
-            h.productsAdapter.setItems(productos);
-        }
 
-        /* ---------- Recycler Recetas ---------- */
-        if (h.recipesAdapter == null) {
+            /* -------- Recetas -------- */
             h.recipesAdapter = new RecipeItemAdapter(recetas, ctx, parentFragment,
                     () -> {
                         updateNutritionSummary(h, block);
@@ -159,45 +176,56 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
 
             h.rvRecipes.setLayoutManager(new LinearLayoutManager(ctx));
             h.rvRecipes.setAdapter(h.recipesAdapter);
-            h.rvRecipes.setRecycledViewPool(POOL_RECIPES);            // ⬅️ pool exclusivo
+            h.rvRecipes.setRecycledViewPool(POOL_RECIPES);
 
+            if (h.recipesHelper != null) h.recipesHelper.attachToRecyclerView(null);
             h.recipesHelper = new ItemTouchHelper(
                     new RecipeItemAdapter.SwipeToDeleteCallback(ctx, h.recipesAdapter));
             h.recipesHelper.attachToRecyclerView(h.rvRecipes);
-        } else {
-            h.recipesAdapter.setItems(recetas);
+
+            // ¡Muy importante!
+            h.currentBlock = block;   // ahora este ViewHolder representa a ‘block’
+
+        } else { // mismo bloque ⇒ sólo refrescamos los datos
+            h.productsAdapter.setItems(productos);
+            h.recipesAdapter .setItems(recetas);
         }
 
-        /* ---------- Visibilidad de etiquetas ---------- */
-        h.labelRecetas.setVisibility(recetas.isEmpty()    ? View.GONE : View.VISIBLE);
-        h.rvRecipes  .setVisibility(recetas.isEmpty()     ? View.GONE : View.VISIBLE);
-        h.labelProductos.setVisibility(productos.isEmpty()? View.GONE : View.VISIBLE);
-        h.rvProducts .setVisibility(productos.isEmpty()   ? View.GONE : View.VISIBLE);
+        /*────────────────────  VISIBILIDAD DE ETIQUETAS  ───────────────────*/
+        h.labelRecetas   .setVisibility(recetas.isEmpty()    ? View.GONE : View.VISIBLE);
+        h.rvRecipes      .setVisibility(recetas.isEmpty()    ? View.GONE : View.VISIBLE);
+        h.labelProductos .setVisibility(productos.isEmpty()  ? View.GONE : View.VISIBLE);
+        h.rvProducts     .setVisibility(productos.isEmpty()  ? View.GONE : View.VISIBLE);
 
-        /* ---------- Botón añadir alimento ---------- */
+        /*────────────────────  BOTÓN “+” AÑADIR ALIMENTO  ──────────────────*/
         h.addFoodItemButton.setOnClickListener(v -> {
             FoodMenuDialogFragment dialog = FoodMenuDialogFragment.newInstance();
             dialog.setOnFoodSelected(result -> {
                 FoodItem newItem = new FoodItem(
-                        result.name, result.grams,
-                        result.kcalPer100g, result.protein,
-                        result.carbs,       result.fat,
-                        result.imageUrl);
-                newItem.setChecked(true);
+                        result.name,  result.grams,
+                        result.kcalPer100g,
+                        result.protein, result.carbs, result.fat,
+                        result.imageUrl,  /*isRecipe*/ false);
+
                 if (result.ingredients != null && !result.ingredients.isEmpty()) {
                     newItem.setIngredients(result.ingredients);
                     newItem.setInstructions(result.instructions);
                     newItem.setRecipe(true);
                 }
+                newItem.setChecked(true);
+
                 block.addItem(newItem);
+
+            /* NOTAS:
+               • notifyItemChanged() fuerza redraw de ESTE ViewHolder
+               • los totales del día se recalculan en el callback */
                 notifyItemChanged(h.getBindingAdapterPosition());
                 parentFragment.recalculateDayTotals();
-                Log.d(TAG, "Añadido alimento: " + newItem.getName() + " al bloque " + block.getTitle());
             });
             dialog.show(parentFragment.getParentFragmentManager(), "FoodMenuDialogFragment");
         });
 
-        /* ---------- Menú contextual ---------- */
+        /*────────────────────  MENÚ CONTEXTUAL (delete/duplicate) ──────────*/
         h.menuButton.setOnClickListener(v -> {
             PopupMenu popup = new PopupMenu(v.getContext(), h.menuButton);
             popup.getMenuInflater().inflate(R.menu.food_block_menu, popup.getMenu());
@@ -206,17 +234,15 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
                 if (pos == RecyclerView.NO_POSITION) return false;
                 if (item.getItemId() == R.id.action_delete_block) {
                     if (deleteListener != null) deleteListener.onDeleteRequested(block, pos);
-                    return true;
                 } else if (item.getItemId() == R.id.action_duplicate_block) {
                     duplicateBlock(pos);
-                    return true;
                 }
-                return false;
+                return true;
             });
             popup.show();
         });
 
-        /* ---------- Resumen nutricional ---------- */
+        /*────────────────────  RESUMEN NUTRICIONAL  ────────────────────────*/
         updateNutritionSummary(h, block);
     }
 
@@ -268,6 +294,8 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
             c    += it.getCarbsPer100g()  * factor;
             g    += it.getFatPer100g()    * factor;
         }
+        Log.d("FoodBlockAdapter#updateNutritionSummary",
+                "block=" + b.getTitle() + " kcal=" + kcal);
         h.nutritionKcal   .setText(String.format(Locale.getDefault(), "Kcal: %.0f", kcal));
         h.nutritionProtein.setText(String.format(Locale.getDefault(), "P: %.1fg", p));
         h.nutritionCarbs  .setText(String.format(Locale.getDefault(), "C: %.1fg", c));

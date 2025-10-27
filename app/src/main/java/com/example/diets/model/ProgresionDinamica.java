@@ -261,22 +261,30 @@ public class ProgresionDinamica {
                 compSesion, repsObj, rpeObj, saltoMin, hist);
 
         float rmBase;
+
+
+
+
+
         if (!Float.isNaN(rmAll)) {
             rmBase = rmAll;
+            Log.d(TAG, "rmbase1: " + rmBase);
             if (!Float.isNaN(pesoFeedback)) {
                 float pesoRM = pesoEpley(rmBase, repsObj, rpeObj);
                 float floor = pesoRM * 0.97f, ceil = pesoRM * 1.03f;
                 pesoFeedback = Math.max(floor, Math.min(ceil, pesoFeedback));
                 rmBase = pesoFeedback * (1f + (repsObj + rirObj) / 30f);
+                Log.d(TAG, "rmbase2: " + rmBase);
             }
         } else {
             rmBase = (!Float.isNaN(pesoFeedback))
                     ? pesoFeedback * (1f + (repsObj + rirObj) / 30f)
                     : 40f;
+            Log.d(TAG, "rmbase3: " + rmBase);
         }
         if (Float.isNaN(st.rmCongelado) || (st.bloqueCiclo == 0 && st.subCicloEnBloque == 0)) st.rmCongelado = rmBase;
-        rmBase = st.rmCongelado;
-
+//        rmBase = st.rmCongelado;
+        Log.d(TAG, "rmbase4: " + rmBase);
         float pesoSet = redondearPeso(pesoEpley(rmBase, repsObj, rpeObj), saltoMin);
 
         List<Serie> res = new ArrayList<>(seriesHoy);
@@ -438,30 +446,54 @@ public class ProgresionDinamica {
 
 
     private static float rmReferencia(List<ExerciseSeries> hist, int repsObj, int rpeObj) {
-
         if (hist == null || hist.isEmpty()) {
             Log.w(TAG, "Historial nulo o vacío en rmReferencia. Retornando Float.NaN.");
             return Float.NaN;
         }
 
         if (DEBUG) Log.d(TAG, "rmReferencia: repsObj=" + repsObj + ", rpeObj=" + rpeObj);
-        if (hist == null || hist.isEmpty()) return Float.NaN;
-        int from = Math.max(0, hist.size() - 300);
-        List<ExerciseSeries> ultimas = hist.subList(from, hist.size());
-        float bestRm = Float.NaN, sumRm = 0; int n = 0;
+
+        // Limitar el historial a las últimas 300 series como máximo
+        int fromIndex = Math.max(0, hist.size() - 300);
+        List<ExerciseSeries> ultimas = hist.subList(fromIndex, hist.size());
+
+        float bestRm = Float.NaN;
+        float sumRm = 0f;
+        int n = 0;
+
         for (ExerciseSeries s : ultimas) {
             int reps = s.getReps();
-            float rm = estimar1RM((float) s.getWeight(), reps);
-            bestRm = Float.isNaN(bestRm) ? rm : Math.max(bestRm, rm);
-            sumRm += rm; n++;
+            float rpe = (float) s.getRpe();
+
+
+            // Filtrar solo series pesadas: pocas reps y alto RPE
+            if (rpe <= 8f || reps >= 6) continue;
+
+            float rmEstimado = estimar1RM((float) s.getWeight(), reps);
+
+            if (Float.isNaN(bestRm)) {
+                bestRm = rmEstimado;
+            } else {
+                bestRm = Math.max(bestRm, rmEstimado);
+            }
+
+            sumRm += rmEstimado;
+            n++;
         }
-        if (Float.isNaN(bestRm)) return Float.NaN;
-        float media = sumRm / n;
-        float techo = media * 1.05f;
-        float out = Math.min(bestRm, techo);
-        if (DEBUG) Log.d(TAG, "rmReferencia: resultado=" + out);
-        return out;
+
+        if (n == 0 || Float.isNaN(bestRm)) {
+            Log.w(TAG, "No se encontraron series válidas para calcular rmReferencia.");
+            return Float.NaN;
+        }
+
+        float mediaRm = sumRm / n;
+        float techo = mediaRm * 1.05f;
+        float resultado = Math.min(bestRm, techo);
+
+        if (DEBUG) Log.d(TAG, "rmReferencia: resultado final=" + resultado);
+        return resultado;
     }
+
 
     private static float ajustePorFeedback(List<ExerciseSeries> compSesion,
                                            int repsObj, int rpeObj,

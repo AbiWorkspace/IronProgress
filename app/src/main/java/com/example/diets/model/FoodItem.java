@@ -1,5 +1,7 @@
 package com.example.diets.model;
 
+import android.util.Log;
+
 import java.util.List;
 
 public class FoodItem {
@@ -110,9 +112,16 @@ public class FoodItem {
     public void setRecipe(boolean recipe) {
         this.isRecipe = recipe;
     }
+
     public void setChecked(boolean checked) {
+        Log.d("FoodItem#setChecked",
+                getName() + " hash=" + hashCode() + " -> " + checked);
+
+        // ← aquí estaba el fallo: debe ser isChecked
         this.isChecked = checked;
     }
+
+
     public void setIngredients(List<String> ingredients) {
         this.ingredients = ingredients;
     }

@@ -141,4 +141,11 @@ public class ExerciseSeries {
             return 0.0;
         }
     }
+
+    public String toSimple() {
+        return "w=" + getWeight()
+                + " r=" + getReps()
+                + " rpe=" + getRpe();
+    }
+
 }

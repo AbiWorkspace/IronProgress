@@ -1,12 +1,13 @@
 package com.example.diets.fragments;
 
-import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
@@ -14,6 +15,7 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.diets.R;
 import com.example.diets.activitys.AddExerciseDialogFragment;
 import com.example.diets.adapters.ExercisesAdapter;
@@ -21,40 +23,50 @@ import com.example.diets.model.Exercise;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.TrainingDay;
 import com.google.common.reflect.TypeToken;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.gson.Gson;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
-public class CreatedExercisesFragment extends Fragment implements AddExerciseDialogFragment.AddExerciseListener,
-        ExercisesAdapter.OnExerciseClickListener, ExercisesAdapter.OnExerciseSelectionChangedListener {
+public class CreatedExercisesFragment extends Fragment implements
+        AddExerciseDialogFragment.AddExerciseListener,
+        ExercisesAdapter.OnExerciseClickListener,
+        ExercisesAdapter.OnExerciseSelectionChangedListener {
 
     private static final String TAG = "CreatedExercisesFragment";
+
     private RecyclerView recyclerView;
     private Button doneButton, deleteExerciseButton, addExerciseButton;
-    private List<Exercise> exercises = new ArrayList<>();
-    private List<Exercise> selectedExercises = new ArrayList<>();
-    private static final String FILE_NAME = "exercises.json";
-    private DatabaseReference mDatabase;
+    private final List<Exercise> exercises = new ArrayList<>();
+    private final List<Exercise> selectedExercises = new ArrayList<>();
+    // IDs/keys que el adapter espera
+    private final List<String> selectedExerciseIds = new ArrayList<>();
+
     private ExercisesAdapter adapter;
     private MenuPopupFragment.OnExerciseSelectedListener listener;
-    private TrainingDay trainingDay; // Para recibir el día de entrenamiento y su patrón de movimiento
+    private TrainingDay trainingDay; // Día de entrenamiento y su patrón
+
+    // ===== Helpers de seguridad y archivo por usuario =====
+    private @Nullable String uid() {
+        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+        return (u != null) ? u.getUid() : null;
+    }
+    private File file() {
+        return new File(requireContext().getFilesDir(), uid() + "_exercises.json");
+    }
+    private boolean ready() { return isAdded() && getContext() != null; }
 
     @Nullable
     @Override
@@ -69,63 +81,71 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
         doneButton = view.findViewById(R.id.doneButton);
         addExerciseButton = view.findViewById(R.id.add_exercise_button);
         deleteExerciseButton = view.findViewById(R.id.delete_exercise_button);
-        mDatabase = FirebaseDatabase.getInstance().getReference();
 
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        // 🔥 OBTENER `TrainingDay` SIN PERDER FUNCIONALIDADES
+        // Inicializar SIEMPRE el adapter antes de cargar datos
+        Log.d(TAG, "onViewCreated: Inicializando adapter y asignándolo al RecyclerView.");
+        adapter = new ExercisesAdapter(
+                exercises,
+                selectedExerciseIds,
+                this,
+                this
+        );
+        recyclerView.setAdapter(adapter);
+
+        // Obtener `TrainingDay` y cargar ejercicios
         Bundle args = getArguments();
         if (args != null && args.containsKey("trainingDay")) {
             trainingDay = (TrainingDay) args.getSerializable("trainingDay");
-
-            // ✅ VALIDACIÓN EXTRA - Evitar dayTitle null
             if (trainingDay != null && trainingDay.getDayTitle() == null) {
-                Log.w(TAG, "⚠️ TrainingDay recibido sin dayTitle. Asignando uno genérico.");
+                Log.w(TAG, "onViewCreated: TrainingDay sin dayTitle; asignando genérico.");
                 trainingDay.setDayTitle("Día sin nombre");
             }
-
             if (trainingDay != null) {
-                Log.d(TAG, "📌 Día de entrenamiento recibido en CreatedExercisesFragment: " + trainingDay.getDayTitle());
-                loadExercisesFromInternalStorage(trainingDay.getMovementPatterns()); // ✅ FILTRO POR PATRÓN DE MOVIMIENTO
+                Log.d(TAG, "onViewCreated: Día recibido -> " + trainingDay.getDayTitle());
+                loadExercisesFromInternalStorage(trainingDay.getMovementPatterns());
             } else {
-                Log.e(TAG, "❌ TrainingDay es NULL en CreatedExercisesFragment");
+                Log.e(TAG, "onViewCreated: TrainingDay es NULL; cargando todos.");
                 loadExercisesFromInternalStorage(null);
             }
         } else {
-            Log.e(TAG, "❌ No se recibió `TrainingDay`, cargando todos los ejercicios.");
+            Log.e(TAG, "onViewCreated: No se recibió TrainingDay; cargando todos.");
             loadExercisesFromInternalStorage(null);
         }
 
-        // ✅ BOTÓN PARA GUARDAR EJERCICIOS SELECCIONADOS (NO SE TOCA)
+        // Botón guardar selección
         doneButton.setOnClickListener(v -> {
-            Log.d(TAG, "✅ Enviando " + selectedExercises.size() + " ejercicios seleccionados al listener...");
-
+            if (selectedExercises.size() < 1) {
+                Toast.makeText(getContext(), "Debes seleccionar al menos un ejercicio", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            Log.d(TAG, "doneButton.onClick: Enviando " + selectedExercises.size() + " ejercicios al listener.");
             if (listener != null) {
-                for (Exercise exercise : selectedExercises) {
-                    listener.onExerciseSelected(exercise);
-                }
+                for (Exercise exercise : selectedExercises) listener.onExerciseSelected(exercise);
             }
             getParentFragmentManager().beginTransaction().remove(this).commit();
         });
 
-        // ✅ BOTÓN PARA AGREGAR UN NUEVO EJERCICIO (NO SE TOCA)
+        // Botón agregar ejercicio
         addExerciseButton.setOnClickListener(v -> {
+            Log.d(TAG, "addExerciseButton.onClick: Abriendo AddExerciseDialogFragment y fijando listener.");
             AddExerciseDialogFragment dialogFragment = new AddExerciseDialogFragment();
-            dialogFragment.setAddExerciseListener(this); // 🔥 Asegurar que el listener está configurado
+            dialogFragment.setAddExerciseListener(this);
             dialogFragment.show(getParentFragmentManager(), "AddExerciseDialogFragment");
         });
 
-        // ✅ BOTÓN PARA ELIMINAR EJERCICIOS (NO SE TOCA)
+        // Botón eliminar seleccionados
         deleteExerciseButton.setOnClickListener(v -> showDeleteConfirmationDialog());
     }
-
 
     public void setOnExerciseSelectedListener(MenuPopupFragment.OnExerciseSelectedListener listener) {
         this.listener = listener;
     }
 
     private void showDeleteConfirmationDialog() {
-        new AlertDialog.Builder(getContext())
+        if (!ready()) return;
+        new AlertDialog.Builder(requireContext())
                 .setTitle("Eliminar Ejercicio")
                 .setMessage("¿Estás seguro de que deseas eliminar los ejercicios seleccionados?")
                 .setPositiveButton("Sí", (dialog, which) -> deleteSelectedExercises())
@@ -134,135 +154,131 @@ public class CreatedExercisesFragment extends Fragment implements AddExerciseDia
     }
 
     private void deleteSelectedExercises() {
+        Log.d(TAG, "deleteSelectedExercises: Eliminando " + selectedExercises.size() + " ejercicios seleccionados.");
         exercises.removeAll(selectedExercises);
         selectedExercises.clear();
+        selectedExerciseIds.clear(); // mantener en sync con el adapter
         saveExercisesToInternalStorage();
-        adapter.notifyDataSetChanged();
+        if (adapter != null) adapter.notifyDataSetChanged();
     }
 
     private void saveExercisesToInternalStorage() {
-        try {
-            File file = new File(getContext().getFilesDir(), FILE_NAME);
-            FileWriter writer = new FileWriter(file);
-            Gson gson = new Gson();
-            String json = gson.toJson(exercises);
-            writer.write(json);
-            writer.close();
+        Log.d(TAG, "saveExercisesToInternalStorage: Guardando " + exercises.size() + " ejercicios en JSON.");
+        if (!ready()) return;
+        String u = uid();
+        if (u == null) { Log.w(TAG, "save: uid null"); return; }
+        try (FileWriter writer = new FileWriter(file())) {
+            new Gson().toJson(exercises, writer);
         } catch (IOException e) {
             Log.e(TAG, "❌ Error al guardar ejercicios", e);
         }
     }
 
-    // 🔥 Método actualizado para cargar ejercicios filtrados por patrón de movimiento
-    private void loadExercisesFromInternalStorage(List<MovementPattern> movementPatterns) {
-        try {
-            File file = new File(getContext().getFilesDir(), FILE_NAME);
-            if (!file.exists()) {
-                Log.e(TAG, "❌ Archivo de ejercicios no encontrado.");
-                return;
-            }
-
-            BufferedReader reader = new BufferedReader(new FileReader(file));
-            Gson gson = new Gson();
-            Type listType = new TypeToken<List<Exercise>>() {}.getType();
-            List<Exercise> loadedExercises = gson.fromJson(reader, listType);
-            reader.close();
-
-            if (loadedExercises != null) {
-                exercises.clear();
-                // 🔥 Desactivando filtro por patrón: cargar todos los ejercicios
-                exercises.addAll(loadedExercises);
-
-            }
-
-            setupRecyclerView();
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Error al cargar ejercicios desde almacenamiento interno", e);
-        }
-    }
-
-
-
-    private void setupRecyclerView() {
-        if (recyclerView != null) {
-            adapter = new ExercisesAdapter(
-                    exercises,
-                    new ArrayList<>(),
-                    new ExercisesAdapter.OnExerciseClickListener() {
-                        @Override
-                        public void onExerciseClick(Exercise exercise) {
-                            CreatedExercisesFragment.this.onExerciseClick(exercise);
-                        }
-                    },
-                    this
-            );
-
-
-            recyclerView.setAdapter(adapter);
-            adapter.notifyDataSetChanged();
-        }
-    }
-
-    public void addExerciseToSelection(Exercise exercise) {
-        if (!selectedExercises.contains(exercise)) {
-            selectedExercises.add(exercise);
-        }
-    }
-
-    @Override
-    public void onExerciseAdded(Exercise exercise) {
-        exercises.add(exercise);
-        adapter.notifyItemInserted(exercises.size() - 1);
-        saveExercisesToInternalStorage();
-    }
-    @Override
-    public void onExerciseClick(Exercise exercise) {
-        Log.d(TAG, "🖱 Contenedor clickeado - ejercicio: " + (exercise != null ? exercise.getName() : "null"));
-
-        if (exercise == null) {
-            Log.e(TAG, "❌ Error: El objeto Exercise es null. No se puede abrir el fragmento de detalles.");
+    // Cargar ejercicios (si no hay archivo, el adapter YA está listo → no hay NPE)
+    private void loadExercisesFromInternalStorage(@Nullable List<MovementPattern> movementPatterns) {
+        Log.d(TAG, "loadExercisesFromInternalStorage: Iniciando carga desde almacenamiento interno.");
+        if (!ready()) return;
+        String u = uid();
+        if (u == null) { Log.w(TAG, "load: uid null"); return; }
+        File f = file();
+        if (!f.exists()) {
+            Log.w(TAG, "loadExercisesFromInternalStorage: Archivo no encontrado; lista vacía.");
+            exercises.clear();
+            if (adapter != null) adapter.notifyDataSetChanged();
             return;
         }
 
+        try (BufferedReader reader = new BufferedReader(new FileReader(f))) {
+            Gson gson = new Gson();
+            Type listType = new TypeToken<List<Exercise>>() {}.getType();
+            List<Exercise> loadedExercises = gson.fromJson(reader, listType);
+
+            exercises.clear();
+            if (loadedExercises != null) {
+                exercises.addAll(loadedExercises); // por ahora sin filtro
+                Log.d(TAG, "loadExercisesFromInternalStorage: Cargados " + exercises.size() + " ejercicios.");
+            } else {
+                Log.w(TAG, "loadExercisesFromInternalStorage: JSON vacío o inválido; lista vacía.");
+            }
+
+            if (adapter != null) adapter.notifyDataSetChanged();
+        } catch (Exception e) {
+            Log.e(TAG, "❌ loadExercisesFromInternalStorage: Error al cargar ejercicios", e);
+        }
+    }
+
+    // --- Utilidades de selección/keys -----------------------------------------
+
+    private String keyOf(Exercise e) {
+        if (e == null) return "null";
+        try {
+            int id = e.getId();
+            if (id > 0) return "id:" + id;
+        } catch (Throwable ignore) { }
+        if (e.getName() != null && !e.getName().trim().isEmpty()) return "name:" + e.getName().trim();
+        return "hash:" + System.identityHashCode(e);
+    }
+
+    private void syncSelectAdd(Exercise e) {
+        if (e == null) return;
+        if (!selectedExercises.contains(e)) selectedExercises.add(e);
+        String k = keyOf(e);
+        if (!selectedExerciseIds.contains(k)) selectedExerciseIds.add(k);
+        Log.d(TAG, "syncSelectAdd: añadido " + k + " (total sel=" + selectedExercises.size() + ")");
+    }
+
+    private void syncSelectRemove(Exercise e) {
+        if (e == null) return;
+        selectedExercises.remove(e);
+        String k = keyOf(e);
+        selectedExerciseIds.remove(k);
+        Log.d(TAG, "syncSelectRemove: removido " + k + " (total sel=" + selectedExercises.size() + ")");
+    }
+
+    // --------------------------------------------------------------------------
+
+    public void addExerciseToSelection(Exercise exercise) { syncSelectAdd(exercise); }
+
+    @Override
+    public void onExerciseAdded(Exercise exercise) {
+        Log.d(TAG, "onExerciseAdded: Recibido nuevo ejercicio: " + (exercise != null ? exercise.getName() : "null"));
+        if (exercise == null) {
+            Log.e(TAG, "onExerciseAdded: Exercise es null; no se inserta.");
+            return;
+        }
+        exercises.add(exercise);
+        int pos = exercises.size() - 1;
+        if (adapter != null) adapter.notifyItemInserted(pos);
+        saveExercisesToInternalStorage();
+        Log.d(TAG, "onExerciseAdded: Insertado en posición " + pos + "; total ejercicios = " + exercises.size());
+    }
+
+    @Override
+    public void onExerciseClick(Exercise exercise) {
+        Log.d(TAG, "onExerciseClick: Click en " + (exercise != null ? exercise.getName() : "null"));
+        if (exercise == null) {
+            Log.e(TAG, "onExerciseClick: Exercise es null; no se puede abrir detalles.");
+            return;
+        }
         try {
             ExerciseDetailsFragment fragment = ExerciseDetailsFragment.newInstance(exercise);
-            Log.d(TAG, "🧩 Instancia de ExerciseDetailsFragment creada correctamente");
-
-            Fragment parent = getParentFragment(); // Este debería ser MenuPopupFragment
-            if (parent == null) {
-                Log.e(TAG, "❌ Error: getParentFragment() devolvió null. Este fragmento no tiene un fragmento padre.");
-                return;
-            }
-
+            Fragment parent = getParentFragment(); // Debe ser MenuPopupFragment
+            if (parent == null) { Log.e(TAG, "getParentFragment() es null."); return; }
             FragmentManager childManager = parent.getChildFragmentManager();
-            if (childManager == null) {
-                Log.e(TAG, "❌ Error: childFragmentManager es null. No se puede proceder con la transacción.");
-                return;
-            }
-
-            Log.d(TAG, "🔁 Iniciando transacción de fragmento...");
+            Log.d(TAG, "Iniciando transacción hacia el contenedor del padre.");
             childManager.beginTransaction()
                     .replace(R.id.fragment_container, fragment)
                     .addToBackStack(null)
                     .commit();
-            Log.d(TAG, "✅ Fragmento ExerciseDetailsFragment insertado correctamente en el contenedor.");
+            Log.d(TAG, "Fragmento de detalles insertado correctamente.");
         } catch (Exception e) {
-            Log.e(TAG, "❌ Excepción al intentar abrir ExerciseDetailsFragment: " + e.getMessage(), e);
-        }
-    }
-
-
-
-
-    @Override
-    public void onExerciseSelected(Exercise exercise) {
-        if (!selectedExercises.contains(exercise)) {
-            selectedExercises.add(exercise);
+            Log.e(TAG, "❌ onExerciseClick: Excepción al abrir detalles: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public void onExerciseDeselected(Exercise exercise) {
-        selectedExercises.remove(exercise);
-    }
+    public void onExerciseSelected(Exercise exercise) { syncSelectAdd(exercise); }
+
+    @Override
+    public void onExerciseDeselected(Exercise exercise) { syncSelectRemove(exercise); }
 }

@@ -53,6 +53,11 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     private final List<ExerciseSeries> seriesList;
     private       List<ExerciseSeries> historialSeries = new ArrayList<>();
 
+    /* ----------  cache de la lista original  ---------- */
+    private final List<ExerciseSeries> baseSeries = new ArrayList<>();
+    private boolean suggestionActive = false;          // bandera
+
+
     /* ───────── NUEVO: mejor serie histórica (mayor 1-RM) ───────── */
     private ExerciseSeries bestHistorySerie;
     public  ExerciseSeries getBestHistorySerie(){ return bestHistorySerie; }
@@ -74,12 +79,17 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
      * ========================================================= */
     public SeriesAdapter(List<ExerciseSeries> seriesList,
                          String exerciseName,
-                         TrainingDetailAdapter parentAdapter){
+                         TrainingDetailAdapter parentAdapter) {
+
         Log.d(TAG,"Constructor → tamaño lista: "+seriesList.size());
-        this.seriesList   = seriesList;
-        this.exerciseName = exerciseName;
-        this.parentAdapter= parentAdapter;
+        this.seriesList    = seriesList;
+        this.exerciseName  = exerciseName;
+        this.parentAdapter = parentAdapter;
+
+        /* 🆕  snapshot de la tabla ‘real’  */
+        baseSeries.addAll(seriesList);      // ← copia profunda NO necesaria
     }
+
 
     /* =========================================================
      *  Getters / setters
@@ -215,6 +225,17 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
 
     public void clearLastHistorySerie(){ lastHistorySerie=null; }
 
+    public void clearSuggestions() {
+        if (!suggestionActive) return;      // nada que hacer
+
+        seriesList.clear();
+        seriesList.addAll(baseSeries);      // ← recupera la copia
+        suggestionActive = false;
+
+        reindexSeries();                    // redibuja la tabla
+    }
+
+
     /* =========================================================
      *  Firebase fetch
      * ========================================================= */
@@ -309,9 +330,35 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
      *  Sube la sesión y deduplica histórico
      * ========================================================= */
 
+    private boolean validateAllRpe() {
+        for (int i = 0; i < seriesList.size(); i++) {
+            ExerciseSeries s = seriesList.get(i);
+
+            Number rNum = s.getRpe();            // admite Float/Double/Integer
+            if (rNum == null) {
+                Log.e(TAG, "RPE nulo en serie " + (i + 1));
+                return false;
+            }
+
+            float r = rNum.floatValue();
+            if (Float.isNaN(r) || r < 5f || r > 10f) {
+                Log.e(TAG, "RPE fuera de rango (5–10) en serie " + (i + 1) + ": " + r);
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     /* Guarda ‘list’ en Firebase y ejecuta onFinished cuando termine */
     public void saveToFirebase(List<ExerciseSeries> list, Runnable onFinished) {
+
+        // Guardia: RPE debe estar entre 5 y 10 en todas las series
+        if (!validateAllRpe()) {
+            Log.e(TAG, "RPE fuera de rango (5–10). No se guarda.");
+            if (onFinished != null) onFinished.run();
+            return;
+        }
 
         String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
         DatabaseReference ref = FirebaseDatabase.getInstance()
@@ -365,25 +412,32 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     /* =========================================================
      *  Volcar sugerencias en la lista visible
      * ========================================================= */
-    public void setFromSuggest(List<ProgresionDinamica.Serie> sug){
+    public void setFromSuggest(List<ProgresionDinamica.Serie> sug) {
 
         Log.d(TAG,"setFromSuggest() → "+sug.size()+" serie(s) sugeridas");
-        for(ProgresionDinamica.Serie s:sug)
-            Log.d(TAG,"   ↳ "+s);
 
+        /* 👉 guarda la tabla actual la PRIMERA vez que entras aquí */
+        if (!suggestionActive) {
+            baseSeries.clear();
+            baseSeries.addAll(seriesList);  // copia de seguridad
+        }
+        suggestionActive = true;
+
+        /* construye la vista con la sugerencia */
         seriesList.clear();
-        int n=1;
-        Double prev=previousLoad;
+        int n = 1;
+        Double prev = previousLoad;
 
-        for(ProgresionDinamica.Serie s:sug){
-            ExerciseSeries e=new ExerciseSeries(
-                    n++,s.repeticiones,s.peso,s.rpe);
+        for (ProgresionDinamica.Serie s : sug) {
+            ExerciseSeries e = new ExerciseSeries(
+                    n++, s.repeticiones, s.peso, s.rpe);
             e.setCompleted(false);
-            if(prev!=null) e.setPreviousLoad(prev);
+            if (prev != null) e.setPreviousLoad(prev);
             seriesList.add(e);
         }
-        reindexSeries();
+        reindexSeries();                    //   notifyDataSetChanged incluido
     }
+
 
     /* =========================================================
      *  ViewHolder
@@ -417,16 +471,33 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
                             .setWeight(Double.parseDouble(s.toString()));
                 }catch(NumberFormatException ignore){}
             }};
-        private final TextWatcher rpeWatcher=new SimpleWatcher(){
-            @Override public void afterTextChanged(Editable s){
-                if(isUpdating) return;
-                try{
-                    float r=Float.parseFloat(s.toString());
-                    if(r>=0 && r<=10)
-                        adapter.seriesList.get(getBindingAdapterPosition())
-                                .setRpe(r);
-                }catch(NumberFormatException ignore){}
-            }};
+        private final TextWatcher rpeWatcher = new SimpleWatcher() {
+            @Override public void afterTextChanged(Editable s) {
+                if (isUpdating) return;
+
+                String txt = s.toString().trim();
+                if (txt.isEmpty()) {
+                    rpeInput.setError("RPE requerido (5–10)");
+                    return;
+                }
+                try {
+                    float r = Float.parseFloat(txt);
+                    if (r < 5f || r > 10f) {
+                        rpeInput.setError("RPE debe estar entre 5 y 10");
+                        // No guardes el valor inválido en el modelo
+                        return;
+                    }
+                    rpeInput.setError(null);
+                    adapter.seriesList.get(getBindingAdapterPosition()).setRpe(r);
+                } catch (NumberFormatException ignore) {
+                    rpeInput.setError("RPE inválido");
+                }
+            }
+        };
+
+
+
+
 
         SeriesViewHolder(@NonNull View v,SeriesAdapter a,String exName,
                          TrainingDetailAdapter p){
@@ -445,6 +516,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
             repsInput.setFilters(new InputFilter[]{new InputFilterMinMax(1,30)});
             weightInput.setFilters(new InputFilter[]{
                     new DecimalDigitsFilter(0,500,1)});
+
+            rpeInput.setFilters(new InputFilter[]{ new DecimalDigitsFilter(0, 10, 1) });
 
             v.setOnLongClickListener(l->{
                 int pos=getBindingAdapterPosition();
@@ -551,7 +624,6 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
             }
         }
     }
-    /** Ya no mantenemos listeners vivos; método no-op para compatibilidad. */
     public void detach() {
         // Si en el futuro vuelves a usar ValueEventListener persistente,
         // elimina aquí el listener de Firebase.

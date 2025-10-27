@@ -84,12 +84,13 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
         return new FoodItemViewHolder(
                 LayoutInflater.from(ctx).inflate(R.layout.food_item, p, false));
     }
-
     @Override
     public void onBindViewHolder(@NonNull FoodItemViewHolder h, int pos) {
-        Log.d(TAG, "onBindViewHolder: pos → " + pos);
+
+        Log.d(TAG, "FoodItemAdapter#onBindViewHolder bind pos=" + pos);
         FoodItem it = items.get(pos);
 
+        /* ---------- datos básicos ---------- */
         h.name .setText(it.getName());
         h.grams.setText(String.format(Locale.getDefault(), "%.0f", it.getGrams()));
         double totK = it.getKcalPer100g() * (it.getGrams() / 100.0);
@@ -102,13 +103,38 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
                 .centerCrop()
                 .into(h.img);
 
+        /* ---------- CheckBox ---------- */
         CheckBox cb = h.itemView.findViewById(R.id.foodItemCheck);
+
+        // 1️⃣ - desvinculamos cualquier listener para evitar callbacks fantasma
+        cb.setOnCheckedChangeListener(null);
+
+        // 2️⃣ - refrescamos el estado visual sin disparar el listener
+        Log.d(TAG, "FoodItemAdapter#onBindViewHolder setChecked→" + it.isChecked());
         cb.setChecked(it.isChecked());
-        cb.setOnCheckedChangeListener((b, c) -> {
-            it.setChecked(c);
-            notifyParent();
+
+        // 3️⃣ - vinculamos el listener real (solo reacciona a pulsaciones del usuario)
+        cb.setOnCheckedChangeListener((button, isChecked) -> {
+            Log.d(TAG,
+                    "FoodItemAdapter#onCheckedChange prev=" + it.isChecked() + " new=" + isChecked);
+
+            if (it.isChecked() == isChecked) return;   // nada que hacer
+
+            it.setChecked(isChecked);
+
+            // traza rápida del bloque completo tras el cambio
+            for (int i = 0; i < foodBlock.getItems().size(); i++) {
+                FoodItem fi = foodBlock.getItems().get(i);
+                Log.d(TAG, String.format(Locale.getDefault(),
+                        "   [%d] %s checked=%b grams=%.1f",
+                        i, fi.getName(), fi.isChecked(), fi.getGrams()));
+            }
+
+            Log.d(TAG, "FoodItemAdapter#notifyParent fire recalc");
+            notifyParent();                             // ⇒ recalcula totales
         });
 
+        /* ---------- edición de gramos ---------- */
         h.grams.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s,int st,int c,int a){}
             @Override public void onTextChanged (CharSequence s,int st,int b,int c){}
@@ -126,6 +152,7 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
             }
         });
 
+        /* ---------- click para cambiar gramos o abrir receta ---------- */
         h.itemView.setOnClickListener(v -> {
             FoodSearchFragment.FoodResult fr = map(it);
             if (fr.ingredients != null && !fr.ingredients.isEmpty()) {
@@ -146,6 +173,8 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
         });
     }
 
+
+
     @Override public int getItemCount() {
         return items.size();
     }
@@ -153,10 +182,12 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
 
     /** Permite actualizar la lista sin recrear el adapter. */
     public void setItems(List<FoodItem> newItems) {
-        items.clear();          // items es tu lista interna
-        items.addAll(newItems); // mantenemos la misma referencia
+        Log.d("FoodItemAdapter#setItems", "newSize=" + newItems.size());
+        items.clear();
+        items.addAll(newItems);
         notifyDataSetChanged();
     }
+
 
 
 
@@ -173,8 +204,12 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
         notifyParent();
     }
 
-    // ───────────────────────────────── Utilidades
-    private void notifyParent(){ if(listener!=null) listener.onFoodItemChanged(); }
+    private void notifyParent() {
+        Log.d("FoodItemAdapter#notifyParent",
+                "recalculateDayTotals() solicitado");
+        if (listener != null) listener.onFoodItemChanged();
+    }
+
 
     private FoodSearchFragment.FoodResult map(FoodItem i){
         FoodSearchFragment.FoodResult r = new FoodSearchFragment.FoodResult();

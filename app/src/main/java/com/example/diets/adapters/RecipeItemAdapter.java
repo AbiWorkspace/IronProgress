@@ -124,8 +124,9 @@ public class RecipeItemAdapter extends RecyclerView.Adapter<RecipeItemAdapter.Re
     public int getItemCount() { return items.size(); }
 
     // ───────────────────────────────── API pública
-    /** Permite actualizar la lista sin recrear el adaptador. */
     public void setItems(List<FoodItem> newItems) {
+        Log.d("RecipeItemAdapter#setItems(rec)",
+                "size=" + newItems.size());
         items.clear();
         items.addAll(newItems);
         notifyDataSetChanged();

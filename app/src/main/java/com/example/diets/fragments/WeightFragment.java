@@ -367,6 +367,9 @@ public class WeightFragment extends Fragment {
                     Log.e(LOG_PREFIX, "[saveWeightRecord] Firebase ERROR", e);
                     Toast.makeText(getContext(),"Error al guardar",Toast.LENGTH_SHORT).show();
                 });
+
+        Log.d(LOG_PREFIX, "Calorías obtenidas para " + selectedDate + ": " + kcal);
+
     }
 
     private float fetchStoredCalories(String dateDDMMYYYY) {
@@ -498,6 +501,11 @@ public class WeightFragment extends Fragment {
     private void computeWeeklyStats() {
         Log.d(LOG_PREFIX, "[computeWeeklyStats] ► inicio regs=" + weightRecords.size());
 
+        if (predictedText == null) {
+            Log.e(LOG_PREFIX, "predictedText es null");
+        }
+
+
         // --- MODULAR: Bloque de espera tras ajuste ---
         SharedPreferences p = requireContext().getSharedPreferences(PREF_STATS, Context.MODE_PRIVATE);
         boolean waiting = p.getBoolean(KEY_WAITING_PROGRESS, false);  // ¿Estamos en espera tras ajuste?
@@ -573,16 +581,26 @@ public class WeightFragment extends Fragment {
                 "Calorías medias 7 d: %.0f kcal", avgK3));
         avgCalPrevText.setText(String.format(Locale.getDefault(),
                 "Calorías semana previa: %.0f kcal", avgK2));
-        predictedText.setText(String.format(Locale.getDefault(),
-                "Δkg esperado (↓/↑): %.2f kg", diffKgPred));
+
+        if(diffKgPred == 0){
+            predictedText.setText("Sin cambio calórico entre semanas — predicción no disponible");
+
+        }else {
+            double predictedWeight = avgW3 + trendKg7;
+            predictedText.setText(String.format(Locale.getDefault(),
+                    "Cambio estimado por calorías: %.2f kg\nCambio real observado: %.2f kg",
+                    diffKgPred, trendKg7));
+        }
+
+
 
         // --- Mostrar mensaje de espera si corresponde ---
-        if (waiting && daysLeft > 0) {
-            trendText.setText("⏳ Espera: " + daysLeft + " días para próximo ajuste");
-        } else {
-            trendText.setText(trendKg7 > 0.2 ? "Subiendo 📈" :
-                    trendKg7 < -0.2 ? "Bajando 📉" : "Estable ⚖️");
-        }
+//        if (waiting && daysLeft > 0) {
+//            trendText.setText("Espera: " + daysLeft + " días para próximo ajuste");
+//        } else {
+            trendText.setText(trendKg7 > 0.2 ? "Subiendo Peso" :
+                    trendKg7 < -0.2 ? "Perdiendo Peso " : "Peso Estable ");
+//        }
 
         // --- Comparar con meta ---
         boolean goalDown = userGoal.toLowerCase().contains("perder");

@@ -19,6 +19,8 @@ import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.Spinner;
 import android.widget.Toast;
+import android.os.SystemClock;
+
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -214,7 +216,8 @@ public class FoodSearchFragment extends Fragment {
         if (!q.isEmpty()) searchFood(q);
     }
 
-    /** Consulta OpenFoodFacts por código de barras sin romper el hilo
+
+    /** Consulta OpenFoodFacts por código de barras sin bloquear UI
      *  y con búsqueda textual de respaldo si no se encuentra el producto. */
     private void searchFoodByBarcode(String barcode) {
         Log.d(TAG, "🔍 searchFoodByBarcode: " + barcode);
@@ -224,6 +227,7 @@ public class FoodSearchFragment extends Fragment {
         adapter.notifyDataSetChanged();
 
         new Thread(() -> {
+            final long t0 = SystemClock.elapsedRealtime(); // ⏱ inicio medición
             try {
                 String url = "https://world.openfoodfacts.org/api/v0/product/" +
                         URLEncoder.encode(barcode, "UTF-8") + ".json";
@@ -232,19 +236,23 @@ public class FoodSearchFragment extends Fragment {
                 Response rsp = cli.newCall(new Request.Builder().url(url).build()).execute();
                 if (!rsp.isSuccessful()) throw new IOException("HTTP " + rsp.code());
 
-                JSONObject root   = new JSONObject(rsp.body().string());
-                int status        = root.optInt("status", 0);
+                JSONObject root = new JSONObject(rsp.body().string());
+                int status = root.optInt("status", 0);
 
                 /* ───── producto NO encontrado ───── */
                 if (status != 1) {
+                    final long t1 = SystemClock.elapsedRealtime();
+                    Log.i("OFF_TIMING", "term=" + barcode + " ms=" + (t1 - t0) +
+                            " success=false source=barcode not_found=true");
                     Log.w(TAG, "Código no encontrado (" + barcode + "), status=" + status);
-                    if (isAdded())
+
+                    if (isAdded()) {
                         requireActivity().runOnUiThread(() ->
                                 Toast.makeText(getContext(),
                                         "Código no encontrado. Mostrando resultados relacionados…",
                                         Toast.LENGTH_SHORT).show());
-
-                    // fallback: ejecuta una búsqueda normal con el mismo texto
+                    }
+                    // Fallback: ejecuta una búsqueda normal con el mismo texto
                     searchFood(barcode);
                     return;
                 }
@@ -253,27 +261,38 @@ public class FoodSearchFragment extends Fragment {
                 JSONObject p = root.getJSONObject("product");
                 JSONObject n = p.optJSONObject("nutriments");
                 if (n == null) {
+                    final long t1 = SystemClock.elapsedRealtime();
+                    Log.i("OFF_TIMING", "term=" + barcode + " ms=" + (t1 - t0) +
+                            " success=false source=barcode reason=no_nutriments");
                     Log.w(TAG, "Producto sin nutriments → " + barcode);
-                    if (isAdded())
+
+                    if (isAdded()) {
                         requireActivity().runOnUiThread(() ->
                                 Toast.makeText(getContext(),
                                         "El producto no tiene información nutricional.",
                                         Toast.LENGTH_SHORT).show());
+                    }
                     return;
                 }
 
                 String name = p.optString("product_name_es",
                         p.optString("product_name", "Producto sin nombre"));
+
                 double kcal = n.optDouble("energy-kcal_100g", -1);
                 if (kcal <= 0) kcal = n.optDouble("energy_100g", -1);   // respaldo
 
                 if (kcal <= 0) {
+                    final long t1 = SystemClock.elapsedRealtime();
+                    Log.i("OFF_TIMING", "term=" + barcode + " ms=" + (t1 - t0) +
+                            " success=false source=barcode reason=no_kcal");
                     Log.w(TAG, "Producto sin kcal válido → " + name);
-                    if (isAdded())
+
+                    if (isAdded()) {
                         requireActivity().runOnUiThread(() ->
                                 Toast.makeText(getContext(),
                                         "El producto carece de calorías válidas.",
                                         Toast.LENGTH_SHORT).show());
+                    }
                     return;
                 }
 
@@ -286,6 +305,9 @@ public class FoodSearchFragment extends Fragment {
                 double fiber   = n.optDouble("fiber_100g", -1);
 
                 if (!passesMacroFilters(kcal, protein, carbs, fat, sugar, sodium, fiber)) {
+                    final long t1 = SystemClock.elapsedRealtime();
+                    Log.i("OFF_TIMING", "term=" + barcode + " ms=" + (t1 - t0) +
+                            " success=false source=barcode filtered=true reason=macro_filters");
                     Log.d(TAG, "Producto filtrado por macros → " + name);
                     return;   // se respeta lógica de filtros
                 }
@@ -296,23 +318,34 @@ public class FoodSearchFragment extends Fragment {
                 FoodResult food = new FoodResult(name, kcal, 0, brand, img, protein, carbs, fat);
                 resultObjects.add(food);
 
-                if (isAdded())
+                final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición
+                Log.i("OFF_TIMING", "term=" + barcode + " ms=" + (t1 - t0) +
+                        " success=true source=barcode count=1 name=\"" + name.replace("\"","'") + "\"");
+
+                if (isAdded()) {
                     requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
+                }
 
             } catch (Exception e) {
+                final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin con error
+                Log.i("OFF_TIMING", "term=" + barcode + " ms=" + (t1 - t0) +
+                        " success=false source=barcode error=" + e.getClass().getSimpleName());
                 Log.e(TAG, "searchFoodByBarcode: error", e);
-                if (isAdded())
+
+                if (isAdded()) {
                     requireActivity().runOnUiThread(() ->
                             Toast.makeText(getContext(),
                                     "Error al consultar el código de barras.",
                                     Toast.LENGTH_SHORT).show());
+                }
             }
         }).start();
     }
 
 
+
     private void searchFood(String query) {
-        Log.d(TAG, "🔍 searchFood: " + query);
+        Log.d(TAG, "searchFood: " + query);
         resultObjects.clear(); adapter.notifyDataSetChanged();
         productResults.clear(); recipeResults.clear();
         fetchProductsFromOpenFoodFacts(query);
@@ -460,9 +493,9 @@ public class FoodSearchFragment extends Fragment {
         }).start();
     }
 
-    // ====== PRODUCTOS DESDE OPENFOODFACTS (AÑADE FILTROS NUEVOS + RANKING) =======
     private void fetchProductsFromOpenFoodFacts(String query) {
         new Thread(() -> {
+            final long t0 = SystemClock.elapsedRealtime(); // ⏱ inicio medición
             try {
                 StringBuilder url = new StringBuilder("https://world.openfoodfacts.org/cgi/search.pl")
                         .append("?search_terms=").append(URLEncoder.encode(query, "UTF-8"))
@@ -488,10 +521,13 @@ public class FoodSearchFragment extends Fragment {
                 if (!rsp.isSuccessful()) throw new IOException("HTTP " + rsp.code());
 
                 JSONArray products = new JSONObject(rsp.body().string()).optJSONArray("products");
-                if (products == null) return;
+                if (products == null) {
+                    final long t1 = SystemClock.elapsedRealtime();
+                    Log.i("OFF_TIMING", "term=" + query + " ms=" + (t1 - t0) + " success=false source=red reason=no_products");
+                    return;
+                }
 
                 String qLow = query.toLowerCase(Locale.ROOT);
-
                 List<FoodResult> tempProducts = new ArrayList<>();
 
                 for (int i = 0; i < products.length(); i++) {
@@ -503,6 +539,7 @@ public class FoodSearchFragment extends Fragment {
 
                     JSONObject n = p.optJSONObject("nutriments");
                     if (n == null) continue;
+
                     double kcal = n.optDouble("energy-kcal_100g", -1);
                     double protein = n.optDouble("proteins_100g", 0);
                     double carbs   = n.optDouble("carbohydrates_100g", 0);
@@ -510,6 +547,7 @@ public class FoodSearchFragment extends Fragment {
                     double sugar   = n.optDouble("sugars_100g", -1);
                     double sodium  = n.optDouble("sodium_100g", -1);
                     double fiber   = n.optDouble("fiber_100g", -1);
+
                     if (kcal <= 0) continue;
                     if (!passesMacroFilters(kcal, protein, carbs, fat, sugar, sodium, fiber)) continue;
 
@@ -527,15 +565,30 @@ public class FoodSearchFragment extends Fragment {
                 productResults.addAll(tempProducts);
                 resultObjects.addAll(tempProducts);
 
+                final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición
+                boolean success = !tempProducts.isEmpty();
+                Log.i("OFF_TIMING",
+                        "term=" + query +
+                                " ms=" + (t1 - t0) +
+                                " success=" + success +
+                                " source=red" +
+                                " count=" + tempProducts.size());
+
                 if (isAdded()) requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
 
             } catch (Exception e) {
+                final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición con error
+                Log.i("OFF_TIMING",
+                        "term=" + query +
+                                " ms=" + (t1 - t0) +
+                                " success=false source=red error=" + e.getClass().getSimpleName());
                 Log.e(TAG, "Error OFF", e);
                 if (isAdded()) requireActivity().runOnUiThread(() ->
                         Toast.makeText(getContext(), "Error productos", Toast.LENGTH_SHORT).show());
             }
         }).start();
     }
+
 
     // ================ FILTROS AVANZADOS (SIN romper compatibilidad) ================
     private boolean passesMacroFilters(double kcal, double protein, double carbs, double fat) {

@@ -487,16 +487,17 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
             popupMenu.setOnMenuItemClickListener(item -> {
                 int itemId = item.getItemId();
 
-                if (itemId == R.id.action_edit) {
-                    Log.d(TAG, "[configurePopupMenu] ✏ Editar ejercicio seleccionado: " + exercise.getName());
-                    return true;
-                } else if (itemId == R.id.action_delete) {
+//                if (itemId == R.id.action_edit) {
+//                    Log.d(TAG, "[configurePopupMenu] ✏ Editar ejercicio seleccionado: " + exercise.getName());
+//                    return true;
+//                } else
+               if (itemId == R.id.action_delete) {
                     Log.d(TAG, "[configurePopupMenu] 🗑 Eliminando ejercicio: " + exercise.getName());
 
                     // 🔥 Remover visualmente el ejercicio del contenedor
                     dayContainer.removeView(exerciseContainer);
                     trainingDay.getExercises().removeIf(ex -> ex.getName().equals(exercise.getName()));
-                    Log.d(TAG, "[configurePopupMenu] ✅ Ejercicio eliminado correctamente.");
+                    Log.d(TAG, "[configurePopupMenu] Ejercicio eliminado correctamente.");
 
                     // 🔥 Refrescar la UI
                     dayContainer.post(() -> {
@@ -504,7 +505,7 @@ public class SelectExercisesFragment extends Fragment implements ExercisesAdapte
                         dayContainer.requestLayout();
                     });
 
-                    Toast.makeText(getContext(), "✅ Ejercicio eliminado", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Ejercicio eliminado", Toast.LENGTH_SHORT).show();
                     return true;
                 }
                 return false;

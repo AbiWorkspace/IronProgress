@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
+import com.example.diets.Utils.Prefs;
 import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.adapters.SeriesAdapter;
 import com.example.diets.adapters.TrainingDetailAdapter;
@@ -489,111 +490,128 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
     }
 
     // ************************************************************************
-    // Lógica para finalizar entrenamiento y guardar series completadas globalmente
-    // ************************************************************************
+// Lógica para finalizar entrenamiento y guardar series completadas
+// ************************************************************************
     private void finishWorkout() {
-        // ================================================================================
-        // = INICIO MOD NUEVA FUNCIONALIDAD: Confirmar borrado en Firebase si hay borrados =
-        // ================================================================================
-        if (!adapter.getPendingDeletionExercises().isEmpty()) {
-            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Existen ejercicios pendientes de borrar en Firebase.");
 
-            new AlertDialog.Builder(requireContext())
+        /* ────────────────────────────────────────────────────────────────
+         * 1) Si hay ejercicios pendientes de borrar, primero confirmamos
+         * ──────────────────────────────────────────────────────────────── */
+        if (!adapter.getPendingDeletionExercises().isEmpty()) {
+            Log.d(TAG, "finishWorkout: ejercicios pendientes de borrar ↠ preguntando…");
+
+            new AlertDialog.Builder(requireContext(), R.style.CustomAlertDialog)
                     .setTitle("Eliminar ejercicios permanentemente")
                     .setMessage("¿Deseas eliminar de tu rutina en Firebase los ejercicios que marcaste para borrar?")
-                    .setPositiveButton("Sí, eliminar", (dialog, which) -> {
-                        Log.d(TAG, "TrainingDetailFragment - finishWorkout: Usuario confirmó eliminación en Firebase.");
-                        borrarYReindexarEjerciciosEnFirebase(adapter.getPendingDeletionExercises(), () -> {
-                            // Después de reindexar, continuamos con el flujo normal
-                            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Reindexación completada. Continuando.");
-                            // Llamamos de nuevo para entrar al flujo original (pero ya sin la alerta)
-                            finishWorkout(true);
-                        });
-                    })
-                    .setNegativeButton("No, mantener", (dialog, which) -> {
-                        Log.d(TAG, "TrainingDetailFragment - finishWorkout: Usuario eligió NO eliminar en Firebase.");
-                        // Continuamos el flujo original de finishWorkout
-                        finishWorkout(true);
-                    })
+                    .setPositiveButton("Sí, eliminar", (d, which) ->
+                            borrarYReindexarEjerciciosEnFirebase(
+                                    adapter.getPendingDeletionExercises(),
+                                    () -> finishWorkout(true)
+                            ))
+                    .setNegativeButton("No, mantener", (d, which) -> finishWorkout(true))
                     .show();
 
-            // Salimos para no ejecutar dos veces el mismo flujo
-            return;
         }
-        // ================================================================================
-        // = FIN MOD NUEVA FUNCIONALIDAD                                                   =
-        // ================================================================================
 
-        // ----------------------------------------------------------------------------
-        // Las líneas que ya estaban en este método se ejecutan si NO hay ejercicios
-        // pendientes, O si ya pasamos por la confirmación y volvimos con finishWorkout(true).
-        // ----------------------------------------------------------------------------
-        Log.d(TAG, "TrainingDetailFragment - finishWorkout: Comenzando flujo de finalización del entrenamiento.");
+        /* ────────────────────────────────────────────────────────────────
+         * 2) Flujo normal de finalización
+         * ──────────────────────────────────────────────────────────────── */
+        Log.d(TAG, "finishWorkout: iniciando cierre de sesión…");
 
         // Detener cronómetro
         if (isChronometerRunning) {
             pauseOffset = SystemClock.elapsedRealtime() - chronometerTraining.getBase();
             chronometerTraining.stop();
             isChronometerRunning = false;
-            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Cronómetro detenido. Tiempo total: "
-                    + formatElapsedTime(pauseOffset));
+            Log.d(TAG, "finishWorkout: tiempo total = " + formatElapsedTime(pauseOffset));
         }
 
+        // Evitar doble guardado
         if (seriesSaved) {
-            Log.w(TAG, "⚠ Las series ya fueron guardadas previamente. Se omite guardado.");
+            Log.w(TAG, "finishWorkout: ya se guardaron las series (early-return)");
             return;
         }
 
-        adapter.commitAllEdits();
-        Map<String, List<ExerciseSeries>> seriesPorEjercicio = adapter.getAllCompletedSeriesGroupedByExercise();
+        adapter.commitAllEdits();   // sincroniza EditText / checks
+        Map<String,List<ExerciseSeries>> seriesPorEjercicio =
+                adapter.getAllCompletedSeriesGroupedByExercise();
+
+        /* 2.1) ¿hay series incompletas? */
         boolean haySeriesIncompletas = false;
-
-        // Verificar si hay series incompletas
-        for (UserExercise ejercicio : exercises) {
-            List<ExerciseSeries> listaTotal = adapter.getSeriesListForExercise(ejercicio.getName());
-            List<ExerciseSeries> completadas = seriesPorEjercicio.get(ejercicio.getName());
-
-            if (listaTotal != null && completadas != null && completadas.size() < listaTotal.size()) {
-                Log.w(TAG, "⚠ El ejercicio " + ejercicio.getName() + " tiene series incompletas.");
+        for (UserExercise ej : exercises) {
+            List<ExerciseSeries> total      = adapter.getSeriesListForExercise(ej.getName());
+            List<ExerciseSeries> completadas = seriesPorEjercicio.get(ej.getName());
+            if (total != null && completadas != null && completadas.size() < total.size()) {
                 haySeriesIncompletas = true;
                 break;
             }
         }
-
         if (haySeriesIncompletas) {
-            Log.d(TAG, "TrainingDetailFragment - finishWorkout: Mostrando diálogo por series incompletas.");
             showIncompleteSeriesDialog(seriesPorEjercicio);
-        } else {
-
-
-            Map<String, List<ExerciseSeries>> completadasPorEjercicio =
-                    adapter.getAllCompletedSeriesGroupedByExercise();   // ① ya viene filtrado
-
-            int totalCompletadas = 0;
-            for (List<ExerciseSeries> l : completadasPorEjercicio.values())
-                totalCompletadas += l.size();
-
-            if (totalCompletadas == 0) {
-                Toast.makeText(getContext(),
-                        "Marca al menos una serie como completada antes de finalizar",
-                        Toast.LENGTH_SHORT).show();
-                return;                               // ⛔ ¡salimos!
-            }
-
-            new AlertDialog.Builder(requireContext())
-                    .setTitle("¿Actualizar rutina?")
-                    .setMessage("¿Deseas que el número de series se actualice en tu rutina según los cambios hechos hoy?")
-                    .setPositiveButton("Sí, actualizar", (dialog, which) -> {
-                        actualizarConteoSeriesEnFirebase(); // ✅ actualiza series en userMovementPatterns
-                        guardarSeriesYFinalizar(seriesPorEjercicio);
-                    })
-                    .setNegativeButton("No actualizar", (dialog, which) -> {
-                        guardarSeriesYFinalizar(seriesPorEjercicio);
-                    })
-                    .show();
+            return;
         }
 
+        /* 2.2) ¿al menos una serie completada? */
+        int totalCompletadas = 0;
+        for (List<ExerciseSeries> l : seriesPorEjercicio.values()) totalCompletadas += l.size();
+        if (totalCompletadas == 0) {
+            Toast.makeText(getContext(),
+                    "Marca al menos una serie como completada antes de finalizar",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        /* ────────────────────────────────────────────────────────────────
+         * 3) ⚠ NUEVA GUARD CLAUSE ⚠
+         *    Si la progresión dinámica está OFF, no tocamos el contador
+         *    de series: simplemente guardamos y cerramos.
+         * ──────────────────────────────────────────────────────────────── */
+        if (!Prefs.isDynamicEnabled(requireContext())) {
+            Log.d(TAG, "⏩ Dinámica OFF → se guardan series *sin* actualizar contador");
+            guardarSeriesYFinalizar(seriesPorEjercicio);
+            return;
+        }
+
+// --- 👇 NUEVO: solo preguntar si hay ejercicios con distinto número de series ---
+        boolean hayCambiosEnCantidadDeSeries = false;
+        for (UserExercise ej : exercises) {
+            List<ExerciseSeries> listaActual = adapter.getSeriesListForExercise(ej.getName());
+            int seriesOriginal = ej.getSeries();
+            int seriesActual   = (listaActual != null) ? listaActual.size() : 0;
+            if (seriesActual != seriesOriginal) {
+                hayCambiosEnCantidadDeSeries = true;
+                break;
+            }
+        }
+
+// Si **no** hay cambios, guardar y cerrar (sin preguntar)
+        if (!hayCambiosEnCantidadDeSeries) {
+            Log.d(TAG, "finishWorkout: No hubo cambios en cantidad de series, se guarda directo.");
+            guardarSeriesYFinalizar(seriesPorEjercicio);
+            return;
+        }
+
+
+        new AlertDialog.Builder(requireContext(), R.style.CustomAlertDialog)
+                .setTitle("¿Actualizar rutina?")
+                .setMessage("Has cambiado la cantidad de series en algún ejercicio.\n¿Deseas que el número de series se actualice en tu rutina?")
+                .setPositiveButton("Sí, actualizar", (d, w) -> {
+                    for (UserExercise ex : exercises) {
+                        int nActual = adapter.getSeriesListForExercise(ex.getName()).size();
+                        Log.d(TAG, "EJERCICIO: " + ex.getName() + " - Series actuales: " + nActual + " - Series original: " + ex.getSeries());
+                    }
+                    Log.d(TAG, "actualizarConteoSeriesEnFirebase - metodo llamado ");
+
+                    actualizarConteoSeriesEnFirebase();  // actualiza campo 'series'
+                    guardarSeriesYFinalizar(seriesPorEjercicio);
+                })
+                .setNegativeButton("No actualizar", (d, w) ->
+                        guardarSeriesYFinalizar(seriesPorEjercicio))
+                .show();
+
     }
+
+
 
     // ───────────── TrainingDetailFragment.java ─────────────
     /**
@@ -696,10 +714,6 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         dialog.show();
     }
 
-    /**
-     * Actualiza el campo "series" de cada ejercicio en userMovementPatterns/<dayKey>/userExercises
-     * para reflejar cuántas series tiene localmente en adapter.getSeriesListForExercise(...).
-     */
     private void actualizarConteoSeriesEnFirebase() {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
@@ -713,33 +727,42 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
 
             for (UserExercise exercise : exercises) {
                 final String exerciseName = exercise.getName();
+                // ✅ Evaluar progresión dinámica por ejercicio
+                boolean progDinamicaOn = Prefs.isDynamicEnabledForExercise(requireContext(), exerciseName);
+
+                if (progDinamicaOn) {
+                    Log.d(TAG, "⏩ Progresión dinámica ON para '" + exerciseName + "' → NO se actualiza 'series' en Firebase.");
+                    continue; // saltar este ejercicio
+                }
+                Log.d(TAG, "⏩ Progresión dinámica OFF para '" + exerciseName + "' → SÍ se actualiza 'series' en Firebase.");
+
                 final List<ExerciseSeries> listaSeries = adapter.getSeriesListForExercise(exerciseName);
                 final int seriesCount = (listaSeries != null && !listaSeries.isEmpty())
                         ? listaSeries.size()
-                        : exercise.getSeries();  // Mantener el valor original si no hay series creadas
-
+                        : exercise.getSeries();
 
                 exercisesRef.orderByChild("name").equalTo(exerciseName)
-
-
                         .addListenerForSingleValueEvent(new ValueEventListener() {
                             @Override
                             public void onDataChange(@NonNull DataSnapshot snapshot) {
                                 for (DataSnapshot snap : snapshot.getChildren()) {
                                     String key = snap.getKey();
                                     exercisesRef.child(key).child("series").setValue(seriesCount);
-                                    Log.d(TAG, "🔥 Actualizado series para " + exerciseName + ": " + seriesCount);
+                                    Log.d(TAG, "🔥 [actualizarConteoSeriesEnFirebase] 'series' actualizado para '"
+                                            + exerciseName + "': " + seriesCount);
                                 }
                             }
 
                             @Override
                             public void onCancelled(@NonNull DatabaseError error) {
-                                Log.e(TAG, "❌ Error al actualizar series totales: " + error.getMessage());
+                                Log.e(TAG, "❌ Error al actualizar 'series': " + error.getMessage());
                             }
                         });
             }
         }
     }
+
+
 
 
     // Formatea el tiempo en HH:MM:SS
@@ -931,7 +954,12 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         btnAceptar.setOnClickListener(v -> {
             dialog.dismiss();
 
-            // Actualiza nº de series en userMovementPatterns
+            for (UserExercise ex : exercises) {
+                int nActual = adapter.getSeriesListForExercise(ex.getName()).size();
+                Log.d(TAG, "EJERCICIO: " + ex.getName() + " - Series actuales: " + nActual + " - Series original: " + ex.getSeries());
+            }
+            Log.d(TAG, "actualizarConteoSeriesEnFirebase - metodo llamado ");
+
             actualizarConteoSeriesEnFirebase();
 
             // Ya estaba marcado como guardado arriba; no es necesario repetir

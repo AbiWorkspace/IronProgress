@@ -115,7 +115,7 @@ public class AssignLoadFragment extends Fragment {
 
             if (!areAllExercisesValid()) {
                 Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ No se pueden guardar los datos. Hay ejercicios con información incompleta.");
-                Toast.makeText(getContext(), "⚠️ Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
+                Toast.makeText(getContext(), "Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
                 return;
             }else{
                 Toast.makeText(getContext(), "Formulario de entrenamiento completado", Toast.LENGTH_SHORT).show();
@@ -377,7 +377,7 @@ public class AssignLoadFragment extends Fragment {
 
         if (!areAllExercisesValid()) {
             Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ No se pueden guardar los datos. Hay ejercicios con información incompleta.");
-            Toast.makeText(getContext(), "⚠️ Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
+            Toast.makeText(getContext(), "Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -440,7 +440,7 @@ public class AssignLoadFragment extends Fragment {
                 .addOnFailureListener(e -> Log.e(TAG, "❌ Error al actualizar el estado del formulario.", e));
 
         Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Todos los ejercicios han sido guardados correctamente.");
-        Toast.makeText(getContext(), "✅ Cargas asignadas guardadas exitosamente", Toast.LENGTH_SHORT).show();
+        Toast.makeText(getContext(), "Cargas asignadas guardadas exitosamente", Toast.LENGTH_SHORT).show();
 
         // 🔥 Actualizar los iconos de estado
         updateAllStatusButtonIcons();

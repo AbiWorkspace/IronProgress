@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -24,6 +25,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
+import com.example.diets.Utils.Prefs;
 import com.example.diets.fragments.ExerciseDetailsDialogFragment;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.ExerciseSeries;
@@ -68,6 +70,9 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
     private final Map<String, SeriesAdapter> adaptersPorNombre = new HashMap<>();
 
 
+
+
+
     private final List<ExerciseViewHolder>     viewHolders              = new ArrayList<>();
     private final Map<String, String>          firebaseKeysPorNombre    = new HashMap<>();
     private final Map<String, Integer>         exerciseSeriesCountMap   = new HashMap<>();
@@ -76,19 +81,28 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
     /* 🔄 NUEVO  ➜  cacheamos las listas completas de imágenes                       */
     private final Map<String, List<String>>    exerciseImagesCache      = new HashMap<>();
 
-    /* -------------------------------- Ctor ---------------------------------- */
+    // 1) declara el campo en la cabecera de la clase
+    private boolean dynamicEnabled;   // ← nuevo
+
+    // 2) ajusta TU MISMO constructor
     public TrainingDetailAdapter(List<UserExercise> exercises,
                                  RecyclerView       recyclerView,
                                  String             dayKey,
                                  Context            context,
                                  FragmentManager    fragmentManager) {
+
         Log.d(TAG, "Constructor: ejercicios=" + exercises.size());
-        this.exercises        = exercises;
-        this.recyclerView     = recyclerView;
-        this.dayKey           = dayKey;
-        this.context          = context;
-        this.fragmentManager  = fragmentManager;
+
+        this.exercises       = exercises;
+        this.recyclerView    = recyclerView;
+        this.dayKey          = dayKey;
+        this.context         = context;
+        this.fragmentManager = fragmentManager;
+
+        // ⬇️  NUEVA línea: leemos la preferencia
+        this.dynamicEnabled  = Prefs.isDynamicEnabled(context);
     }
+
 
     /* ---------------- Métodos de acceso requeridos por otros componentes --------------- */
 
@@ -166,6 +180,51 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         holder.itemView.setOnClickListener(v -> abrirDetalles(ue));
         viewHolders.add(holder);
     }
+    public void setDynamicEnabled(boolean value) {
+        this.dynamicEnabled = value;
+
+        for (SeriesAdapter sa : seriesAdapters.values()) {
+            if (value) {
+                generarSugerencias();        // lo acabas de encender
+            } else {
+                sa.clearSuggestions();       // lo apagas → limpiamos
+                sa.notifyDataSetChanged();
+            }
+        }
+    }
+
+
+    public void setDynamicEnabledForExercise(String exerciseName, boolean enabled) {
+        // Aquí puedes guardar localmente, actualizar, refrescar solo ese SeriesAdapter, etc.
+        // Ejemplo:
+        SeriesAdapter sa = seriesAdapters.get(exerciseName);
+        if (sa != null) {
+            if (enabled) {
+                // Genera sugerencias solo para ese ejercicio
+                UserExercise ex = exerciseMap.get(exerciseName);
+                if (ex != null) {
+                    final float SALTO_MIN = 2.5f;
+                    List<ExerciseSeries> feedback = sa.getUpdatedSeriesList();
+                    List<ExerciseSeries> hist = sa.getHistorialSeries();
+                    List<ProgresionDinamica.Serie> sugeridas =
+                            ProgresionDinamica.sugerirSeries(
+                                    context,
+                                    ex,
+                                    feedback,
+                                    hist,
+                                    ProgresionDinamica.NivelUsuario.INTERMEDIO,
+                                    SALTO_MIN
+                            );
+                    if (!sugeridas.isEmpty()) sa.setFromSuggest(sugeridas);
+                }
+            } else {
+                sa.clearSuggestions();
+                sa.notifyDataSetChanged();
+            }
+        }
+    }
+
+
 
     private void abrirDetalles(UserExercise ue) {
         ExerciseDetailsDialogFragment dlg =
@@ -202,98 +261,120 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         }
 
 
-
         public void bind(UserExercise ex) {
+            Log.d(TAG, "ExerciseViewHolder - bind: Iniciando vinculación del ejercicio '" + ex.getName() + "'");
 
             txtName.setText(ex.getName());
-// ─── placeholder mientras llega Firebase ───
-            seriesList    = new ArrayList<>();                              // lista vacía
-            seriesAdapter = new SeriesAdapter(seriesList, ex.getName(),     // adapter vacío
-                    TrainingDetailAdapter.this);
+
+            // ─── Reutiliza adapter si ya lo habías creado ───
+            SeriesAdapter cached = seriesAdapters.get(ex.getName());
+            if (cached != null) {
+                Log.d(TAG, "ExerciseViewHolder - bind: Adapter ya existente para '" + ex.getName() + "'");
+                seriesAdapter = cached;
+                seriesList    = cached.getSeriesList();
+            } else {
+                Log.d(TAG, "ExerciseViewHolder - bind: Creando adapter y lista de series para '" + ex.getName() + "'");
+                seriesList = new ArrayList<>();
+                int n = Math.max(1, ex.getSeries());
+                for (int i = 0; i < n; i++) {
+                    ExerciseSeries serie = new ExerciseSeries(
+                            i + 1,
+                            ex.getReps(),
+                            ex.getWeight(),
+                            ex.getRpe()
+                    );
+                    serie.setCompleted(false); // O el valor real si lo tienes
+                    seriesList.add(serie);
+                }
+                seriesAdapter = new SeriesAdapter(seriesList, ex.getName(), TrainingDetailAdapter.this);
+                seriesAdapters.put(ex.getName(), seriesAdapter);
+            }
+
             rvSeries.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
             rvSeries.setAdapter(seriesAdapter);
 
-
-// ─── 0) creamos lista + adapter vacíos ───────────────────────────────────
-            seriesList     = new ArrayList<>();
-            seriesAdapter  = new SeriesAdapter(seriesList, ex.getName(), TrainingDetailAdapter.this);
-            rvSeries.setLayoutManager(new LinearLayoutManager(itemView.getContext()));
-            rvSeries.setAdapter(seriesAdapter);
-
-
-
-            /* ───── 2) pintamos la tabla ───── */
-
-
-
-            seriesAdapters.put(ex.getName(), seriesAdapter); // ① guarda la referencia
-            exerciseMap.put(ex.getName(), ex);               // ② acceso rápido al UserExercise
-
-
+            // Referencias rápidas
+            seriesAdapters.put(ex.getName(), seriesAdapter);
+            exerciseMap.put(ex.getName(), ex);
             exerciseSeriesCountMap.put(ex.getName(), seriesList.size());
 
             loadFirstPicture(ex, img);
 
             btnAddSeries.setOnClickListener(v -> {
-                int num = seriesList.size()+1;
-                seriesList.add(new ExerciseSeries(num,1,0,0));
-                seriesAdapter.notifyItemInserted(seriesList.size()-1);
+                int num = seriesList.size() + 1;
+                Log.d(TAG, "ExerciseViewHolder - bind: Añadiendo nueva serie (" + num + ") a '" + ex.getName() + "'");
+                seriesList.add(new ExerciseSeries(num, 1, 0, 0));
+                seriesAdapter.notifyItemInserted(seriesList.size() - 1);
                 exerciseSeriesCountMap.put(ex.getName(), seriesList.size());
             });
 
             icMore.setOnClickListener(v -> showPopupDelete(ex));
             txtName.setOnClickListener(v -> openDetails(ex));
 
-            /* ───── 3) ahora SÍ consultamos Firebase para refinar ───── */
+            // --- Refinar series con Firebase y APLICAR PROGRESIÓN DINÁMICA si corresponde ---
             fetchKeyIfNeeded(ex.getName(), key -> {
-                if (key == null) return;
+                if (key == null) {
+                    Log.e(TAG, "ExerciseViewHolder - bind: No se encontró clave Firebase para '" + ex.getName() + "'");
+                    return;
+                }
+                Log.d(TAG, "ExerciseViewHolder - bind: Clave Firebase recuperada para '" + ex.getName() + "': " + key);
 
                 seriesAdapter.cargarUltimasSeriesDesdeFirebase(key, context, () -> {
+                    Log.d(TAG, "ExerciseViewHolder - bind: Series refinadas desde Firebase para '" + ex.getName() + "'");
                     seriesAdapter.commitAllEdits();
-                    /* a) ► ahora tomamos la MEJOR serie histórica (mayor 1 RM)              */
-                    List<ExerciseSeries> comp = new ArrayList<>();
-                    ExerciseSeries best = seriesAdapter.getBestHistorySerie();   // ← NUEVO
-                    if (best != null) comp.add(best);
 
-                    /* b) ► y añadimos las series completadas hoy (si las hay)               */
-                    comp.addAll(seriesAdapter.getUpdatedSeriesList());
+                    // Lee la preferencia real del ejercicio:
+                    boolean progDinamicaOn = Prefs.isDynamicEnabledForExercise(itemView.getContext(), ex.getName());
+                    Log.d(TAG, "ExerciseViewHolder - bind: Progresión dinámica guardada para '" + ex.getName() + "' = " + progDinamicaOn);
 
-                    List<ProgresionDinamica.Serie> sug = ProgresionDinamica.sugerirSeries(
-                            context,                // ← AGREGA EL CONTEXT AQUÍ
-                            ex,
-                            comp,
-                            seriesAdapter.getHistorialSeries(),   // 👈 pasa el historial
-                            ProgresionDinamica.NivelUsuario.INTERMEDIO,
-                            2.5f);
-
-
-                    /* (opcional) fallback inicial si no hay historial … */
-                    if (sug.isEmpty()) {
-                        float refPeso = best != null ? (float) best.getWeight()
-                                : (float) ex.getWeight();
-                        sug = ProgresionDinamica.generarSeriesInicio(refPeso,
-                                ProgresionDinamica.TipoEjercicio.MULTIARTICULAR,
-                                3);
+                    if (progDinamicaOn) {
+                        // Sugerir series automáticamente al entrar (peso, reps, cantidad, etc.)
+                        List<ProgresionDinamica.Serie> sugeridas = ProgresionDinamica.sugerirSeries(
+                                context,
+                                ex,
+                                seriesAdapter.getUpdatedSeriesList(),
+                                seriesAdapter.getHistorialSeries(),
+                                ProgresionDinamica.NivelUsuario.INTERMEDIO,
+                                2.5f
+                        );
+                        Log.d(TAG, "ExerciseViewHolder - bind: Sugerencia dinámica aplicada (" + sugeridas.size() + " series)");
+                        if (!sugeridas.isEmpty()) {
+                            seriesAdapter.setFromSuggest(sugeridas);
+                        }
+                        rvSeries.setAdapter(seriesAdapter);
+                    } else {
+                        // Si está OFF, deja la lista tal cual (manual/histórica)
+                        Log.d(TAG, "ExerciseViewHolder - bind: Dinámica OFF → se conserva la tabla original para '" + ex.getName() + "'");
+                        rvSeries.setAdapter(seriesAdapter);
                     }
-
-                    rvSeries.setAdapter(seriesAdapter);   // siempre refrescas la vista
-
-                    /* d) ► refrescamos la UI */
-                    seriesAdapter.setFromSuggest(sug);
                 });
             });
-
         }
+
+
 
         public void detachAllListeners() {
             TrainingDetailAdapter.this.detachAllListeners();  // compat, no-op
         }
 
 
+        /** Muestra el menú contextual (eliminar / progresión dinámica).              */
         private void showPopupDelete(UserExercise ex) {
             PopupMenu pm = new PopupMenu(itemView.getContext(), icMore);
+
             pm.inflate(R.menu.menu_exercise_actions);
+
+            MenuItem dynItem = pm.getMenu().findItem(R.id.action_toggle_dynamic);
+            if (dynItem != null) {
+                boolean estadoGuardado = Prefs.isDynamicEnabledForExercise(itemView.getContext(), ex.getName());
+                dynItem.setChecked(estadoGuardado);
+
+                Log.d(TAG, "showPopupDelete: Check 'Progresión dinámica' cargado para " + ex.getName() + " = " + estadoGuardado);
+            }
+
+
             pm.setOnMenuItemClickListener(menuItem -> {
+
                 if (menuItem.getItemId() == R.id.action_delete) {
                     int p = getBindingAdapterPosition();
                     if (p != RecyclerView.NO_POSITION) {
@@ -309,10 +390,61 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                     }
                     return true;
                 }
+
+                if (menuItem.getItemId() == R.id.action_toggle_dynamic) {
+                    boolean newVal = !menuItem.isChecked();
+                    menuItem.setChecked(newVal);
+
+                    Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
+                            "El usuario ha " + (newVal ? "activado" : "desactivado") +
+                            " la Progresión Dinámica para el ejercicio '" + ex.getName() + "'.");
+
+                    // Guarda preferencia del usuario para este ejercicio
+                    Prefs.setDynamicEnabledForExercise(itemView.getContext(), ex.getName(), newVal);
+                    Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
+                            "Se ha guardado la preferencia Progresión Dinámica = " + newVal +
+                            " para el ejercicio '" + ex.getName() + "'.");
+
+                    if (newVal) {
+                        // El usuario quiere sugerencias automáticas
+                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
+                                "Solicitando sugerencia dinámica de series para '" + ex.getName() + "'.");
+                        List<ProgresionDinamica.Serie> sugeridas = ProgresionDinamica.sugerirSeries(
+                                context,
+                                ex,
+                                seriesAdapter.getUpdatedSeriesList(),
+                                seriesAdapter.getHistorialSeries(),
+                                ProgresionDinamica.NivelUsuario.INTERMEDIO,
+                                2.5f
+                        );
+                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
+                                "Sugerencias recibidas: " + sugeridas.size() + " series.");
+                        seriesAdapter.setFromSuggest(sugeridas);
+                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
+                                "La tabla de series ha sido reemplazada por la sugerencia dinámica.");
+                    } else {
+                        // El usuario desactivó la sugerencia, restaurar lista original
+                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
+                                "Restaurando la lista original de series para '" + ex.getName() + "'.");
+                        seriesAdapter.clearSuggestions();
+                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
+                                "La tabla de series ha sido restaurada a los valores de Firebase.");
+                    }
+
+                    return true;
+                }
+
+
+
                 return false;
             });
+
             pm.show();
         }
+
+
+
+
 
         private void openDetails(UserExercise ex) {
             FragmentManager fm = ((FragmentActivity) itemView.getContext()).getSupportFragmentManager();
@@ -340,25 +472,54 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                     if (key != null) {
                         seriesAdapter.cargarUltimasSeriesDesdeFirebase(key, context, () -> {
 
-                            /* 1️⃣  –  antes de leer los EditText y los check ✅ */
-                            seriesAdapter.commitAllEdits();                // fuerza a refrescar los datos en memoria
+                            seriesAdapter.commitAllEdits();            // refresca cache-UI
+                            rvSeries.setAdapter(seriesAdapter);        // siempre
 
-                            /* 2️⃣  –  construimos la lista REAL de series completadas */
-                            List<ExerciseSeries> comp = seriesAdapter.getUpdatedSeriesList();
+                            if (!TrainingDetailAdapter.this.dynamicEnabled) {
+                                Log.d(TAG, "Dinámica OFF → se conserva la tabla original");
+                                return;                           // ⬅️  ¡nada de sugerencias!
+                            }
 
-                            /* 3️⃣  –  pedimos la nueva sugerencia */
-                            List<ProgresionDinamica.Serie> sugeridas =
+                            /* ---------- feedback + historial ---------- */
+                            List<ExerciseSeries> comp  = new ArrayList<>();
+                            ExerciseSeries best = seriesAdapter.getBestHistorySerie();
+                            if (best != null) comp.add(best);
+                            comp.addAll(seriesAdapter.getUpdatedSeriesList());
+
+                            Log.d(TAG,
+                                    "PD-IN  ➜ best="
+                                            + (best==null? "null":best.toSimple())
+                                            + "  comp=" + comp.size()
+                                            + "  hist=" + seriesAdapter.getHistorialSeries().size());
+
+                            List<ProgresionDinamica.Serie> sug =
                                     ProgresionDinamica.sugerirSeries(
                                             context,
                                             ex,
-                                            comp,                               // feedback de hoy
-                                            seriesAdapter.getHistorialSeries(), // TODA la historia
+                                            comp,
+                                            seriesAdapter.getHistorialSeries(),
                                             ProgresionDinamica.NivelUsuario.INTERMEDIO,
                                             2.5f);
 
-                            /* 4️⃣  –  volcamos las sugerencias a la UI */
-                            seriesAdapter.setFromSuggest(sugeridas);
+                            /* fallback inicial */
+                            if (sug.isEmpty()) {
+                                float ref = best != null ? (float) best.getWeight()
+                                        : (float) ex.getWeight();
+                                sug = ProgresionDinamica.generarSeriesInicio(
+                                        ref,
+                                        ProgresionDinamica.TipoEjercicio.MULTIARTICULAR,
+                                        3);
+                            }
+
+                            /* 🚫 NO sustituimos la lista si no hay sugerencias válidas */
+                            if (!sug.isEmpty()) {
+                                seriesAdapter.setFromSuggest(sug);
+                            }
                         });
+
+
+
+
                     }
 
                 });
@@ -580,7 +741,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
      *  NUEVO – generarSugerencias: feedback solo de completadas
      * ========================================================= */
     public void generarSugerencias() {
-
+        if (!dynamicEnabled) return;
         if (seriesAdapters.isEmpty()) return;
 
         final float SALTO_MIN = 2.5f;     // paso de discos
@@ -600,6 +761,9 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
             /* ---------- 2) historial completo para RM all-time ---------- */
             List<ExerciseSeries> hist = sa.getHistorialSeries();
 
+
+
+
             /* ---------- 3) pedir sugerencia a ProgresionDinamica ---------- */
             List<ProgresionDinamica.Serie> sugeridas =
                     ProgresionDinamica.sugerirSeries(
@@ -610,14 +774,17 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                             ProgresionDinamica.NivelUsuario.INTERMEDIO,
                             SALTO_MIN);
 
-
             /* ---------- 4) volcar la sugerencia en la UI ---------- */
-            sa.setFromSuggest(sugeridas);      // ya hace notify*
+            if (!sugeridas.isEmpty()) {          // ✅ solo si hay algo que mostrar
+                sa.setFromSuggest(sugeridas);    // ya hace notify*
+            }   // si está vacía, mantenemos las series actuales
+
         }
 
         /* Si algún adapter externo depende del recálculo de sus hijos */
         notifyDataSetChanged();                // opcional: solo si lo necesitas
     }
+
 
 
     /** Ya no mantenemos listeners vivos; método no-op para compatibilidad. */

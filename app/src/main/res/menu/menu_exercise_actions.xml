@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item
-        android:id="@+id/action_edit"
-        android:title="Editar" />
+
+    <!-- Eliminar ejercicio -->
     <item
         android:id="@+id/action_delete"
         android:title="Eliminar" />
+
+    <!-- NUEVO: interruptor Progresión dinámica -->
+    <item
+        android:id="@+id/action_toggle_dynamic"
+        android:title="Progresión dinámica"
+        android:checkable="true"
+        android:checked="true" />   <!-- ON por defecto -->
+
 </menu>
