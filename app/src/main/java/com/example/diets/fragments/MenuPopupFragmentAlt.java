@@ -16,38 +16,50 @@ import androidx.fragment.app.FragmentManager;
 import com.example.diets.R;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.TrainingDay;
+import com.example.diets.selection.OnExercisesSelectedListener;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.util.List;
 public class MenuPopupFragmentAlt extends DialogFragment {
 
-    private SelectExercisesFragment.OnExercisesSelectedListener listener;
+    private static final String TAG = "MenuPopupFragmentAlt";
+
+    private OnExercisesSelectedListener listener;  // ✅ ÚNICO listener
     private TrainingDay trainingDay;
 
     @Override
     public void onAttach(@NonNull Context context) {
         super.onAttach(context);
 
-        Fragment parentFragment = getParentFragment();
-        if (parentFragment instanceof SelectExercisesFragment.OnExercisesSelectedListener) {
-            listener = (SelectExercisesFragment.OnExercisesSelectedListener) parentFragment;
-            Log.d("MenuPopupFragmentAlt", "✅ Listener obtenido desde el fragmento padre.");
-        } else if (context instanceof SelectExercisesFragment.OnExercisesSelectedListener) {
-            listener = (SelectExercisesFragment.OnExercisesSelectedListener) context;
-            Log.d("MenuPopupFragmentAlt", "✅ Listener obtenido desde la actividad.");
+        Fragment parent = getParentFragment(); // clave cuando se abre con getChildFragmentManager()
+        if (parent instanceof OnExercisesSelectedListener) {
+            listener = (OnExercisesSelectedListener) parent;
+            Log.d(TAG, "✅ Listener obtenido desde el fragmento padre.");
+        } else if (context instanceof OnExercisesSelectedListener) {
+            listener = (OnExercisesSelectedListener) context; // fallback actividad
+            Log.d(TAG, "✅ Listener obtenido desde la actividad.");
         } else {
-            throw new RuntimeException("El fragmento o la actividad debe implementar OnExercisesSelectedListener");
+            throw new RuntimeException("El fragmento padre o la actividad debe implementar OnExercisesSelectedListener");
         }
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        listener = null;
     }
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_menu_popup, container, false);
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view,
+                              @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
         BottomNavigationView navigationView = view.findViewById(R.id.navigation);
@@ -55,7 +67,7 @@ public class MenuPopupFragmentAlt extends DialogFragment {
         Bundle args = getArguments();
         if (args != null && args.containsKey("trainingDay")) {
             trainingDay = (TrainingDay) args.getSerializable("trainingDay");
-            Log.d("MenuPopupFragmentAlt", "📌 TrainingDay recibido: " + trainingDay);
+            Log.d(TAG, "📌 TrainingDay recibido: " + trainingDay);
         }
 
         navigationView.setOnItemSelectedListener(item -> {
@@ -73,13 +85,11 @@ public class MenuPopupFragmentAlt extends DialogFragment {
                 selectedFragment.setArguments(fragmentArgs);
 
                 if (selectedFragment instanceof ExerciseSelectionDialogFragmentAlt) {
-                    ((ExerciseSelectionDialogFragmentAlt) selectedFragment).setOnExercisesSelectedListener(
-                            (selectedExercises, day) -> sendExercisesToParentFragment(selectedExercises, day)
-                    );
+                    ((ExerciseSelectionDialogFragmentAlt) selectedFragment)
+                            .setOnExercisesSelectedListener(this::sendExercisesToParentFragment);
                 } else if (selectedFragment instanceof CreatedExercisesFragmentAlt) {
-                    ((CreatedExercisesFragmentAlt) selectedFragment).setOnExercisesSelectedListener(
-                            (selectedExercises, day) -> sendExercisesToParentFragment(selectedExercises, day)
-                    );
+                    ((CreatedExercisesFragmentAlt) selectedFragment)
+                            .setOnExercisesSelectedListener(this::sendExercisesToParentFragment);
                 }
 
                 getChildFragmentManager().beginTransaction()
@@ -95,12 +105,12 @@ public class MenuPopupFragmentAlt extends DialogFragment {
         }
     }
 
-    public void sendExercisesToParentFragment(List<Exercise> selectedExercises, TrainingDay trainingDay) {
+    /** Envía la selección al host (padre/actividad) y cierra el popup. */
+    public void sendExercisesToParentFragment(@NonNull List<Exercise> selectedExercises,
+                                              @NonNull TrainingDay trainingDay) {
         if (listener != null) {
-            for (Exercise exercise : selectedExercises) {
-                listener.onExercisesSelected(selectedExercises, trainingDay);
-
-            }
+            // ✅ Llamar UNA sola vez con la lista completa (no en bucle)
+            listener.onExercisesSelected(selectedExercises, trainingDay);
         }
         dismiss();
     }

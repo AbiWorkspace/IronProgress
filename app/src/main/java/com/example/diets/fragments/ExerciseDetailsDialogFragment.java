@@ -53,6 +53,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private static final String ARG_EXERCISE = "exerciseIndex";
     private static final String ARG_DAY      = "dayKey";
     private static final String ARG_INTERNAL = "isFromInternal";
+    private static final String ARG_UID      = "effectiveUid";   // ✅ nuevo
     private static final String TAG          = "ExerciseDetailsDialogFragment";
 
     /* ──────────────────────────── vistas ──────────────────────────── */
@@ -81,6 +82,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private String  exerciseIndex;
     private String  dayKey;
     private boolean isFromInternal;
+    private String  uidForQueries; // ✅ UID efectivo (cliente en modo coach, o usuario actual)
 
     /* ────────────────────────── binding de vistas ────────────────────────── */
     private void bindViews(View view) {
@@ -101,6 +103,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     }
 
     /* ───────────────────────── factory methods ───────────────────────── */
+    /** Versión legacy (sin UID explícito). Mantiene compatibilidad. */
     public static ExerciseDetailsDialogFragment newInstance(String exerciseIndex,
                                                             String dayKey,
                                                             boolean isFromInternal) {
@@ -110,10 +113,30 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         args.putString(ARG_EXERCISE, exerciseIndex);
         args.putString(ARG_DAY, dayKey);
         args.putBoolean(ARG_INTERNAL, isFromInternal);
+        // sin ARG_UID → usará el currentUser
         f.setArguments(args);
         return f;
     }
 
+    /** Nueva versión para **modo Coach**: pasa el UID del cliente. */
+    public static ExerciseDetailsDialogFragment newInstance(String exerciseIndex,
+                                                            String dayKey,
+                                                            boolean isFromInternal,
+                                                            @Nullable String effectiveUid) {
+        Log.d(TAG, "newInstance(+uid): creando fragmento con argumentos (coach compatible).");
+        ExerciseDetailsDialogFragment f = new ExerciseDetailsDialogFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_EXERCISE, exerciseIndex);
+        args.putString(ARG_DAY, dayKey);
+        args.putBoolean(ARG_INTERNAL, isFromInternal);
+        if (!TextUtils.isEmpty(effectiveUid)) {
+            args.putString(ARG_UID, effectiveUid); // ✅
+        }
+        f.setArguments(args);
+        return f;
+    }
+
+    /** Legacy: interno. Se mantiene igual. */
     public static ExerciseDetailsDialogFragment newInstanceFromInternal(Exercise exercise) {
         Log.d(TAG, "newInstanceFromInternal: creando fragmento para ejercicio interno.");
         ExerciseDetailsDialogFragment f = new ExerciseDetailsDialogFragment();
@@ -137,9 +160,20 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
             dayKey           = getArguments().getString(ARG_DAY);
             isFromInternal   = getArguments().getBoolean(ARG_INTERNAL, false);
             internalExercise = (UserExercise) getArguments().getSerializable("exercise");
+            String argUid    = getArguments().getString(ARG_UID, null);
 
-            Log.d(TAG, "onCreate: argumentos recibidos. exerciseIndex=" + exerciseIndex
-                    + ", dayKey=" + dayKey + ", isFromInternal=" + isFromInternal);
+            // ✅ Resolver UID efectivo: primero el pasado por argumentos; si no, el usuario actual
+            if (!TextUtils.isEmpty(argUid)) {
+                uidForQueries = argUid;
+            } else {
+                FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+                uidForQueries = (u != null) ? u.getUid() : null;
+            }
+
+            Log.d(TAG, "onCreate: args → exerciseIndex=" + exerciseIndex
+                    + ", dayKey=" + dayKey
+                    + ", isFromInternal=" + isFromInternal
+                    + ", uidForQueries=" + uidForQueries);
         }
     }
 
@@ -170,11 +204,10 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
             populateFirebaseUI(view);
         }
 
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user != null && dayKey != null && !dayKey.isEmpty()) {
-            loadMovementPattern(view, user.getUid());   // solo lee y muestra texto
+        if (!TextUtils.isEmpty(uidForQueries) && !TextUtils.isEmpty(dayKey)) {
+            loadMovementPattern(view, uidForQueries);   // ✅ siempre con UID efectivo
         } else {
-            Log.d(TAG, "Patrón de movimiento omitido (usuario o dayKey nulo)");
+            Log.d(TAG, "Patrón de movimiento omitido (uidForQueries o dayKey nulo)");
         }
 
         return view;
@@ -222,24 +255,21 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         }
 
         fetchSeriesDataPorNombre(ex.getName(), textPersonalRecord);
-
     }
 
     /* ───────────────────────── población UI: Firebase ───────────────────────── */
     private void populateFirebaseUI(View view) {
 
         Log.d(TAG, "populateFirebaseUI: poblando UI desde Firebase.");
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null || exerciseIndex == null || exerciseIndex.isEmpty()) {
-            Log.e(TAG, "populateFirebaseUI: No hay usuario o ID inválido");
+        if (TextUtils.isEmpty(uidForQueries) || TextUtils.isEmpty(exerciseIndex)) {
+            Log.e(TAG, "populateFirebaseUI: uidForQueries o exerciseIndex inválido.");
             dismiss();
             return;
         }
 
-        String uid = user.getUid();
         DatabaseReference ref = databaseReference
                 .child("users")
-                .child(uid)
+                .child(uidForQueries)                  // ✅ UID efectivo
                 .child("userExercises")
                 .child(exerciseIndex);
 
@@ -260,7 +290,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                 bindFirebaseExercise(ex);
                 cargarImagenesFirebase(ex.getName());
                 fetchSeriesData(exerciseIndex, textPersonalRecord);
-                loadMovementPattern(view, uid);
+                loadMovementPattern(view, uidForQueries);
 
                 double rm = computeEstimatedRm(snap);
                 textRM.setText("RM Estimado: " + String.format("%.2f", rm) + " kg");
@@ -297,10 +327,10 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private void loadMovementPattern(View view, String uid) {
 
         Log.d(TAG, "loadMovementPattern: buscando patrón de movimiento para dayKey=" + dayKey);
-        if (dayKey == null || dayKey.isEmpty()) return;
+        if (dayKey == null || dayKey.isEmpty() || TextUtils.isEmpty(uid)) return;
 
         databaseReference.child("users")
-                .child(uid)
+                .child(uid)                             // ✅ UID efectivo
                 .child("userMovementPatterns")
                 .child(dayKey)
                 .child("name")
@@ -398,15 +428,14 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private void fetchSeriesData(String exerciseId, TextView textPersonalRecord) {
 
         Log.d(TAG, "fetchSeriesData: Iniciando descarga de series para: " + exerciseId);
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Log.e(TAG, "fetchSeriesData: usuario no autenticado.");
+        if (TextUtils.isEmpty(uidForQueries)) {
+            Log.e(TAG, "fetchSeriesData: uidForQueries vacío.");
             return;
         }
 
         DatabaseReference seriesRef = databaseReference
                 .child("users")
-                .child(user.getUid())
+                .child(uidForQueries)                 // ✅ UID efectivo
                 .child("userExercises")
                 .child(exerciseId)
                 .child("seriesData");
@@ -485,7 +514,6 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                     textRM.setText("RM Estimado: " + String.format("%.2f", bestRm) + " kg");
                 }
 
-
                 drawProgressChart(allSeriesData);
             }
             @Override public void onCancelled(@NonNull DatabaseError error) {
@@ -498,12 +526,14 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private void fetchSeriesDataPorNombre(String nombreEjercicio,
                                           TextView textPersonalRecord) {
 
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) return;
+        if (TextUtils.isEmpty(uidForQueries)) {
+            Log.e(TAG, "fetchSeriesDataPorNombre: uidForQueries vacío.");
+            return;
+        }
 
         DatabaseReference ref = databaseReference
                 .child("users")
-                .child(user.getUid())
+                .child(uidForQueries)                 // ✅ UID efectivo
                 .child("userExercises");
 
         ref.orderByChild("name").equalTo(nombreEjercicio)
@@ -574,7 +604,9 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         dataSet.setDrawValues(true);
 
         if (bestEntry != null) {
-            LineDataSet highlight = new LineDataSet(List.of(bestEntry), "Mejor Serie");
+            List<Entry> bestList = new ArrayList<>();
+            bestList.add(bestEntry);
+            LineDataSet highlight = new LineDataSet(bestList, "Mejor Serie");
             highlight.setColor(Color.RED);
             highlight.setCircleColor(Color.RED);
             highlight.setCircleRadius(6f);

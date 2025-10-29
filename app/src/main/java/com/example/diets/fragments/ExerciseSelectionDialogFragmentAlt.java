@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -55,6 +56,11 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
     private ExercisesAdapter adapter;
     private TrainingDay trainingDay;
     private SelectExercisesFragment.OnExercisesSelectedListener listener;
+
+    /* ─────────── Coach Mode ─────────── */
+    private boolean coachMode = false;
+    private String effectiveUid = null;   // UID del cliente si coachMode, o del usuario actual
+    private String dayKey = null;
 
     /* ─────────── Listener setter ─────────── */
     public void setOnExercisesSelectedListener(SelectExercisesFragment.OnExercisesSelectedListener l) {
@@ -76,8 +82,8 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
         super.onViewCreated(view, savedInstanceState);
 
         recyclerView = view.findViewById(R.id.recyclerView);
-        doneButton = view.findViewById(R.id.doneButton);
-        mDatabase = FirebaseDatabase.getInstance().getReference();
+        doneButton   = view.findViewById(R.id.doneButton);
+        mDatabase    = FirebaseDatabase.getInstance().getReference();
 
         if (recyclerView != null) {
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -86,12 +92,25 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
 
         /* Recuperar argumentos */
         Bundle args = getArguments();
+        String argTargetUid = null;
         if (args != null) {
             trainingDay = (TrainingDay) args.getSerializable("trainingDay");
-            if (trainingDay != null) {
-                Log.d(TAG, "TrainingDay recibido → " + trainingDay.getDayTitle());
-                loadExercises(trainingDay.getDayTitle());
-            }
+            coachMode   = args.getBoolean("coachMode", false);
+            argTargetUid= safeTrim(args.getString("targetUid", null));
+        }
+
+        // Resolver UID efectivo (cliente si coach, si no el actual)
+        effectiveUid = resolveEffectiveUid(coachMode, argTargetUid);
+        dayKey = (trainingDay != null) ? trainingDay.getDayTitle() : null;
+
+        Log.d(TAG, "✔ coachMode=" + coachMode + " | effectiveUid=" + effectiveUid + " | dayKey=" + dayKey);
+
+        if (trainingDay != null) {
+            loadExercises(dayKey);
+        } else {
+            // Sin trainingDay → mostrar todo
+            Log.w(TAG, "⚠ trainingDay nulo: se listarán todos los ejercicios.");
+            loadAllExercisesNoFilter();
         }
 
         /* Botón «Hecho» */
@@ -108,13 +127,23 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
     /* ──────────────────────────────────────── */
     /*             CARGA DE EJERCICIOS          */
     /* ──────────────────────────────────────── */
-    private void loadExercises(String dayKey) {
-        obtenerMovementPatternDelDia(dayKey, pattern -> {
+    private void loadExercises(String key) {
+        // Coach: si no hay UID efectivo o key, listar todo sin romper flujo
+        if (coachMode && (effectiveUid == null || isEmpty(key))) {
+            Log.w(TAG, "⚠ Coach sin effectiveUid o dayKey → listar TODO sin filtro.");
+            loadAllExercisesNoFilter();
+            return;
+        }
+
+        obtenerMovementPatternDelDia(effectiveUid, key, pattern -> {
             if (pattern == null) {
-                Log.w(TAG, "⚠ No se encontró patrón para " + dayKey);
+                Log.w(TAG, "⚠ No se encontró patrón para " + key + " en uid=" + effectiveUid);
+                // mostrar todo para no bloquear flujo
+                loadAllExercisesNoFilter();
                 return;
             }
 
+            // Con patrón → filtrar por músculos
             mDatabase.child("exercises")
                     .addListenerForSingleValueEvent(new ValueEventListener() {
                         @Override
@@ -130,6 +159,7 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
                                 }
                             }
                             setupRecyclerView();
+                            Log.d(TAG, "✅ ejercicios filtrados=" + exercises.size());
                         }
 
                         @Override
@@ -140,12 +170,32 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
         });
     }
 
+    /** Lista TODOS los ejercicios sin filtrar (bypass). */
+    private void loadAllExercisesNoFilter() {
+        mDatabase.child("exercises")
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override public void onDataChange(@NonNull DataSnapshot ds) {
+                        exercises.clear();
+                        for (DataSnapshot child : ds.getChildren()) {
+                            Object data = child.getValue();
+                            if (data instanceof Map) {
+                                Exercise ex = mapToExercise((Map<String, Object>) data);
+                                if (ex != null) exercises.add(ex);
+                            }
+                        }
+                        setupRecyclerView();
+                        Log.d(TAG, "✅ ejercicios (sin filtro)=" + exercises.size());
+                    }
+                    @Override public void onCancelled(@NonNull DatabaseError e) {
+                        Log.e(TAG, "❌ Firebase error: " + e.getMessage());
+                    }
+                });
+    }
+
     /* ──────────────────────────────────────── */
     /*       COMPARACIÓN DE MÚSCULOS            */
     /* ──────────────────────────────────────── */
     private boolean hasMatchingMuscles(Exercise ex, MovementPattern pattern) {
-
-        /* Si falta info básica, no hacemos match */
         if ((ex.getMusclesWorked() == null || ex.getMusclesWorked().isEmpty()) &&
                 (ex.getSynergistMuscles() == null || ex.getSynergistMuscles().isEmpty()))
             return false;
@@ -184,17 +234,27 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
     /* ──────────────────────────────────────── */
     /*         OBTENER MOVEMENT PATTERN         */
     /* ──────────────────────────────────────── */
-    private void obtenerMovementPatternDelDia(String dayKey, MovementPatternCallback cb) {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
+    private void obtenerMovementPatternDelDia(@Nullable String uid, String key, MovementPatternCallback cb) {
+        // Si no pasaron UID (usuario normal) se usa el actual
+        String finalUid = uid;
+        if (isEmpty(finalUid)) {
+            FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+            finalUid = (u != null) ? u.getUid() : null;
+        }
+
+        if (isEmpty(finalUid) || isEmpty(key)) {
+            Log.w(TAG, "⚠ obtenerMovementPatternDelDia: uid/key nulos.");
             cb.onPatternLoaded(null);
             return;
         }
 
+        String path = "users/" + finalUid + "/userMovementPatterns/" + key;
+        Log.d(TAG, "🔎 fetch patrón → " + path);
+
         FirebaseDatabase.getInstance().getReference("users")
-                .child(user.getUid())
+                .child(finalUid)
                 .child("userMovementPatterns")
-                .child(dayKey)
+                .child(key)
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot ds) {
@@ -207,13 +267,17 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
                         p.setName(ds.child("name").getValue(String.class));
 
                         List<String> syn = new ArrayList<>();
-                        for (DataSnapshot m : ds.child("synergistMuscles").getChildren())
-                            syn.add(m.getValue(String.class));
+                        for (DataSnapshot m : ds.child("synergistMuscles").getChildren()) {
+                            String val = m.getValue(String.class);
+                            if (val != null) syn.add(val);
+                        }
                         p.setSynergistMuscles(syn);
 
                         List<String> w = new ArrayList<>();
-                        for (DataSnapshot m : ds.child("musclesWorked").getChildren())
-                            w.add(m.getValue(String.class));
+                        for (DataSnapshot m : ds.child("musclesWorked").getChildren()) {
+                            String val = m.getValue(String.class);
+                            if (val != null) w.add(val);
+                        }
                         p.setMusclesWorked(w);
 
                         cb.onPatternLoaded(p);
@@ -221,6 +285,7 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
 
                     @Override
                     public void onCancelled(@NonNull DatabaseError e) {
+                        Log.e(TAG, "❌ obtenerMovementPatternDelDia:onCancelled " + e.getMessage());
                         cb.onPatternLoaded(null);
                     }
                 });
@@ -258,7 +323,7 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
     /* ──────────────────────────────────────── */
     private String normalizeMuscleName(String s) {
         if (s == null) return "";
-        return s.trim().toLowerCase()
+        return s.trim().toLowerCase(Locale.ROOT)
                 .replace("á", "a").replace("é", "e").replace("í", "i")
                 .replace("ó", "o").replace("ú", "u").replace("ü", "u")
                 .replaceAll("[^a-zñ]", "");
@@ -317,7 +382,7 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
     private void addOrRemoveSelection(Exercise ex) {
         if (selectedExercises.contains(ex)) selectedExercises.remove(ex);
         else selectedExercises.add(ex);
-        adapter.notifyDataSetChanged();
+        if (adapter != null) adapter.notifyDataSetChanged();
     }
 
     /* ─────────────── Callbacks de adapter ─────────────── */
@@ -336,7 +401,21 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
     /* ──────────────────────────────────────── */
     private void showExerciseDetails(Exercise exercise) {
         loadExerciseImagesFromFirebase(exercise, () -> {
+            // Usa tu factory existente y luego injerta argumentos extra sin romper compatibilidad
             ExerciseDetailsFragment f = ExerciseDetailsFragment.newInstance(exercise);
+
+            // Inyecta args para modo coach y para evitar el primer filtro de RPE
+            Bundle b = (f.getArguments() != null) ? f.getArguments() : new Bundle();
+            b.putBoolean("coachMode", coachMode);
+            if (!isEmpty(effectiveUid)) b.putString("uidForQueries", effectiveUid);
+            if (!isEmpty(dayKey))      b.putString("dayKey", dayKey);
+
+            // >>> IMPORTANTE: el detalle debe leer este flag y **ignorar el primer onItemSelected del Spinner**
+            // para no borrar la gráfica al iniciar (caso coach).
+            b.putBoolean("preventInitialRpeFilter", true);
+
+            f.setArguments(b);
+
             getParentFragmentManager()
                     .beginTransaction()
                     .replace(R.id.fragment_container, f)
@@ -371,6 +450,21 @@ public class ExerciseSelectionDialogFragmentAlt extends DialogFragment
                         done.run();
                     }
                 });
+    }
+
+    /* ─────────────── Helpers ─────────────── */
+    private String resolveEffectiveUid(boolean isCoachMode, @Nullable String target) {
+        if (isCoachMode && !isEmpty(target)) return target;
+        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+        return (u != null) ? u.getUid() : null;
+    }
+
+    private boolean isEmpty(@Nullable String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    private String safeTrim(@Nullable String s) {
+        return s == null ? null : s.trim();
     }
 
     /* ─────────────── Callback interfaz ─────────────── */
