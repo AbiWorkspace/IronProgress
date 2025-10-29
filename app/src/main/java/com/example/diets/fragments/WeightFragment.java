@@ -26,6 +26,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
@@ -42,6 +43,7 @@ import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
@@ -64,32 +66,37 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-
 public class WeightFragment extends Fragment {
 
     /* -------------------------------------------------- */
     /* ------------------- CONSTANTES ------------------- */
     /* -------------------------------------------------- */
     private static final String KEY_WAITING_PROGRESS = "waiting_progress";
-    private static final String KEY_WAITING_DATE = "waiting_date"; // la fecha del último ajuste en epochDay
-    private static final int WAIT_DAYS_AFTER_ADJUST = 7;
+    private static final String KEY_WAITING_DATE     = "waiting_date"; // epochDay del último ajuste
+    private static final int WAIT_DAYS_AFTER_ADJUST  = 7;
 
-    private static final String LOG_PREFIX = "WeigntFragment";           // para filtrar en Logcat
+    private static final String LOG_PREFIX = "WeightFragment";
     private static final String PREF_STATS = "WeightStats";
-    private static final String KEY_MISMATCH_WEEKS   = "mismatchWeeks";
+    private static final String KEY_MISMATCH_WEEKS = "mismatchWeeks";
+    private static final String KEY_LAST_ADJ_DATE  = "lastAdjustmentDate";
 
-    private static final String KEY_LAST_ADJ_DATE    = "lastAdjustmentDate";
-    private static final String PREFS_NAME = "FoodPrefs";
-    private static final DateTimeFormatter SP_DATE =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.getDefault());
-    /* ---------- Utils fechas ---------- */
-    private static final DateTimeFormatter DF_IN = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final String PREFS_NAME = "FoodPrefs"; // donde guardas los totales diarios
+
+    private static final DateTimeFormatter SP_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.getDefault());
+    private static final DateTimeFormatter DF_IN   = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
     private static long daysBetween(LocalDate a, LocalDate b){
         return java.time.temporal.ChronoUnit.DAYS.between(a, b);
     }
     private static LocalDate parseDDMMYYYY(String d){
         return LocalDate.parse(d, DF_IN);
     }
+
+    /* -------------------------------------------------- */
+    /* ------------- MODO COACH / UID EFECTIVO ---------- */
+    /* -------------------------------------------------- */
+    private boolean isCoachMode = false;
+    private String effectiveUid = null;
 
     /* -------------------------------------------------- */
     /* ----------------- ATRIBUTOS UI ------------------- */
@@ -106,14 +113,40 @@ public class WeightFragment extends Fragment {
     /* -------------------------------------------------- */
     private final List<WeightRecord> weightRecords = new ArrayList<>();
     private WeightAdapter weightAdapter;
-    private DatabaseReference databaseReference;
-    private String userId;
+    private DatabaseReference databaseReference; // -> /weightRecords/{effectiveUid}
     private String userGoal = "";          // perder / ganar / mantener
     private String selectedDate = null;    // dd/MM/yyyy
 
-    /* -------------------------------------------------- */
-    /* ---------------- CICLO DE VIDA ------------------- */
-    /* -------------------------------------------------- */
+    /* ===================== CICLO DE VIDA ===================== */
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // Determinar UID efectivo desde argumentos (modo coach) o usuario actual
+        Bundle args = getArguments();
+        FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
+
+        if (args != null) {
+            isCoachMode = args.getBoolean("coachMode", false);
+            if (isCoachMode) {
+                effectiveUid = args.getString("targetUid");
+                Log.i(LOG_PREFIX, "MODO COACH. effectiveUid=" + effectiveUid);
+            } else {
+                effectiveUid = (current != null) ? current.getUid() : null;
+                Log.i(LOG_PREFIX, "MODO USUARIO (args). effectiveUid=" + effectiveUid);
+            }
+        } else {
+            isCoachMode = false;
+            effectiveUid = (current != null) ? current.getUid() : null;
+            Log.i(LOG_PREFIX, "MODO USUARIO (sin args). effectiveUid=" + effectiveUid);
+        }
+
+        if (effectiveUid == null) {
+            Log.e(LOG_PREFIX, "ERROR: effectiveUid es null. No se podrán cargar/guardar datos.");
+        }
+    }
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container,
@@ -123,13 +156,6 @@ public class WeightFragment extends Fragment {
 
         View v = inflater.inflate(R.layout.fragment_weight, container, false);
 
-        /* ---------- Firebase ---------- */
-        userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        databaseReference = FirebaseDatabase.getInstance()
-                .getReference("weightRecords")
-                .child(userId);
-        Log.d(LOG_PREFIX, "[onCreateView] userId=" + userId);
-
         /* ---------- Referencias UI ---------- */
         bindViews(v);
 
@@ -137,35 +163,53 @@ public class WeightFragment extends Fragment {
         selectDateButton.setOnClickListener(btn -> showDatePickerDialog());
         saveWeightButton.setOnClickListener(btn -> saveWeightRecord());
 
-
         /* ---------- Recycler ---------- */
         weightAdapter = new WeightAdapter(weightRecords,
                 (rec, pos) -> showEditDialog(rec, pos));
 
         LinearLayoutManager lm = new LinearLayoutManager(
                 getContext(), LinearLayoutManager.VERTICAL, true); // reverseLayout = true
-        lm.setStackFromEnd(true);          // mantiene el “ancla” al comienzo
+        lm.setStackFromEnd(true);
 
         weightRecyclerView.setLayoutManager(lm);
         weightRecyclerView.setAdapter(weightAdapter);
-
-        /* desactiva el nested-scroll también por código para cubrir todos los casos */
         weightRecyclerView.setNestedScrollingEnabled(false);
-
-        attachSwipeToDelete();
-
-
-        /* ---------- Descarga metas y registros ---------- */
-        FirebaseDatabase.getInstance()
-                .getReference("users").child(userId).child("goal")
-                .get()
-                .addOnSuccessListener(snap -> {
-                    userGoal = snap.exists() ? snap.getValue(String.class) : "";
-                    loadWeightRecords();
-                });
 
         setupBottomNav(v);
         return v;
+    }
+
+    @Override
+    public void onViewCreated(@NonNull View v, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(v, savedInstanceState);
+
+        if (effectiveUid == null) {
+            if (isAdded()) Toast.makeText(getContext(), "No se pudo identificar al usuario.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Inicializa referencia Firebase con effectiveUid
+        databaseReference = FirebaseDatabase.getInstance()
+                .getReference("weightRecords")
+                .child(effectiveUid);
+
+        // Habilita swipe delete (usa databaseReference)
+        attachSwipeToDelete();
+
+        // Descarga objetivo y luego registros
+        FirebaseDatabase.getInstance()
+                .getReference("users").child(effectiveUid).child("goal")
+                .get()
+                .addOnSuccessListener(snap -> {
+                    if (!isAdded()) return;
+                    userGoal = snap.exists() ? snap.getValue(String.class) : "";
+                    loadWeightRecords();
+                })
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    Log.e(LOG_PREFIX, "Error leyendo goal", e);
+                    loadWeightRecords();
+                });
     }
 
     /**
@@ -186,10 +230,11 @@ public class WeightFragment extends Fragment {
                 int pos = vh.getAdapterPosition();
                 if (pos == RecyclerView.NO_POSITION) return;
 
-                // 1️⃣ eliminar de Firebase (si existe id)
+                // 1️⃣ eliminar de Firebase (si existe id y tenemos referencia)
                 WeightRecord rec = weightRecords.get(pos);
-                if (rec.getId() != null)
+                if (databaseReference != null && rec.getId() != null) {
                     databaseReference.child(rec.getId()).removeValue();
+                }
 
                 // 2️⃣ eliminar de lista + UI
                 weightRecords.remove(pos);
@@ -197,11 +242,9 @@ public class WeightFragment extends Fragment {
 
                 // 3️⃣ refrescar gráfica y estadísticas
                 if (isAdded() && getContext() != null) updateChart();
-
                 computeWeeklyStats();
             }
 
-            // — dibuja fondo e ícono mientras se desliza — //
             @Override
             public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView rv,
                                     @NonNull RecyclerView.ViewHolder vh,
@@ -249,9 +292,7 @@ public class WeightFragment extends Fragment {
         trendText      = v.findViewById(R.id.trendText);
     }
 
-    /* -------------------------------------------------- */
-    /* ---------------- GENERAR DATE PICKER ------------- */
-    /* -------------------------------------------------- */
+    /* ---------------------- DATE PICKER ---------------------- */
     private void showDatePickerDialog() {
         Log.d(LOG_PREFIX, "[showDatePickerDialog] ► abierto");
         Calendar c = Calendar.getInstance();
@@ -268,9 +309,7 @@ public class WeightFragment extends Fragment {
                 .show();
     }
 
-    /* -------------------------------------------------- */
-    /* ------- GUARDAR / EDITAR REGISTROS --------------- */
-    /* -------------------------------------------------- */
+    /* ----------------- GUARDAR / EDITAR REGISTROS ----------------- */
     private void showEditDialog(WeightRecord record, int position) {
         Log.d(LOG_PREFIX, "[showEditDialog] id=" + record.getId());
         Dialog d = new Dialog(requireContext());
@@ -297,10 +336,9 @@ public class WeightFragment extends Fragment {
                 record.setCalories(newC);
                 weightRecords.set(position, record);
                 weightAdapter.notifyItemChanged(position);
-                if (record.getId()!=null)
+                if (databaseReference != null && record.getId()!=null)
                     databaseReference.child(record.getId()).setValue(record);
                 Log.d(LOG_PREFIX, "[showEditDialog] guardado id=" + record.getId());
-                // 3️⃣ refrescar gráfica y estadísticas
                 if (isAdded() && getContext() != null) updateChart();
                 computeWeeklyStats();
                 d.dismiss();
@@ -311,6 +349,7 @@ public class WeightFragment extends Fragment {
         });
         d.show();
     }
+
     private static double slopeKgPerDay(List<WeightRecord> list){
         int n=list.size();
         if(n<2) return 0;
@@ -322,10 +361,17 @@ public class WeightFragment extends Fragment {
         }
         double num = n*sumXY - sumX*sumY;
         double den = n*sumXX - sumX*sumX;
-        return den==0? 0 : num/den;           // kg / índice-día
+        return den==0? 0 : num/den;
     }
+
     private void saveWeightRecord() {
         Log.d(LOG_PREFIX, "[saveWeightRecord] ► inicio");
+
+        if (databaseReference == null || effectiveUid == null) {
+            if (isAdded()) Toast.makeText(getContext(),"No se ha inicializado el usuario.",Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         String wStr = weightInput.getText().toString().trim();
         if (wStr.isEmpty() || selectedDate == null) {
             Log.w(LOG_PREFIX, "[saveWeightRecord] peso o fecha vacío");
@@ -354,29 +400,35 @@ public class WeightFragment extends Fragment {
 
         databaseReference.child(id).setValue(rec)
                 .addOnSuccessListener(v -> {
+                    if (!isAdded()) return;
                     Log.d(LOG_PREFIX, "[saveWeightRecord] Firebase OK id=" + id);
                     weightRecords.add(rec);
                     sortByDateDesc();
                     weightAdapter.notifyDataSetChanged();
-                    // 3️⃣ refrescar gráfica y estadísticas
-                    if (isAdded() && getContext() != null) updateChart();
-
+                    updateChart();
                     computeWeeklyStats();
                 })
                 .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
                     Log.e(LOG_PREFIX, "[saveWeightRecord] Firebase ERROR", e);
                     Toast.makeText(getContext(),"Error al guardar",Toast.LENGTH_SHORT).show();
                 });
 
         Log.d(LOG_PREFIX, "Calorías obtenidas para " + selectedDate + ": " + kcal);
-
     }
 
+    /**
+     * Busca en SharedPreferences (FoodPrefs) las kcal del día (clave compatible con DashboardFragment):
+     * Formato: "totK_{effectiveUid}_{yyyy-MM-dd}"
+     */
     private float fetchStoredCalories(String dateDDMMYYYY) {
+        if (!isAdded() || getContext() == null || effectiveUid == null) return 0f;
+
         try {
             Date d  = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(dateDDMMYYYY);
             LocalDate ld = d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-            String key = "totKcal_" + ld.format(SP_DATE);
+            String key = "totK_" + effectiveUid + "_" + ld.format(SP_DATE);
+
             SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             if (prefs.contains(key)) {
                 float kcal = prefs.getFloat(key, 0f);
@@ -390,12 +442,14 @@ public class WeightFragment extends Fragment {
         return 0f;
     }
 
-    /* -------------------------------------------------- */
-    /* ----------- CARGA DE REGISTROS ------------------- */
-    /* -------------------------------------------------- */
+    /* --------------------- CARGA DE REGISTROS --------------------- */
     private void loadWeightRecords() {
+        if (databaseReference == null) return;
+
         Log.d(LOG_PREFIX, "[loadWeightRecords] ► inicio");
         databaseReference.get().addOnSuccessListener(ds -> {
+            if (!isAdded()) return;
+
             weightRecords.clear();
             for (DataSnapshot sn : ds.getChildren()) {
                 WeightRecord r = sn.getValue(WeightRecord.class);
@@ -404,10 +458,11 @@ public class WeightFragment extends Fragment {
             Log.d(LOG_PREFIX, "[loadWeightRecords] total=" + weightRecords.size());
             sortByDateDesc();
             weightAdapter.notifyDataSetChanged();
-            // 3️⃣ refrescar gráfica y estadísticas
-            if (isAdded() && getContext() != null) updateChart();
-
+            updateChart();
             computeWeeklyStats();
+        }).addOnFailureListener(e -> {
+            if (!isAdded()) return;
+            Log.e(LOG_PREFIX, "Error al cargar weightRecords", e);
         });
     }
 
@@ -423,6 +478,8 @@ public class WeightFragment extends Fragment {
     }
 
     private void updateChart() {
+        if (!isAdded()) return;
+
         Log.d(LOG_PREFIX,"[updateChart] puntos=" + weightRecords.size());
 
         // 1️⃣ Ordenar por fecha ASC: más antiguo a la izquierda
@@ -499,17 +556,14 @@ public class WeightFragment extends Fragment {
     }
 
     private void computeWeeklyStats() {
+        if (!isAdded() || getContext() == null) return;
+
         Log.d(LOG_PREFIX, "[computeWeeklyStats] ► inicio regs=" + weightRecords.size());
 
-        if (predictedText == null) {
-            Log.e(LOG_PREFIX, "predictedText es null");
-        }
-
-
-        // --- MODULAR: Bloque de espera tras ajuste ---
+        // --- MODULAR: Bloque de espera tras ajuste (per-user con prefKey) ---
         SharedPreferences p = requireContext().getSharedPreferences(PREF_STATS, Context.MODE_PRIVATE);
-        boolean waiting = p.getBoolean(KEY_WAITING_PROGRESS, false);  // ¿Estamos en espera tras ajuste?
-        long lastAdjustDay = p.getLong(KEY_WAITING_DATE, 0);
+        boolean waiting = p.getBoolean(prefKey(KEY_WAITING_PROGRESS), false);
+        long lastAdjustDay = p.getLong(prefKey(KEY_WAITING_DATE), 0);
         long today = LocalDate.now().toEpochDay();
         int daysLeft = 0;
 
@@ -517,11 +571,11 @@ public class WeightFragment extends Fragment {
             long daysSince = today - lastAdjustDay;
             daysLeft = (int) (WAIT_DAYS_AFTER_ADJUST - daysSince);
             if (daysLeft > 0) {
-                Log.d(LOG_PREFIX, "⏳ esperando " + daysLeft + " d tras ajuste (último ajuste: " + lastAdjustDay + ", hoy: " + today + ")");
+                Log.d(LOG_PREFIX, "⏳ esperando " + daysLeft + " d tras ajuste");
             } else {
                 Log.d(LOG_PREFIX, "🟢 Fin del periodo de espera. Se reanuda el análisis.");
                 waiting = false;
-                p.edit().putBoolean(KEY_WAITING_PROGRESS, false).apply();
+                p.edit().putBoolean(prefKey(KEY_WAITING_PROGRESS), false).apply();
             }
         }
 
@@ -531,8 +585,6 @@ public class WeightFragment extends Fragment {
                 .count();
         Log.d(LOG_PREFIX, "[computeWeeklyStats] Pesajes últimos 14 días: " + last14);
         if (last14 < 6) {
-            Log.d(LOG_PREFIX, "⏸ Muy pocos pesajes (" + last14 + "/14 d) → no evaluar");
-            // Vacía la UI, para evitar datos basura
             avgWeightText.setText("Peso medio 7 d: —");
             avgCalText.setText("Calorías medias 7 d: —");
             avgCalPrevText.setText("Calorías semana previa: —");
@@ -541,11 +593,10 @@ public class WeightFragment extends Fragment {
             return;
         }
 
-        // --- Calculo de medias semanales ---
+        // --- Cálculo de medias semanales ---
         List<Double> avgs = computeWeeklyAverages(); // hasta 3 medias
         Log.d(LOG_PREFIX, "[computeWeeklyStats] medias disponibles: " + avgs.size());
         if (avgs.size() < 3) {
-            Log.d(LOG_PREFIX, "⏸ Faltan medias (" + avgs.size() + "/3)");
             avgWeightText.setText("Peso medio 7 d: —");
             avgCalText.setText("Calorías medias 7 d: —");
             avgCalPrevText.setText("Calorías semana previa: —");
@@ -561,7 +612,6 @@ public class WeightFragment extends Fragment {
         // --- Tendencia semanal (peso) ---
         double kgPerWeek = avgW3 - avgW2;
         double trendKg7  = kgPerWeek;
-        Log.d(LOG_PREFIX, String.format(Locale.getDefault(), "[computeWeeklyStats] medias: W1=%.2f W2=%.2f W3=%.2f | Δkg=%.2f", avgW1, avgW2, avgW3, kgPerWeek));
 
         // --- Calorías medias ---
         double avgK3 = kcalAverageForRange(-7);
@@ -569,10 +619,6 @@ public class WeightFragment extends Fragment {
         double avgK1 = kcalAverageForRange(-21);
         double diffKcal   = (avgK3 - avgK2) * 7;
         double diffKgPred = diffKcal / 7700.0;
-
-        Log.d(LOG_PREFIX, String.format(Locale.getDefault(),
-                "[computeWeeklyStats] kcal: W1=%.0f W2=%.0f W3=%.0f | diffKcal=%.0f | diffKgPred=%.2f",
-                avgK1, avgK2, avgK3, diffKcal, diffKgPred));
 
         // --- UI: SIEMPRE actualizar (aunque esté esperando) ---
         avgWeightText.setText(String.format(Locale.getDefault(),
@@ -582,25 +628,16 @@ public class WeightFragment extends Fragment {
         avgCalPrevText.setText(String.format(Locale.getDefault(),
                 "Calorías semana previa: %.0f kcal", avgK2));
 
-        if(diffKgPred == 0){
+        if (diffKgPred == 0){
             predictedText.setText("Sin cambio calórico entre semanas — predicción no disponible");
-
-        }else {
-            double predictedWeight = avgW3 + trendKg7;
+        } else {
             predictedText.setText(String.format(Locale.getDefault(),
                     "Cambio estimado por calorías: %.2f kg\nCambio real observado: %.2f kg",
                     diffKgPred, trendKg7));
         }
 
-
-
-        // --- Mostrar mensaje de espera si corresponde ---
-//        if (waiting && daysLeft > 0) {
-//            trendText.setText("Espera: " + daysLeft + " días para próximo ajuste");
-//        } else {
-            trendText.setText(trendKg7 > 0.2 ? "Subiendo Peso" :
-                    trendKg7 < -0.2 ? "Perdiendo Peso " : "Peso Estable ");
-//        }
+        trendText.setText(trendKg7 > 0.2 ? "Subiendo Peso" :
+                trendKg7 < -0.2 ? "Perdiendo Peso " : "Peso Estable ");
 
         // --- Comparar con meta ---
         boolean goalDown = userGoal.toLowerCase().contains("perder");
@@ -608,69 +645,67 @@ public class WeightFragment extends Fragment {
         boolean goalKeep = !(goalDown || goalUp);
 
         boolean weightOk = (goalDown && kgPerWeek <= -0.5 * avgW3 * 0.01) ||   // -0.5 %/sem
-                (goalUp   && kgPerWeek >= 0.25) ||             // ≥250 g/sem
-                (goalKeep && Math.abs(kgPerWeek) < 0.15);        // ±150 g/sem
+                (goalUp   && kgPerWeek >= 0.25) ||                              // ≥250 g/sem
+                (goalKeep && Math.abs(kgPerWeek) < 0.15);                        // ±150 g/sem
 
         boolean kcalOk   = (goalDown && diffKcal < -350) ||
                 (goalUp   && diffKcal > 350)  ||
                 (goalKeep && Math.abs(diffKcal) < 350);
 
         // --- Mismatch/espera y ajuste ---
-        int mismatch = p.getInt(KEY_MISMATCH_WEEKS, 0);
+        int mismatch = p.getInt(prefKey(KEY_MISMATCH_WEEKS), 0);
 
         if (weightOk && kcalOk) {
-            Log.d(LOG_PREFIX, "✔ Progreso alineado → mismatch=0");
             mismatch = 0;
         } else {
             mismatch++;
             Log.d(LOG_PREFIX, String.format(Locale.getDefault(), "✖ desajuste (mismatch=%d/2) [pesoOK=%b kcalOK=%b]", mismatch, weightOk, kcalOk));
         }
 
-        // --- Si se cumplen los criterios para reajuste y NO estamos en espera ---
+        // --- Ajuste si corresponde y no estamos en espera ---
         if (!waiting && mismatch >= 2) {
             ajustarCaloriasSegunMeta(trendKg7, goalDown, goalUp);
             waiting = true;
             mismatch = 0;
             long adjToday = LocalDate.now().toEpochDay();
-            Log.d(LOG_PREFIX, "🔄 Ajuste de calorías realizado. Esperando " + WAIT_DAYS_AFTER_ADJUST + " días. Fecha inicio espera: " + adjToday);
+            Log.d(LOG_PREFIX, "🔄 Ajuste de calorías realizado. Esperando " + WAIT_DAYS_AFTER_ADJUST + " días.");
             p.edit()
-                    .putBoolean(KEY_WAITING_PROGRESS, true)
-                    .putLong(KEY_WAITING_DATE, adjToday)
+                    .putBoolean(prefKey(KEY_WAITING_PROGRESS), true)
+                    .putLong(prefKey(KEY_WAITING_DATE), adjToday)
                     .apply();
         }
 
-        // --- Guardar estado en prefs ---
+        // Guardar estado por usuario
         p.edit()
-                .putInt(KEY_MISMATCH_WEEKS, mismatch)
-                .putBoolean(KEY_WAITING_PROGRESS, waiting)
+                .putInt(prefKey(KEY_MISMATCH_WEEKS), mismatch)
+                .putBoolean(prefKey(KEY_WAITING_PROGRESS), waiting)
                 .apply();
 
         Log.d(LOG_PREFIX, "[computeWeeklyStats] ► fin");
     }
 
-
-
     /**
      * Ajusta la meta calórica diaria en Firebase según la tendencia de peso.
      *
      * @param trendKg7  pendiente de la media semanal (kg / 7 d)
-     * @param goalDown  true  → meta “perder peso”
-     * @param goalUp    true  → meta “ganar músculo”
+     * @param goalDown  true → meta “perder peso”
+     * @param goalUp    true → meta “ganar músculo”
      */
     private void ajustarCaloriasSegunMeta(double trendKg7,
                                           boolean goalDown,
                                           boolean goalUp) {
 
+        if (effectiveUid == null) return;
+
         DatabaseReference kcalRef = FirebaseDatabase.getInstance()
-                .getReference("users").child(userId).child("caloriesToday");
+                .getReference("users").child(effectiveUid).child("caloriesToday");
 
         kcalRef.get().addOnSuccessListener(snap -> {
-            if (!snap.exists()) return;
+            if (!snap.exists() || !isAdded()) return;
 
             double curr = snap.getValue(Double.class);
-            double upd  = curr;                          // por defecto sin cambio
+            double upd  = curr; // por defecto sin cambio
 
-            /* --- mismas reglas que tenías, encapsuladas --- */
             if (goalDown) {                              // perder peso
                 if (trendKg7 > -0.15) upd = curr * 0.95;
             } else if (goalUp) {                         // ganar músculo
@@ -680,28 +715,29 @@ public class WeightFragment extends Fragment {
                 else if (trendKg7 < -0.15) upd = curr * 1.05;
             }
 
-            /* --- guardar si cambió --- */
             if (upd != curr) {
                 kcalRef.setValue(upd);
                 Log.d(LOG_PREFIX, String.format(Locale.getDefault(),
                         "[ajustarCalorias] kcal %,.0f → %,.0f", curr, upd));
 
-                // registra fecha del ajuste (para la espera de ≥7 d)
+                // registra fecha del ajuste (per-user)
                 SharedPreferences ps = requireContext()
                         .getSharedPreferences(PREF_STATS, Context.MODE_PRIVATE);
                 ps.edit()
-                        .putString(KEY_LAST_ADJ_DATE, LocalDate.now().format(SP_DATE))
+                        .putString(prefKey(KEY_LAST_ADJ_DATE), LocalDate.now().format(SP_DATE))
                         .apply();
             } else {
                 Log.d(LOG_PREFIX, "[ajustarCalorias] kcal sin cambio");
             }
+        }).addOnFailureListener(e -> {
+            if (!isAdded()) return;
+            Log.e(LOG_PREFIX, "Error leyendo caloriesToday", e);
         });
     }
 
-
     /** Calcula kcal promedio en los 7 días terminando en offset (-7,-14,-21). */
     private double kcalAverageForRange(int offsetFromToday){
-        LocalDate to   = LocalDate.now().plusDays(offsetFromToday);      // inclusive
+        LocalDate to   = LocalDate.now().plusDays(offsetFromToday); // inclusive
         LocalDate from = to.minusDays(7);
         return weightRecords.stream()
                 .filter(r -> {
@@ -723,7 +759,7 @@ public class WeightFragment extends Fragment {
         int n = weightRecords.size();
         if (n == 0) return avgs;
 
-        // -- aseguramos orden ASC (antiguo→reciente) --
+        // ordenar ASC (antiguo→reciente)
         weightRecords.sort(Comparator.comparing(r -> parseDDMMYYYY(r.getDate())));
 
         for (int start = n - 21; start < n; start += 7) {
@@ -738,13 +774,10 @@ public class WeightFragment extends Fragment {
                 avgs.add(avg);
             }
         }
-        return avgs;      // 0-3 medias
+        return avgs; // 0-3 medias
     }
 
-
-    /* -------------------------------------------------- */
-    /* -------------- HELPERS VARIOS -------------------- */
-    /* -------------------------------------------------- */
+    /* -------------------------- HELPERS -------------------------- */
     private boolean hasRecordForDate(String d){
         for (WeightRecord r:weightRecords) if (d.equals(r.getDate())) return true;
         return false;
@@ -761,5 +794,10 @@ public class WeightFragment extends Fragment {
             }
             return item.getItemId()==R.id.navigation_dashboard;
         });
+    }
+
+    /** Prefijo por usuario para claves en SharedPreferences */
+    private String prefKey(String base) {
+        return (effectiveUid == null) ? base : (effectiveUid + "_" + base);
     }
 }

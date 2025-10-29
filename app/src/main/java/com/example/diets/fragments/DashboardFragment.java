@@ -2,7 +2,6 @@ package com.example.diets.fragments;
 
 import android.app.DatePickerDialog;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
@@ -15,16 +14,16 @@ import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.app.AlertDialog;
+
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
-import com.example.diets.activitys.MainActivity;
 import com.example.diets.activitys.ViewPagerActivity;
 import com.example.diets.adapters.FoodBlockAdapter;
 import com.example.diets.dialogs.RecipeDialog;
@@ -33,11 +32,9 @@ import com.example.diets.model.FoodItem;
 import com.example.diets.model.User;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.*;
 
 import com.google.gson.Gson;
@@ -73,9 +70,9 @@ public class DashboardFragment extends Fragment {
 
     // Fechas
     private static final DateTimeFormatter DATE_FMT =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd");                  // para claves
+            DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DISPLAY_FMT =
-            DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault()); // UI
+            DateTimeFormatter.ofPattern("EEE, d MMM yyyy", Locale.getDefault());
 
     // Bloques por defecto
     private static final String[] DEFAULT_FOOD_NAMES =
@@ -88,6 +85,11 @@ public class DashboardFragment extends Fragment {
     // Firebase
     private DatabaseReference mDatabase;
     private FirebaseAuth mAuth;
+
+    // --- MODO COACH ---
+    private boolean isCoachMode = false;
+    private String effectiveUid;
+    // --- FIN ---
 
     // Datos/usuario
     private final List<FoodBlock> foodBlockList = new ArrayList<>();
@@ -109,10 +111,8 @@ public class DashboardFragment extends Fragment {
     private SharedPreferences goalPrefs;
     private final SharedPreferences.OnSharedPreferenceChangeListener goalListener =
             (sp, key) -> {
-                if (key == null) return;
-                FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-                if (u == null) return;
-                String pfx = u.getUid() + "_";
+                if (key == null || effectiveUid == null) return;
+                String pfx = effectiveUid + "_";
                 if (key.equals(pfx + K_KCAL) || key.equals(pfx + K_PROT) ||
                         key.equals(pfx + K_CARB) || key.equals(pfx + K_FAT)) {
                     if (loadGoalsFromPrefs()) {
@@ -136,7 +136,7 @@ public class DashboardFragment extends Fragment {
         if (ctx instanceof OnNavigationItemSelectedListener) {
             mListener = (OnNavigationItemSelectedListener) ctx;
         } else {
-            throw new RuntimeException(ctx + " must implement OnNavigationItemSelectedListener");
+            Log.w(TAG, ctx + " does not implement OnNavigationItemSelectedListener");
         }
     }
 
@@ -148,6 +148,37 @@ public class DashboardFragment extends Fragment {
         }
     }
 
+    // --- onCreate: determina UID efectivo ---
+    @Override
+    public void onCreate(@Nullable Bundle saved) {
+        super.onCreate(saved);
+        Log.d(TAG, "[onCreate] Determinando UID efectivo...");
+
+        mAuth = FirebaseAuth.getInstance();
+        String loggedInUserUid = (mAuth.getCurrentUser() != null) ? mAuth.getCurrentUser().getUid() : null;
+
+        Bundle args = getArguments();
+        if (args != null) {
+            isCoachMode = args.getBoolean("coachMode", false);
+            if (isCoachMode) {
+                effectiveUid = args.getString("targetUid");
+                Log.i(TAG, "MODO COACH activado. UID efectivo: " + effectiveUid);
+            } else {
+                effectiveUid = loggedInUserUid;
+                Log.i(TAG, "MODO USUARIO (args presentes, coachMode=false). UID efectivo: " + effectiveUid);
+            }
+        } else {
+            isCoachMode = false;
+            effectiveUid = loggedInUserUid;
+            Log.i(TAG, "MODO USUARIO (sin args). UID efectivo: " + effectiveUid);
+        }
+
+        if (effectiveUid == null) {
+            Log.e(TAG, "¡ERROR FATAL! effectiveUid es null. LoggedInUID: " + (loggedInUserUid != null ? loggedInUserUid : "null") + " CoachMode: " + isCoachMode);
+            if (isAdded()) Toast.makeText(getContext(), "Error: No se pudo determinar el usuario.", Toast.LENGTH_LONG).show();
+        }
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inf,
@@ -155,9 +186,13 @@ public class DashboardFragment extends Fragment {
                              @Nullable Bundle saved) {
         Log.d(TAG, "[onCreateView] inflating layout");
 
-        if (goalPrefs == null) {
-            goalPrefs = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
-            goalPrefs.registerOnSharedPreferenceChangeListener(goalListener);
+        if (goalPrefs == null && getContext() != null) {
+            try {
+                goalPrefs = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
+                goalPrefs.registerOnSharedPreferenceChangeListener(goalListener);
+            } catch (IllegalStateException e) {
+                Log.e(TAG, "Error getting SharedPreferences in onCreateView", e);
+            }
         }
 
         return inf.inflate(R.layout.activity_food, cont, false);
@@ -166,134 +201,140 @@ public class DashboardFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View v, @Nullable Bundle saved) {
         super.onViewCreated(v, saved);
+        Log.d(TAG, "[onViewCreated] Binding UI and loading data...");
+
+        if (getContext() == null) {
+            Log.e(TAG, "Contexto nulo en onViewCreated, saliendo.");
+            return;
+        }
 
         cleanupOldEntries();
-        migrateAllSavedDays(); // si es temporal, muévelo a una pantalla de mantenimiento
+        migrateAllSavedDays();
 
-        mAuth     = FirebaseAuth.getInstance();
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
         bindUI(v);
 
-        // 1) Carga metas
-        loadGoalsFromPrefs();
-        updateMacrosUI();
+        if (effectiveUid != null) {
+            loadGoalsFromPrefs();
+            updateMacrosUI();
+            loadFoodBlocksForDate(currentDate);
+            recalculateDayTotals();
+            loadUserData(effectiveUid);
+        } else {
+            Log.e(TAG, "[onViewCreated] effectiveUid es null. No se cargan datos principales.");
+            Toast.makeText(getContext(), "Error al cargar datos del usuario.", Toast.LENGTH_SHORT).show();
+        }
 
-        // 2) Carga comida del día
-        loadFoodBlocksForDate(currentDate);
-
-        // 3) Recalcula
-        recalculateDayTotals();
-
-        // Navegación/menús
         setupDateNavigation();
         setupBottomNav(v);
-        setupDrawer(v);
-
-        // Cargar usuario (para goal ranges y caloriesToday)
-        FirebaseUser cur = mAuth.getCurrentUser();
-        if (cur != null) {
-            loadUserData(cur.getUid());
-        } else {
-            Log.w(TAG, "[onViewCreated] usuario null");
-        }
     }
 
     @Override
     public void onPause() {
         super.onPause();
-        Log.d(TAG, "[onPause] guardando día " + currentDate);
-        guardarComidasDelDia(currentDate);
+        if (effectiveUid != null) {
+            Log.d(TAG, "[onPause] guardando día " + currentDate + " para UID: " + effectiveUid);
+            guardarComidasDelDia(currentDate);
+        } else {
+            Log.w(TAG, "[onPause] effectiveUid es null, no se guardan datos del día.");
+        }
     }
 
     /* ==================== Helpers de UID y claves ==================== */
 
     @Nullable
-    private String uid() {
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        return u != null ? u.getUid() : null;
-    }
+    private String uid() { return effectiveUid; }
 
     private String keyFood(LocalDate d) {
         String u = uid();
-        return "food_" + (u == null ? "nouid" : u) + "_" + DATE_FMT.format(d);
+        if (u == null) {
+            Log.e(TAG, "¡UID nulo al generar keyFood!");
+            return "food_error_" + DATE_FMT.format(d);
+        }
+        return "food_" + u + "_" + DATE_FMT.format(d);
     }
-    private String keyTotK(LocalDate d) {
-        String u = uid();
-        return "totK_" + (u == null ? "nouid" : u) + "_" + DATE_FMT.format(d);
-    }
-    private String keyTotP(LocalDate d) {
-        String u = uid();
-        return "totP_" + (u == null ? "nouid" : u) + "_" + DATE_FMT.format(d);
-    }
-    private String keyTotC(LocalDate d) {
-        String u = uid();
-        return "totC_" + (u == null ? "nouid" : u) + "_" + DATE_FMT.format(d);
-    }
-    private String keyTotF(LocalDate d) {
-        String u = uid();
-        return "totF_" + (u == null ? "nouid" : u) + "_" + DATE_FMT.format(d);
-    }
+    private String keyTotK(LocalDate d) { String u = uid(); if (u==null) return "totK_error_"+DATE_FMT.format(d); return "totK_" + u + "_" + DATE_FMT.format(d); }
+    private String keyTotP(LocalDate d) { String u = uid(); if (u==null) return "totP_error_"+DATE_FMT.format(d); return "totP_" + u + "_" + DATE_FMT.format(d); }
+    private String keyTotC(LocalDate d) { String u = uid(); if (u==null) return "totC_error_"+DATE_FMT.format(d); return "totC_" + u + "_" + DATE_FMT.format(d); }
+    private String keyTotF(LocalDate d) { String u = uid(); if (u==null) return "totF_error_"+DATE_FMT.format(d); return "totF_" + u + "_" + DATE_FMT.format(d); }
 
     /* ==================== Metas (load/save/UI) ==================== */
 
     private boolean loadGoalsFromPrefs() {
-        if (!isAdded()) return false;
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        if (u == null) return false;
+        if (!isAdded() || getContext() == null) return false;
+        if (effectiveUid == null) {
+            goalsKcal = 0; goalsP = 0; goalsF = 0; goalsC = 0;
+            return false;
+        }
 
-        SharedPreferences p = (goalPrefs != null)
-                ? goalPrefs
-                : requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
+        SharedPreferences p;
+        try {
+            p = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting SharedPreferences in loadGoalsFromPrefs", e);
+            return false;
+        }
 
-        String prefix = u.getUid() + "_";
-        if (!p.contains(prefix + K_KCAL)) return false;
+        String prefix = effectiveUid + "_";
+        if (!p.contains(prefix + K_KCAL)) {
+            goalsKcal = 0; goalsP = 0; goalsF = 0; goalsC = 0;
+            return false;
+        }
 
         goalsKcal = p.getFloat(prefix + K_KCAL, 0f);
         goalsP    = p.getFloat(prefix + K_PROT, 0f);
         goalsF    = p.getFloat(prefix + K_FAT , 0f);
         goalsC    = p.getFloat(prefix + K_CARB, 0f);
 
-        Log.d(TAG, String.format(Locale.getDefault(),
-                "[loadGoalsFromPrefs] kcal=%.0f P=%.0f C=%.0f F=%.0f",
-                goalsKcal, goalsP, goalsC, goalsF));
         return true;
     }
 
     private void saveGoalsToPrefs() {
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        if (u == null || !isAdded()) return;
+        if (effectiveUid == null || !isAdded() || getContext() == null) return;
 
-        String prefix = u.getUid() + "_";
-        SharedPreferences.Editor ed = requireContext()
-                .getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE)
-                .edit();
+        SharedPreferences.Editor ed;
+        try {
+            ed = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE).edit();
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting SharedPreferences editor in saveGoalsToPrefs", e);
+            return;
+        }
 
+        String prefix = effectiveUid + "_";
         ed.putFloat(prefix + K_KCAL, (float) goalsKcal);
         ed.putFloat(prefix + K_PROT, (float) goalsP);
         ed.putFloat(prefix + K_FAT , (float) goalsF);
         ed.putFloat(prefix + K_CARB, (float) goalsC);
         ed.apply();
-
-        Log.d(TAG, "[saveGoalsToPrefs] metas guardadas localmente");
     }
 
     private void updateMacrosUI() {
-        if (!isAdded() || barCalories == null) return;
+        if (!isAdded() || barCalories == null || labelCalories == null || goalsKcal < 0) {
+            if (labelCalories != null) labelCalories.setText("Calorías: Cargando...");
+            return;
+        }
 
-        barCalories.setMax((int) Math.max(0, goalsKcal));
-        barProtein .setMax((int) Math.max(0, goalsP));
-        barCarbs   .setMax((int) Math.max(0, goalsC));
-        barFat     .setMax((int) Math.max(0, goalsF));
+        barCalories.setMax((int) Math.max(1, goalsKcal));
+        barProtein .setMax((int) Math.max(1, goalsP));
+        barCarbs   .setMax((int) Math.max(1, goalsC));
+        barFat     .setMax((int) Math.max(1, goalsF));
+
+        Totales t = calcularTotalesActuales();
 
         labelCalories.setText(String.format(Locale.getDefault(),
-                "Calorías: 0 / %.0f kcal", goalsKcal));
+                "Calorías: %.0f / %.0f kcal", t.kcal, goalsKcal));
         labelProtein .setText(String.format(Locale.getDefault(),
-                "Proteínas: 0 / %.0f g",  goalsP));
+                "Proteínas: %.0f / %.0f g",  t.prot, goalsP));
         labelCarbs   .setText(String.format(Locale.getDefault(),
-                "Carbohidratos: 0 / %.0f g", goalsC));
+                "Carbohidratos: %.0f / %.0f g", t.carb, goalsC));
         labelFat     .setText(String.format(Locale.getDefault(),
-                "Grasas: 0 / %.0f g", goalsF));
+                "Grasas: %.0f / %.0f g", t.fat, goalsF));
+
+        barCalories.setProgress((int) Math.min(Math.max(0, t.kcal), goalsKcal));
+        barProtein .setProgress((int) Math.min(Math.max(0, t.prot), goalsP));
+        barCarbs   .setProgress((int) Math.min(Math.max(0, t.carb), goalsC));
+        barFat     .setProgress((int) Math.min(Math.max(0, t.fat) , goalsF));
     }
 
     /* ==================== UI wiring ==================== */
@@ -316,6 +357,7 @@ public class DashboardFragment extends Fragment {
 
         recyclerViewFoodBlocks = v.findViewById(R.id.recyclerFoodBlocks);
         recyclerViewFoodBlocks.setLayoutManager(new LinearLayoutManager(getContext()));
+
         foodBlockAdapter = new FoodBlockAdapter(
                 foodBlockList,
                 getContext(),
@@ -326,22 +368,33 @@ public class DashboardFragment extends Fragment {
 
         v.findViewById(R.id.addFoodButton).setOnClickListener(view -> {
             if (foodBlockList.size() >= MAX_FOOD_BLOCKS) {
-                Toast.makeText(getContext(), "Máximo de bloques alcanzado", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Máximo de bloques de comida alcanzado.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            foodBlockList.add(new FoodBlock("Nueva comida"));
-            if (foodBlockAdapter != null) foodBlockAdapter.notifyItemInserted(foodBlockList.size() - 1);
+            FoodBlock newBlock = new FoodBlock("Nueva Comida " + (foodBlockList.size() + 1));
+            foodBlockList.add(newBlock);
+            if (foodBlockAdapter != null) {
+                foodBlockAdapter.notifyItemInserted(foodBlockList.size() - 1);
+                recyclerViewFoodBlocks.smoothScrollToPosition(foodBlockList.size() - 1);
+            }
+            guardarComidasDelDia(currentDate);
         });
 
         txtCurrentDate.setOnClickListener(v1 -> {
+            if (getContext() == null) return;
+
             LocalDate date = currentDate;
             DatePickerDialog dpd = new DatePickerDialog(
                     requireContext(),
                     (view, year, month, dayOfMonth) -> {
-                        LocalDate picked = LocalDate.of(year, month + 1, dayOfMonth);
-                        switchDate(picked);
+                        LocalDate pickedDate = LocalDate.of(year, month + 1, dayOfMonth);
+                        if (!pickedDate.equals(currentDate)) {
+                            switchDate(pickedDate);
+                        }
                     },
-                    date.getYear(), date.getMonthValue() - 1, date.getDayOfMonth()
+                    date.getYear(),
+                    date.getMonthValue() - 1,
+                    date.getDayOfMonth()
             );
             dpd.show();
         });
@@ -351,84 +404,108 @@ public class DashboardFragment extends Fragment {
 
     private void setupDateNavigation() {
         btnPrevDay.setOnClickListener(v -> switchDate(currentDate.minusDays(1)));
+
         btnNextDay.setOnClickListener(v -> {
             LocalDate tomorrow = currentDate.plusDays(1);
             if (ChronoUnit.DAYS.between(LocalDate.now(), tomorrow) <= MAX_DAYS_IN_FUTURE) {
                 switchDate(tomorrow);
             } else {
-                Toast.makeText(getContext(), "No puedes planificar tan lejos", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "No puedes planificar comidas tan a futuro.", Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     private void setupBottomNav(View v) {
-        BottomNavigationView bottom = v.findViewById(R.id.bottom_navigation);
-        if (bottom == null) return;
-        bottom.setOnItemSelectedListener(item -> {
-            if (item.getItemId() == R.id.navigation_home) {
-                if (mListener != null) mListener.onNavigationItemSelected(1);
-                return true;
-            } else if (item.getItemId() == R.id.navigation_dashboard) {
-                if (getActivity() instanceof ViewPagerActivity) {
-                    ((ViewPagerActivity) getActivity()).switchToWeightFragment();
-                }
-                return true;
-            }
-            return false;
-        });
-    }
+        BottomNavigationView bottomNav = v.findViewById(R.id.bottom_navigation);
+        if (bottomNav == null) return;
 
-    private void setupDrawer(View v) {
-        NavigationView nav = v.findViewById(R.id.navigation_view);
-        nav.setNavigationItemSelectedListener(item -> {
-            if (item.getItemId() == R.id.nav_logout) {
-                mAuth.signOut();
-                startActivity(new Intent(getActivity(), MainActivity.class)
-                        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            ViewPagerActivity activity = (getActivity() instanceof ViewPagerActivity) ? (ViewPagerActivity) getActivity() : null;
+            if (activity == null) return false;
+
+            if (itemId == R.id.navigation_home) {
+                if (mListener != null) {
+                    mListener.onNavigationItemSelected(1);
+                    return true;
+                }
+                return false;
+            } else if (itemId == R.id.navigation_dashboard) {
+                activity.switchToWeightFragment();
                 return true;
+            } else {
+                return false;
             }
-            return false;
         });
     }
 
     /* ==================== Usuario / metas desde Firebase ==================== */
 
-    private void loadUserData(String uid) {
-        mDatabase.child("users").child(uid)
+    private void loadUserData(String uidToLoad) {
+        if (!isAdded()) return;
+
+        mDatabase.child("users").child(uidToLoad)
                 .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override public void onDataChange(@NonNull DataSnapshot snap) {
-                        if (!isAdded()) return;
+                    @Override public void onDataChange(@NonNull DataSnapshot userSnapshot) {
+                        if (!isAdded() || getContext() == null) return;
 
-                        if (!snap.exists()) { Log.w(TAG, "snapshot vacío"); return; }
-                        user = snap.getValue(User.class);
-                        if (user == null) { Log.w(TAG, "user==null"); return; }
+                        if (!userSnapshot.exists()) {
+                            Toast.makeText(getContext(), "Error: No se encontraron los datos del usuario.", Toast.LENGTH_LONG).show();
+                            return;
+                        }
 
-                        DatabaseReference kcalRef = mDatabase.child("users").child(uid).child("caloriesToday");
-                        kcalRef.get().addOnSuccessListener(calSnap -> {
-                            if (!isAdded()) return;
+                        user = userSnapshot.getValue(User.class);
+                        if (user == null) {
+                            Toast.makeText(getContext(), "Error al procesar datos del usuario.", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
 
-                            double kcalToday = calSnap.exists()
-                                    ? calSnap.getValue(Double.class)
-                                    : user.calculateCalories(
-                                    user.getWeight(), user.getHeight(), user.getAge(),
-                                    user.getGender(), user.getActivityLevel(), user.getGoal());
+                        DatabaseReference kcalRef = mDatabase.child("users").child(uidToLoad).child("caloriesToday");
+                        kcalRef.get().addOnSuccessListener(kcalSnapshot -> {
+                            if (!isAdded() || getContext() == null) return;
 
-                            if (!calSnap.exists()) {
-                                kcalRef.setValue(kcalToday);
-                                Log.i(TAG, "caloriesToday creado → " + kcalToday);
+                            double calculatedKcalToday;
+                            if (user.getWeight() <= 0 || user.getHeight() <= 0 || user.getAge() <= 0) {
+                                calculatedKcalToday = 0;
+                            } else {
+                                calculatedKcalToday = user.calculateCalories(
+                                        user.getWeight(), user.getHeight(), user.getAge(),
+                                        user.getGender(), user.getActivityLevel(), user.getGoal()
+                                );
                             }
 
-                            boolean loadedPrefs = loadGoalsFromPrefs();
-                            if (!loadedPrefs) {
-                                goalsKcal = kcalToday;
+                            double kcalTodayValue = kcalSnapshot.exists()
+                                    ? kcalSnapshot.getValue(Double.class)
+                                    : calculatedKcalToday;
+
+                            if (!kcalSnapshot.exists() && calculatedKcalToday > 0) {
+                                kcalRef.setValue(kcalTodayValue);
+                            }
+
+                            boolean prefsExistentes = loadGoalsFromPrefs();
+
+                            if (!prefsExistentes || goalsKcal <= 0) {
+                                goalsKcal = kcalTodayValue;
+                                // Métodos SIN argumentos (evita error de signatura)
                                 goalsP    = user.calculateProtein();
                                 goalsF    = user.calculateFat();
                                 goalsC    = user.calculateCarbs();
+                                // Escalar si el total macro kcal no cuadra
+                                double mk = goalsP*4 + goalsC*4 + goalsF*9;
+                                if (kcalTodayValue > 0 && mk > 0 && Math.abs(mk - kcalTodayValue) > 10) {
+                                    double f = kcalTodayValue / mk;
+                                    goalsP = Math.round(goalsP * f);
+                                    goalsC = Math.round(goalsC * f);
+                                    goalsF = Math.round(goalsF * f);
+                                }
                                 saveGoalsToPrefs();
                             } else {
-                                if (Math.abs(kcalToday - goalsKcal) >= 10) {
-                                    double factor = kcalToday / (goalsP * 4 + goalsC * 4 + goalsF * 9);
-                                    goalsKcal = kcalToday;
+                                // Rebalanceo ligero si difiere mucho la meta de kcal vs caloriesToday
+                                if (Math.abs(kcalTodayValue - goalsKcal) >= 10) {
+                                    double currentTotalMacroKcal = goalsP * 4 + goalsC * 4 + goalsF * 9;
+                                    double factor = (currentTotalMacroKcal > 0) ? kcalTodayValue / currentTotalMacroKcal : 1.0;
+
+                                    goalsKcal = Math.round(kcalTodayValue);
                                     goalsP = Math.round(goalsP * factor);
                                     goalsC = Math.round(goalsC * factor);
                                     goalsF = Math.round(goalsF * factor);
@@ -438,10 +515,19 @@ public class DashboardFragment extends Fragment {
 
                             updateMacrosUI();
                             recalculateDayTotals();
+
+                        }).addOnFailureListener(e -> {
+                            Log.e(TAG, "[loadUserData] Error al obtener caloriesToday de Firebase", e);
+                            updateMacrosUI();
+                            recalculateDayTotals();
                         });
                     }
-                    @Override public void onCancelled(@NonNull DatabaseError err) {
-                        Log.e(TAG, "[loadUserData] Firebase error: " + err.getMessage());
+                    @Override public void onCancelled(@NonNull DatabaseError databaseError) {
+                        if (!isAdded()) return;
+                        Toast.makeText(getContext(), "Error al cargar perfil: " + databaseError.getMessage(), Toast.LENGTH_LONG).show();
+                        goalsKcal=0; goalsP=0; goalsC=0; goalsF=0;
+                        updateMacrosUI();
+                        recalculateDayTotals();
                     }
                 });
     }
@@ -449,10 +535,22 @@ public class DashboardFragment extends Fragment {
     /* ==================== Cambiar de fecha ==================== */
 
     private void switchDate(LocalDate newDate) {
-        guardarComidasDelDia(currentDate);
+        if (effectiveUid != null) {
+            guardarComidasDelDia(currentDate);
+        }
         currentDate = newDate;
-        txtCurrentDate.setText(currentDate.format(DISPLAY_FMT));
-        loadFoodBlocksForDate(currentDate);
+
+        if (txtCurrentDate != null) {
+            txtCurrentDate.setText(currentDate.format(DISPLAY_FMT));
+        }
+
+        if (effectiveUid != null) {
+            loadFoodBlocksForDate(currentDate);
+        } else {
+            foodBlockList.clear();
+            if (foodBlockAdapter != null) foodBlockAdapter.notifyDataSetChanged();
+            recalculateDayTotals();
+        }
     }
 
     /* ==================== Guardar / Cargar ==================== */
@@ -461,9 +559,13 @@ public class DashboardFragment extends Fragment {
         if (!isAdded() || getContext() == null) return;
         if (foodBlockList == null) return;
 
-        SharedPreferences.Editor ed = requireContext()
-                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .edit();
+        SharedPreferences.Editor ed;
+        try {
+            ed = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit();
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting SharedPreferences editor in guardarComidasDelDia", e);
+            return;
+        }
 
         String json = GSON.toJson(foodBlockList);
         ed.putString(keyFood(date), json);
@@ -473,531 +575,582 @@ public class DashboardFragment extends Fragment {
         ed.putFloat(keyTotP(date), (float) t.prot);
         ed.putFloat(keyTotF(date), (float) t.fat);
         ed.putFloat(keyTotC(date), (float) t.carb);
-        ed.apply();
 
-        Log.d(TAG, String.format(Locale.getDefault(),
-                "[guardarComidasDelDia] %s bloques=%d  K=%.1f P=%.1f C=%.1f F=%.1f",
-                date, foodBlockList.size(), t.kcal, t.prot, t.carb, t.fat));
+        ed.apply();
     }
 
     private void loadFoodBlocksForDate(LocalDate date) {
-        if (!isAdded()) return;
+        if (!isAdded() || getContext() == null) return;
 
         dataLoaded = false;
 
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences prefs;
+        try {
+            prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting SharedPreferences in loadFoodBlocksForDate", e);
+            foodBlockList.clear();
+            if (foodBlockAdapter != null) foodBlockAdapter.notifyDataSetChanged();
+            recalculateDayTotals();
+            return;
+        }
+
         String json = prefs.getString(keyFood(date), null);
 
         foodBlockList.clear();
-        boolean debeGuardar = false;
+        boolean debeGuardarCambios = false;
 
-        if (json == null) {
-            Log.d(TAG, "[loadFoodBlocksForDate] " + date + " sin datos → bloques por defecto");
-            for (String def : DEFAULT_FOOD_NAMES) foodBlockList.add(new FoodBlock(def));
-            debeGuardar = true;
+        if (json == null || json.isEmpty() || json.equals("[]")) {
+            for (String defaultName : DEFAULT_FOOD_NAMES) {
+                foodBlockList.add(new FoodBlock(defaultName));
+            }
+            debeGuardarCambios = true;
         } else {
             try {
-                Type type = new TypeToken<List<FoodBlock>>() {}.getType();
-                List<FoodBlock> loaded = GSON.fromJson(json, type);
-                if (loaded != null) foodBlockList.addAll(loaded);
+                Type listType = new TypeToken<ArrayList<FoodBlock>>() {}.getType();
+                List<FoodBlock> loadedBlocks = GSON.fromJson(json, listType);
+
+                if (loadedBlocks != null && !loadedBlocks.isEmpty()) {
+                    foodBlockList.addAll(loadedBlocks);
+
+                    for (FoodBlock block : foodBlockList) {
+                        if (block.getItems() != null) {
+                            for (FoodItem item : block.getItems()) {
+                                if (!item.isRecipe() && item.getIngredients() != null && !item.getIngredients().isEmpty()) {
+                                    item.setRecipe(true);
+                                    debeGuardarCambios = true;
+                                }
+                            }
+                        } else {
+                            // Requiere que FoodBlock tenga setItems(List<FoodItem>)
+                            block.setItems(new ArrayList<FoodItem>());
+                            debeGuardarCambios = true;
+                        }
+                    }
+
+                    if (foodBlockList.size() < DEFAULT_FOOD_NAMES.length) {
+                        Set<String> currentTitles = new HashSet<>();
+                        for (FoodBlock block : foodBlockList) {
+                            if (block.getTitle() != null)
+                                currentTitles.add(block.getTitle().trim().toLowerCase());
+                        }
+                        for (String defaultName : DEFAULT_FOOD_NAMES) {
+                            if (!currentTitles.contains(defaultName.trim().toLowerCase())) {
+                                foodBlockList.add(new FoodBlock(defaultName));
+                                debeGuardarCambios = true;
+                            }
+                        }
+                    }
+
+                } else {
+                    for (String defaultName : DEFAULT_FOOD_NAMES) foodBlockList.add(new FoodBlock(defaultName));
+                    debeGuardarCambios = true;
+                }
+
             } catch (Exception e) {
-                Log.e(TAG, "[loadFoodBlocksForDate] JSON inválido → día reiniciado", e);
-                for (String def : DEFAULT_FOOD_NAMES) foodBlockList.add(new FoodBlock(def));
-                debeGuardar = true;
-            }
-
-            // Migración de recetas antiguas
-            for (FoodBlock b : foodBlockList) {
-                for (FoodItem it : b.getItems()) {
-                    if (!it.isRecipe()
-                            && it.getIngredients() != null
-                            && !it.getIngredients().isEmpty()) {
-                        it.setRecipe(true);
-                        debeGuardar = true;
-                    }
-                }
-            }
-
-            // Asegurar bloques básicos
-            if (foodBlockList.size() < DEFAULT_FOOD_NAMES.length) {
-                Set<String> existentes = new HashSet<>();
-                for (FoodBlock fb : foodBlockList) {
-                    existentes.add(fb.getTitle().trim().toLowerCase());
-                }
-                for (String def : DEFAULT_FOOD_NAMES) {
-                    if (!existentes.contains(def.trim().toLowerCase())) {
-                        foodBlockList.add(new FoodBlock(def));
-                        debeGuardar = true;
-                    }
-                }
+                Log.e(TAG, "[loadFoodBlocksForDate] Error al parsear JSON. Usando bloques por defecto.", e);
+                foodBlockList.clear();
+                for (String defaultName : DEFAULT_FOOD_NAMES) foodBlockList.add(new FoodBlock(defaultName));
+                debeGuardarCambios = true;
             }
         }
 
-        if (debeGuardar) guardarComidasDelDia(date);
+        if (debeGuardarCambios) {
+            guardarComidasDelDia(date);
+        }
 
         dataLoaded = true;
 
-        if (foodBlockAdapter != null) foodBlockAdapter.notifyDataSetChanged();
+        if (foodBlockAdapter != null) {
+            foodBlockAdapter.notifyDataSetChanged();
+        }
         recalculateDayTotals();
     }
 
     private void cleanupOldEntries() {
-        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
-        if (u == null || !isAdded()) return;
+        if (effectiveUid == null || !isAdded() || getContext() == null) return;
 
-        String uid = u.getUid();
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        Map<String, ?> all = prefs.getAll();
+        SharedPreferences prefs;
+        try {
+            prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting SharedPreferences in cleanupOldEntries", e);
+            return;
+        }
+
+        Map<String, ?> allEntries = prefs.getAll();
         LocalDate today = LocalDate.now();
+        SharedPreferences.Editor editor = prefs.edit();
+        boolean removedAny = false;
 
-        String prefix = "food_" + uid + "_";
-        for (String k : all.keySet()) {
-            if (!k.startsWith(prefix)) continue;
-            String dateStr = k.substring(prefix.length());
-            try {
-                LocalDate d = LocalDate.parse(dateStr, DATE_FMT);
-                if (ChronoUnit.DAYS.between(d, today) > 365) {
-                    prefs.edit().remove(k).apply();
-                    Log.d(TAG, "[cleanupOldEntries] Entrada eliminada: " + k);
+        String foodPrefix = "food_" + effectiveUid + "_";
+        String totKPrefix = "totK_" + effectiveUid + "_";
+        String totPPrefix = "totP_" + effectiveUid + "_";
+        String totCPrefix = "totC_" + effectiveUid + "_";
+        String totFPrefix = "totF_" + effectiveUid + "_";
+
+        for (String key : allEntries.keySet()) {
+            String dateStr = null;
+            if (key.startsWith(foodPrefix)) dateStr = key.substring(foodPrefix.length());
+            else if (key.startsWith(totKPrefix)) dateStr = key.substring(totKPrefix.length());
+            else if (key.startsWith(totPPrefix)) dateStr = key.substring(totPPrefix.length());
+            else if (key.startsWith(totCPrefix)) dateStr = key.substring(totCPrefix.length());
+            else if (key.startsWith(totFPrefix)) dateStr = key.substring(totFPrefix.length());
+
+            if (dateStr != null) {
+                try {
+                    LocalDate entryDate = LocalDate.parse(dateStr, DATE_FMT);
+                    long daysBetween = ChronoUnit.DAYS.between(entryDate, today);
+                    if (daysBetween > 365) {
+                        editor.remove(key);
+                        removedAny = true;
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "[cleanupOldEntries] No se pudo parsear fecha en clave: " + key, e);
                 }
-            } catch (Exception e) {
-                Log.w(TAG, "[cleanupOldEntries] Fecha inválida en clave: " + k, e);
             }
         }
+
+        if (removedAny) editor.apply();
     }
 
-    /** MIGRACIÓN: recorre todas las claves food_* (con/sin UID) y marca como receta
-     *  cualquier FoodItem que tenga ingredientes pero recipe=false. */
+    /** MIGRACIÓN: Marca como receta items antiguos que tengan ingredientes. */
     private void migrateAllSavedDays() {
-        if (!isAdded()) return;
-        SharedPreferences p = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        Map<String, ?> all = p.getAll();
-        for (String k : all.keySet()) {
-            if (!k.startsWith("food_")) continue; // incluye legacy y con UID
-            Object raw = all.get(k);
-            if (!(raw instanceof String)) continue;
-            String json = (String) raw;
-            if (json == null) continue;
+        if (!isAdded() || getContext() == null) return;
+
+        SharedPreferences p;
+        try {
+            p = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting SharedPreferences in migrateAllSavedDays", e);
+            return;
+        }
+
+        Map<String, ?> allEntries = p.getAll();
+        SharedPreferences.Editor editor = p.edit();
+        boolean madeChanges = false;
+
+        for (String key : allEntries.keySet()) {
+            if (!key.startsWith("food_")) continue;
+
+            Object rawValue = allEntries.get(key);
+            if (!(rawValue instanceof String)) continue;
+            String json = (String) rawValue;
+            if (json == null || json.isEmpty()) continue;
 
             try {
-                Type t = new TypeToken<List<FoodBlock>>() {}.getType();
-                List<FoodBlock> blocks = GSON.fromJson(json, t);
-                boolean changed = false;
+                Type listType = new TypeToken<ArrayList<FoodBlock>>() {}.getType();
+                List<FoodBlock> blocks = GSON.fromJson(json, listType);
+                boolean changedInThisKey = false;
 
                 if (blocks != null) {
-                    for (FoodBlock b : blocks) {
-                        if (b == null || b.getItems() == null) continue;
-                        for (FoodItem it : b.getItems()) {
-                            if (!it.isRecipe()
-                                    && it.getIngredients() != null
-                                    && !it.getIngredients().isEmpty()) {
-                                it.setRecipe(true);
-                                changed = true;
+                    for (FoodBlock block : blocks) {
+                        if (block == null || block.getItems() == null) continue;
+                        for (FoodItem item : block.getItems()) {
+                            if (item == null) continue;
+                            if (!item.isRecipe()
+                                    && item.getIngredients() != null
+                                    && !item.getIngredients().isEmpty()) {
+                                item.setRecipe(true);
+                                changedInThisKey = true;
                             }
                         }
                     }
                 }
 
-                if (changed) {
-                    p.edit().putString(k, GSON.toJson(blocks)).apply();
-                    Log.i(TAG, "⚙️  Día migrado → " + k);
+                if (changedInThisKey) {
+                    String updatedJson = GSON.toJson(blocks);
+                    editor.putString(key, updatedJson);
+                    madeChanges = true;
                 }
+
             } catch (Exception e) {
-                Log.e(TAG, "[migrateAllSavedDays] error parseando " + k, e);
+                Log.e(TAG, "[migrateAllSavedDays] Error procesando/parseando JSON para clave " + key, e);
             }
         }
+
+        if (madeChanges) editor.apply();
     }
 
     /* ==================== Diálogo de macros ==================== */
 
     private void showEditMacrosDialog() {
-        ContextThemeWrapper m3Ctx = new ContextThemeWrapper(
+        if (getContext() == null) return;
+
+        ContextThemeWrapper themedContext = new ContextThemeWrapper(
                 requireContext(), R.style.ThemeOverlay_Diets_Material3Bridge);
 
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(m3Ctx);
-        View content = LayoutInflater.from(m3Ctx).inflate(R.layout.dialog_edit_macros, null, false);
-        builder.setView(content);
-        AlertDialog dlg = builder.create();
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(themedContext);
+        View dialogView = LayoutInflater.from(themedContext).inflate(R.layout.dialog_edit_macros, null);
+        builder.setView(dialogView);
 
-        if (dlg.getWindow() != null) {
-            dlg.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
+        final AlertDialog dialog = builder.create(); // usa la de androidx
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(android.graphics.Color.TRANSPARENT));
         }
 
-        TextInputEditText eKcal = content.findViewById(R.id.inpKcal);
-        TextInputEditText ePro  = content.findViewById(R.id.inpProt);
-        TextInputEditText eCarb = content.findViewById(R.id.inpCarb);
-        TextInputEditText eFat  = content.findViewById(R.id.inpFat);
-        Button btnCancel = content.findViewById(R.id.btnCancel);
-        Button btnApply  = content.findViewById(R.id.btnApply);
+        TextInputEditText etKcal = dialogView.findViewById(R.id.inpKcal);
+        TextInputEditText etProt = dialogView.findViewById(R.id.inpProt);
+        TextInputEditText etCarb = dialogView.findViewById(R.id.inpCarb);
+        TextInputEditText etFat  = dialogView.findViewById(R.id.inpFat);
+        Button btnCancel = dialogView.findViewById(R.id.btnCancel);
+        Button btnApply  = dialogView.findViewById(R.id.btnApply);
 
-        eKcal.setText(String.valueOf((int) goalsKcal));
-        ePro .setText(String.valueOf((int) goalsP));
-        eCarb.setText(String.valueOf((int) goalsC));
-        eFat .setText(String.valueOf((int) goalsF));
+        etKcal.setText(String.format(Locale.US, "%.0f", goalsKcal));
+        etProt.setText(String.format(Locale.US, "%.0f", goalsP));
+        etCarb.setText(String.format(Locale.US, "%.0f", goalsC));
+        etFat.setText(String.format(Locale.US, "%.0f", goalsF));
 
-        btnCancel.setOnClickListener(v -> dlg.dismiss());
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnApply.setOnClickListener(v -> {
-            boolean hasError = false;
+            boolean hasInputError = false;
 
-            double newKcal = -1;
+            double newKcal = -1.0;
             try {
-                String kcalStr = eKcal.getText().toString().trim();
-                if (kcalStr.isEmpty()) throw new Exception();
+                String kcalStr = etKcal.getText().toString().trim();
+                if (kcalStr.isEmpty()) throw new NumberFormatException("Kcal vacío");
                 newKcal = Double.parseDouble(kcalStr);
-                if (newKcal <= 0 || Double.isNaN(newKcal)) throw new Exception();
-                eKcal.setError(null);
-            } catch (Exception ex) {
-                eKcal.setError("Valor inválido");
-                hasError = true;
+                if (newKcal <= 0 || Double.isNaN(newKcal) || newKcal > 15000) {
+                    throw new NumberFormatException("Kcal fuera de rango");
+                }
+                etKcal.setError(null);
+            } catch (NumberFormatException ex) {
+                etKcal.setError("Valor inválido (ej: 2000)");
+                hasInputError = true;
             }
 
-            Double newP = parseOrNull(ePro);
-            if (newP != null && (newP <= 0 || Double.isNaN(newP))) { ePro.setError("Valor inválido"); hasError = true; }
-            else ePro.setError(null);
+            Double newProt = parseOrNull(etProt);
+            Double newCarb = parseOrNull(etCarb);
+            Double newFatV = parseOrNull(etFat);
 
-            Double newC = parseOrNull(eCarb);
-            if (newC != null && (newC <= 0 || Double.isNaN(newC))) { eCarb.setError("Valor inválido"); hasError = true; }
-            else eCarb.setError(null);
-
-            Double newF = parseOrNull(eFat);
-            if (newF != null && (newF <= 0 || Double.isNaN(newF))) { eFat.setError("Valor inválido"); hasError = true; }
-            else eFat.setError(null);
-
-            if (hasError) {
-                Toast.makeText(getContext(), "Corrige los valores marcados", Toast.LENGTH_SHORT).show();
+            if (hasInputError) {
+                Toast.makeText(getContext(), "Corrige los valores inválidos.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            if (newP != null && Math.round(newP) == Math.round(goalsP)) newP = null;
-            if (newC != null && Math.round(newC) == Math.round(goalsC)) newC = null;
-            if (newF != null && Math.round(newF) == Math.round(goalsF)) newF = null;
+            boolean kcalChanged = Math.abs(newKcal - goalsKcal) > 0.1;
+            boolean protChanged = (newProt != null && Math.abs(newProt - goalsP) > 0.1) || (newProt == null && goalsP != 0);
+            boolean carbChanged = (newCarb != null && Math.abs(newCarb - goalsC) > 0.1) || (newCarb == null && goalsC != 0);
+            boolean fatChanged  = (newFatV != null && Math.abs(newFatV - goalsF) > 0.1) || (newFatV == null && goalsF != 0);
 
-            boolean kcalOnly = (newP == null && newC == null && newF == null) &&
-                    (Math.round(newKcal) != Math.round(goalsKcal));
-
-            if (!kcalOnly && newP == null && newC == null && newF == null) {
-                Toast.makeText(getContext(), "Introduce al menos un macronutriente", Toast.LENGTH_SHORT).show();
+            if (!kcalChanged && !protChanged && !carbChanged && !fatChanged) {
+                dialog.dismiss();
                 return;
             }
 
-            autoRebalanceMacros(newKcal, newP, newC, newF);
-            dlg.dismiss();
+            autoRebalanceMacros(newKcal, newProt, newCarb, newFatV);
+
+            dialog.dismiss();
         });
 
-        dlg.show();
+        dialog.show();
     }
 
-    private Double parseOrNull(TextInputEditText et) {
-        String s = et.getText().toString().trim();
-        return s.isEmpty() ? null : Double.parseDouble(s);
+    private Double parseOrNull(TextInputEditText editText) {
+        if (editText == null || editText.getText() == null) return null;
+        String text = editText.getText().toString().trim();
+        if (text.isEmpty()) return null;
+        try {
+            double value = Double.parseDouble(text);
+            if (Double.isNaN(value) || value < 0) {
+                editText.setError("Inválido");
+                return null;
+            }
+            editText.setError(null);
+            return value;
+        } catch (NumberFormatException e) {
+            editText.setError("Inválido");
+            return null;
+        }
     }
 
     /* ==================== Rebalanceo de macros ==================== */
 
-    private void autoRebalanceMacros(double kcal,
-                                     @Nullable Double pGr,
-                                     @Nullable Double cGr,
-                                     @Nullable Double fGr) {
-        // ⓪ – solo cambió la kcal → escalar proporcional respetando rangos
-        if (pGr == null && cGr == null && fGr == null) {
-            Map<String, MacroRange> range = getRanges(user != null ? user.getGoal() : null);
+    private void autoRebalanceMacros(double targetKcal,
+                                     @Nullable Double fixedProtGr,
+                                     @Nullable Double fixedCarbGr,
+                                     @Nullable Double fixedFatGr) {
 
-            double P = goalsP * (kcal / Math.max(1.0, goalsKcal));
-            double C = goalsC * (kcal / Math.max(1.0, goalsKcal));
-            double F = goalsF * (kcal / Math.max(1.0, goalsKcal));
-
-            P = clamp(P, range.get("P").minPct * kcal / 4, range.get("P").maxPct * kcal / 4);
-            C = clamp(C, range.get("C").minPct * kcal / 4, range.get("C").maxPct * kcal / 4);
-            F = clamp(F, range.get("F").minPct * kcal / 9, range.get("F").maxPct * kcal / 9);
-
-            goalsKcal = Math.round(kcal);
-            goalsP = Math.round(P);
-            goalsC = Math.round(C);
-            goalsF = Math.round(F);
-
-            barCalories.setMax((int) goalsKcal);
-            barProtein .setMax((int) goalsP);
-            barCarbs   .setMax((int) goalsC);
-            barFat     .setMax((int) goalsF);
-
-            String id = uid();
-            if (id != null) {
-                mDatabase.child("users").child(id).child("caloriesToday").setValue(goalsKcal);
+        // Caso 0: Solo cambió Kcal -> escalar distribuciones actuales
+        if (fixedProtGr == null && fixedCarbGr == null && fixedFatGr == null) {
+            double currentTotalKcal = goalsKcal;
+            if (currentTotalKcal <= 0) {
+                if (user != null) {
+                    goalsKcal = Math.round(targetKcal);
+                    goalsP = Math.round(user.calculateProtein());
+                    goalsC = Math.round(user.calculateCarbs());
+                    goalsF = Math.round(user.calculateFat());
+                    double mk = goalsP*4 + goalsC*4 + goalsF*9;
+                    if (mk > 0) {
+                        double f = targetKcal / mk;
+                        goalsP = Math.round(goalsP * f);
+                        goalsC = Math.round(goalsC * f);
+                        goalsF = Math.round(goalsF * f);
+                    }
+                } else {
+                    goalsKcal = Math.round(targetKcal); goalsP = 0; goalsC = 0; goalsF = 0;
+                }
+            } else {
+                double scaleFactor = targetKcal / currentTotalKcal;
+                goalsKcal = Math.round(targetKcal);
+                goalsP = Math.round(goalsP * scaleFactor);
+                goalsC = Math.round(goalsC * scaleFactor);
+                goalsF = Math.round(goalsF * scaleFactor);
             }
 
             saveGoalsToPrefs();
+            updateMacrosUI();
             recalculateDayTotals();
             return;
         }
 
-        // ① – los 3 macros fueron editados → respetar
-        if (pGr != null && cGr != null && fGr != null) {
-            goalsKcal = Math.round(kcal);
-            goalsP = Math.round(pGr);
-            goalsC = Math.round(cGr);
-            goalsF = Math.round(fGr);
-            saveGoalsToPrefs();
-            recalculateDayTotals();
-            return;
-        }
+        Map<String, MacroRange> ranges = getRanges(user != null ? user.getGoal() : null);
 
-        Map<String, MacroRange> range = getRanges(user != null ? user.getGoal() : null);
+        double finalP, finalC, finalF;
+        double kcalFromFixedMacros = 0;
+        if (fixedProtGr != null) kcalFromFixedMacros += fixedProtGr * 4;
+        if (fixedCarbGr != null) kcalFromFixedMacros += fixedCarbGr * 4;
+        if (fixedFatGr != null) kcalFromFixedMacros += fixedFatGr * 9;
 
-        double P = (pGr != null) ? pGr : goalsP;
-        double C = (cGr != null) ? cGr : goalsC;
-        double F = (fGr != null) ? fGr : goalsF;
+        double remainingKcal = targetKcal - kcalFromFixedMacros;
 
-        if (pGr != null) {
-            double pct = (pGr * 4) / kcal;
-            if (pct < range.get("P").minPct) P = range.get("P").minPct * kcal / 4;
-            if (pct > range.get("P").maxPct) P = range.get("P").maxPct * kcal / 4;
-        }
-        if (cGr != null) {
-            double pct = (cGr * 4) / kcal;
-            if (pct < range.get("C").minPct) C = range.get("C").minPct * kcal / 4;
-            if (pct > range.get("C").maxPct) C = range.get("C").maxPct * kcal / 4;
-        }
-        if (fGr != null) {
-            double pct = (fGr * 9) / kcal;
-            if (pct < range.get("F").minPct) F = range.get("F").minPct * kcal / 9;
-            if (pct > range.get("F").maxPct) F = range.get("F").maxPct * kcal / 9;
-        }
-
-        double usedKcal = P * 4 + C * 4 + F * 9;
-        double remKcal = kcal - usedKcal;
-
-        if ((pGr != null && cGr != null) || (pGr != null && fGr != null) || (cGr != null && fGr != null)) {
-            if (pGr == null)      P = remKcal / 4;
-            else if (cGr == null) C = remKcal / 4;
-            else                  F = remKcal / 9;
+        if (fixedProtGr != null && fixedCarbGr != null && fixedFatGr != null) {
+            finalP = fixedProtGr; finalC = fixedCarbGr; finalF = fixedFatGr;
+        } else if ((fixedProtGr != null && fixedCarbGr != null) ||
+                (fixedProtGr != null && fixedFatGr  != null) ||
+                (fixedCarbGr != null && fixedFatGr  != null)) {
+            if (fixedProtGr == null) { // C y F fijos
+                finalP = Math.max(0, remainingKcal / 4);
+                finalC = fixedCarbGr; finalF = fixedFatGr;
+            } else if (fixedCarbGr == null) { // P y F fijos
+                finalP = fixedProtGr;
+                finalC = Math.max(0, remainingKcal / 4);
+                finalF = fixedFatGr;
+            } else { // P y C fijos
+                finalP = fixedProtGr; finalC = fixedCarbGr;
+                finalF = Math.max(0, remainingKcal / 9);
+            }
         } else {
-            if (cGr == null && fGr == null) { // solo P editado
-                double kcalFijas = P * 4;
-                double kcalAjustables = kcal - kcalFijas;
-                double prev = goalsC * 4 + goalsF * 9;
-                if (prev > 0) {
-                    double ratioC = (goalsC * 4) / prev;
-                    C = (kcalAjustables * ratioC) / 4;
-                    F = (kcalAjustables * (1.0 - ratioC)) / 9;
-                } else {
-                    C = (kcalAjustables * 0.5) / 4;
-                    F = (kcalAjustables * 0.5) / 9;
-                }
-            } else if (pGr == null && fGr == null) { // solo C editado
-                double kcalFijas = C * 4;
-                double kcalAjustables = kcal - kcalFijas;
-                double prev = goalsP * 4 + goalsF * 9;
-                if (prev > 0) {
-                    double ratioP = (goalsP * 4) / prev;
-                    P = (kcalAjustables * ratioP) / 4;
-                    F = (kcalAjustables * (1.0 - ratioP)) / 9;
-                } else {
-                    P = (kcalAjustables * 0.5) / 4;
-                    F = (kcalAjustables * 0.5) / 9;
-                }
-            } else if (pGr == null && cGr == null) { // solo F editado
-                double kcalFijas = F * 9;
-                double kcalAjustables = kcal - kcalFijas;
-                double prev = goalsP * 4 + goalsC * 4;
-                if (prev > 0) {
-                    double ratioP = (goalsP * 4) / prev;
-                    P = (kcalAjustables * ratioP) / 4;
-                    C = (kcalAjustables * (1.0 - ratioP)) / 4;
-                } else {
-                    P = (kcalAjustables * 0.5) / 4;
-                    C = (kcalAjustables * 0.5) / 4;
-                }
+            double prevNonFixedKcal = 0;
+            double prevProtRatio = 0, prevCarbRatio = 0, prevFatRatio = 0;
+
+            if (fixedProtGr == null) prevNonFixedKcal += goalsP * 4;
+            if (fixedCarbGr == null) prevNonFixedKcal += goalsC * 4;
+            if (fixedFatGr == null) prevNonFixedKcal += goalsF * 9;
+
+            if (prevNonFixedKcal > 0) {
+                if (fixedProtGr == null) prevProtRatio = (goalsP * 4) / prevNonFixedKcal;
+                if (fixedCarbGr == null) prevCarbRatio = (goalsC * 4) / prevNonFixedKcal;
+                if (fixedFatGr == null) prevFatRatio = (goalsF * 9) / prevNonFixedKcal;
+            } else {
+                if (fixedProtGr != null) { prevCarbRatio = 0.5; prevFatRatio = 0.5; }
+                else if (fixedCarbGr != null) { prevProtRatio = 0.5; prevFatRatio = 0.5; }
+                else { prevProtRatio = 0.5; prevCarbRatio = 0.5; }
+            }
+
+            if (fixedProtGr != null) {
+                finalP = fixedProtGr;
+                double sum = prevCarbRatio + prevFatRatio;
+                if (sum <= 0) { prevCarbRatio = 0.5; prevFatRatio = 0.5; sum = 1.0; }
+                finalC = Math.max(0, (remainingKcal * (prevCarbRatio / sum)) / 4);
+                finalF = Math.max(0, (remainingKcal * (prevFatRatio  / sum)) / 9);
+            } else if (fixedCarbGr != null) {
+                finalC = fixedCarbGr;
+                double sum = prevProtRatio + prevFatRatio;
+                if (sum <= 0) { prevProtRatio = 0.5; prevFatRatio = 0.5; sum = 1.0; }
+                finalP = Math.max(0, (remainingKcal * (prevProtRatio / sum)) / 4);
+                finalF = Math.max(0, (remainingKcal * (prevFatRatio  / sum)) / 9);
+            } else {
+                finalF = fixedFatGr;
+                double sum = prevProtRatio + prevCarbRatio;
+                if (sum <= 0) { prevProtRatio = 0.5; prevCarbRatio = 0.5; sum = 1.0; }
+                finalP = Math.max(0, (remainingKcal * (prevProtRatio / sum)) / 4);
+                finalC = Math.max(0, (remainingKcal * (prevCarbRatio / sum)) / 4);
             }
         }
 
-        P = clamp(P, range.get("P").minPct * kcal / 4, range.get("P").maxPct * kcal / 4);
-        C = clamp(C, range.get("C").minPct * kcal / 4, range.get("C").maxPct * kcal / 4);
-        F = clamp(F, range.get("F").minPct * kcal / 9, range.get("F").maxPct * kcal / 9);
+        double minProtG = ranges.get("P").minPct * targetKcal / 4.0;
+        double maxProtG = ranges.get("P").maxPct * targetKcal / 4.0;
+        double minCarbG = ranges.get("C").minPct * targetKcal / 4.0;
+        double maxCarbG = ranges.get("C").maxPct * targetKcal / 4.0;
+        double minFatG  = ranges.get("F").minPct * targetKcal / 9.0;
+        double maxFatG  = ranges.get("F").maxPct * targetKcal / 9.0;
 
-        goalsKcal = Math.round(kcal);
-        goalsP = Math.round(P);
-        goalsC = Math.round(C);
-        goalsF = Math.round(F);
+        finalP = clamp(finalP, minProtG, maxProtG);
+        finalC = clamp(finalC, minCarbG, maxCarbG);
+        finalF = clamp(finalF, minFatG, maxFatG);
 
-        barCalories.setMax((int) goalsKcal);
-        barProtein .setMax((int) goalsP);
-        barCarbs   .setMax((int) goalsC);
-        barFat     .setMax((int) goalsF);
+        double finalKcal = finalP * 4 + finalC * 4 + finalF * 9;
 
-        String id = uid();
-        if (id != null) {
-            mDatabase.child("users").child(id).child("caloriesToday").setValue(goalsKcal);
-        }
+        goalsKcal = Math.round(finalKcal);
+        goalsP = Math.round(finalP);
+        goalsC = Math.round(finalC);
+        goalsF = Math.round(finalF);
+
         saveGoalsToPrefs();
+        updateMacrosUI();
         recalculateDayTotals();
     }
 
-    private Map<String, MacroRange> getRanges(@Nullable String goal) {
-        String g = goal == null ? "" : goal.toLowerCase();
-        Map<String, MacroRange> r = new HashMap<>();
-        if (g.contains("ganar")) {             // BULKING
-            r.put("P", new MacroRange(0.25, 0.30));
-            r.put("F", new MacroRange(0.15, 0.25));
-            r.put("C", new MacroRange(0.45, 0.60));
-        } else if (g.contains("perder")) {     // CUTTING
-            r.put("P", new MacroRange(0.25, 0.35));
-            r.put("F", new MacroRange(0.20, 0.30));
-            r.put("C", new MacroRange(0.25, 0.45));
-        } else {                                // MANTENIMIENTO
-            r.put("P", new MacroRange(0.15, 0.25));
-            r.put("F", new MacroRange(0.25, 0.30));
-            r.put("C", new MacroRange(0.45, 0.55));
+    private Map<String, MacroRange> getRanges(@Nullable String goalString) {
+        String normalizedGoal = (goalString == null) ? "mantenimiento" : goalString.trim().toLowerCase();
+
+        Map<String, MacroRange> ranges = new HashMap<>();
+        ranges.put("P", new MacroRange(0.15, 0.25));
+        ranges.put("C", new MacroRange(0.45, 0.55));
+        ranges.put("F", new MacroRange(0.25, 0.35));
+
+        if (normalizedGoal.contains("ganar") || normalizedGoal.contains("volumen") || normalizedGoal.contains("bulk")) {
+            ranges.put("P", new MacroRange(0.25, 0.35));
+            ranges.put("C", new MacroRange(0.40, 0.60));
+            ranges.put("F", new MacroRange(0.15, 0.25));
+        } else if (normalizedGoal.contains("perder") || normalizedGoal.contains("definir") || normalizedGoal.contains("cut")) {
+            ranges.put("P", new MacroRange(0.30, 0.40));
+            ranges.put("C", new MacroRange(0.30, 0.50));
+            ranges.put("F", new MacroRange(0.20, 0.30));
         }
-        return r;
+
+        return ranges;
     }
 
-    private static double clamp(double val, double min, double max) {
-        return Math.max(min, Math.min(max, val));
+    private static double clamp(double value, double min, double max) {
+        if (min > max) {
+            double temp = min; min = max; max = temp;
+        }
+        return Math.max(min, Math.min(value, max));
     }
 
     private static class MacroRange {
-        final double minPct, maxPct;
-        MacroRange(double min, double max) { this.minPct = min; this.maxPct = max; }
+        final double minPct;
+        final double maxPct;
+        MacroRange(double minPercentage, double maxPercentage) {
+            this.minPct = Math.max(0.0, Math.min(1.0, minPercentage));
+            this.maxPct = Math.max(0.0, Math.min(1.0, maxPercentage));
+        }
     }
 
     /* ==================== Borrado de bloques ==================== */
 
-    private void showDeleteBlockDialog(FoodBlock block, int position) {
-        new AlertDialog.Builder(requireContext())
-                .setTitle("Eliminar bloque de comida")
-                .setMessage("¿Deseas eliminar este bloque?")
+    private void showDeleteBlockDialog(FoodBlock blockToDelete, int position) {
+        if (getContext() == null || blockToDelete == null) return;
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Eliminar Bloque de Comida")
+                .setMessage("¿Eliminar '" + blockToDelete.getTitle() + "'? Esta acción no se puede deshacer.")
+                .setNegativeButton("Cancelar", (dialog, which) -> dialog.dismiss())
                 .setPositiveButton("Eliminar", (dialog, which) -> {
-                    foodBlockList.remove(position);
-                    if (foodBlockAdapter != null) foodBlockAdapter.notifyItemRemoved(position);
-                    recalculateDayTotals();
-                    guardarComidasDelDia(currentDate);
-                })
-                .setNeutralButton("Cancelar", null)
-                .show();
-    }
-
-    private void removeBlockFromAllMatchingDays(String blockTitle, int position, int dayOfWeek) {
-        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        Map<String, ?> all = prefs.getAll();
-
-        String u = uid();
-        if (u == null) return;
-        String prefix = "food_" + u + "_";
-
-        Gson gson = GSON;
-        for (String key : all.keySet()) {
-            if (!key.startsWith(prefix)) continue;
-            String dateStr = key.substring(prefix.length()); // yyyy-MM-dd
-            try {
-                LocalDate date = LocalDate.parse(dateStr, DATE_FMT);
-                if (date.getDayOfWeek().getValue() == dayOfWeek) {
-                    String json = (String) all.get(key);
-                    if (json == null) continue;
-
-                    Type t = new TypeToken<List<FoodBlock>>() {}.getType();
-                    List<FoodBlock> blocks = gson.fromJson(json, t);
-                    boolean changed = false;
-
-                    if (position >= 0 && position < blocks.size()) {
-                        FoodBlock candidate = blocks.get(position);
-                        if (candidate.getTitle().equalsIgnoreCase(blockTitle)) {
-                            blocks.remove(position);
-                            changed = true;
+                    try {
+                        if (position >= 0 && position < foodBlockList.size()) {
+                            foodBlockList.remove(position);
+                            if (foodBlockAdapter != null) {
+                                foodBlockAdapter.notifyItemRemoved(position);
+                                foodBlockAdapter.notifyItemRangeChanged(position, foodBlockList.size() - position);
+                            }
+                            recalculateDayTotals();
+                            guardarComidasDelDia(currentDate);
+                        } else {
+                            Toast.makeText(getContext(), "Posición inválida.", Toast.LENGTH_SHORT).show();
                         }
+                    } catch (IndexOutOfBoundsException e) {
+                        Toast.makeText(getContext(), "Error al eliminar.", Toast.LENGTH_SHORT).show();
                     }
-                    if (changed) {
-                        prefs.edit().putString(key, gson.toJson(blocks)).apply();
-                        Log.i(TAG, "[removeBlockFromAllMatchingDays] Eliminado '" + blockTitle + "' en " + key);
-                    }
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "[removeBlockFromAllMatchingDays] Fecha inválida: " + dateStr, e);
-            }
-        }
+                })
+                .show();
     }
 
     /* ==================== Totales y UI ==================== */
 
-    private static class Totales { double kcal, prot, fat, carb; }
+    private static class Totales { double kcal = 0, prot = 0, fat = 0, carb = 0; }
 
     private Totales calcularTotalesActuales() {
         Totales t = new Totales();
         if (foodBlockList == null || foodBlockList.isEmpty()) return t;
 
-        int blockIdx = 0;
-        for (FoodBlock b : foodBlockList) {
-            int itemIdx = 0;
-            for (FoodItem it : b.getItems()) {
-                if (!it.isChecked()) { itemIdx++; continue; }
-
-                double factor   = it.getGrams() / 100.0;
-                double thisKcal = it.getKcalPer100g()   * factor;
-                double thisProt = it.getProteinPer100g()* factor;
-                double thisCarb = it.getCarbsPer100g()  * factor;
-                double thisFat  = it.getFatPer100g()    * factor;
-
-                t.kcal += thisKcal;
-                t.prot += thisProt;
-                t.carb += thisCarb;
-                t.fat  += thisFat;
-                itemIdx++;
+        for (FoodBlock block : foodBlockList) {
+            if (block == null || block.getItems() == null || block.getItems().isEmpty()) continue;
+            for (FoodItem item : block.getItems()) {
+                if (item == null || !item.isChecked()) continue;
+                double factor = item.getGrams() / 100.0;
+                if (factor < 0) factor = 0;
+                t.kcal += item.getKcalPer100g() * factor;
+                t.prot += item.getProteinPer100g() * factor;
+                t.carb += item.getCarbsPer100g() * factor;
+                t.fat  += item.getFatPer100g() * factor;
             }
-            blockIdx++;
         }
         return t;
     }
 
     public void recalculateDayTotals() {
+        if (!isAdded() || labelCalories == null || barCalories == null || goalsKcal < 0) return;
+
         Totales t = calcularTotalesActuales();
 
-        labelCalories.setText(String.format(Locale.getDefault(),
-                "Calorías: %.0f / %.0f kcal", t.kcal, goalsKcal));
-        labelProtein.setText(String.format(Locale.getDefault(),
-                "Proteínas: %.0f / %.0f g", t.prot, goalsP));
-        labelFat.setText(String.format(Locale.getDefault(),
-                "Grasas: %.0f / %.0f g", t.fat, goalsF));
-        labelCarbs.setText(String.format(Locale.getDefault(),
-                "Carbohidratos: %.0f / %.0f g", t.carb, goalsC));
+        labelCalories.setText(String.format(Locale.getDefault(), "Calorías: %.0f / %.0f kcal", t.kcal, goalsKcal));
+        labelProtein.setText(String.format(Locale.getDefault(),  "Proteínas: %.0f / %.0f g",  t.prot, goalsP));
+        labelCarbs.setText(String.format(Locale.getDefault(),    "Carbohidratos: %.0f / %.0f g", t.carb, goalsC));
+        labelFat.setText(String.format(Locale.getDefault(),      "Grasas: %.0f / %.0f g",    t.fat, goalsF));
 
-        barCalories.setProgress((int) Math.min(t.kcal, goalsKcal));
-        barProtein .setProgress((int) Math.min(t.prot, goalsP));
-        barFat     .setProgress((int) Math.min(t.fat , goalsF));
-        barCarbs   .setProgress((int) Math.min(t.carb, goalsC));
+        barCalories.setMax((int) Math.max(1, goalsKcal));
+        barProtein.setMax((int) Math.max(1, goalsP));
+        barCarbs.setMax((int) Math.max(1, goalsC));
+        barFat.setMax((int) Math.max(1, goalsF));
 
-        if (dataLoaded) {
+        barCalories.setProgress((int) clamp(t.kcal, 0, goalsKcal));
+        barProtein.setProgress((int) clamp(t.prot, 0, goalsP));
+        barCarbs.setProgress((int) clamp(t.carb, 0, goalsC));
+        barFat.setProgress((int) clamp(t.fat, 0, goalsF));
+
+        if (dataLoaded && effectiveUid != null) {
             guardarComidasDelDia(currentDate);
         }
     }
 
     /* ==================== Recetas ==================== */
 
-    public void showRecipeDialog(FoodSearchFragment.FoodResult recipe) {
-        RecipeDialog dialog = RecipeDialog.newInstance(recipe);
-        dialog.setOnGramsConfirmedListener(result -> {
-            FoodItem item = new FoodItem(
-                    result.name,
-                    result.grams,
-                    result.kcalPer100g,
-                    result.protein,
-                    result.carbs,
-                    result.fat,
-                    result.imageUrl,
-                    result.isRecipe()
-            );
-            item.setIngredients(result.ingredients);
-            item.setInstructions(result.instructions);
-            item.setChecked(true);
+    public void showRecipeDialog(FoodSearchFragment.FoodResult recipeResult) {
+        if (!isAdded() || getParentFragmentManager() == null) return;
 
-            if (!foodBlockList.isEmpty()) {
-                foodBlockList.get(0).addItem(item);
-                if (foodBlockAdapter != null) foodBlockAdapter.notifyItemChanged(0);
+        RecipeDialog dialog = RecipeDialog.newInstance(recipeResult);
+
+        dialog.setOnGramsConfirmedListener(confirmedResult -> {
+            FoodItem newItem = new FoodItem(
+                    confirmedResult.name,
+                    confirmedResult.grams,
+                    confirmedResult.kcalPer100g,
+                    confirmedResult.protein,
+                    confirmedResult.carbs,
+                    confirmedResult.fat,
+                    confirmedResult.imageUrl,
+                    true
+            );
+            if (confirmedResult.ingredients != null) {
+                newItem.setIngredients(new ArrayList<>(confirmedResult.ingredients));
+            }
+            if (confirmedResult.instructions != null) {
+                newItem.setInstructions(confirmedResult.instructions);
+            }
+
+            newItem.setChecked(true);
+
+            if (foodBlockList != null && !foodBlockList.isEmpty()) {
+                FoodBlock targetBlock = foodBlockList.get(0);
+                targetBlock.addItem(newItem);
+
+                if (foodBlockAdapter != null) {
+                    foodBlockAdapter.notifyItemChanged(0);
+                }
+
                 guardarComidasDelDia(currentDate);
                 recalculateDayTotals();
+
             } else {
-                Toast.makeText(getContext(), "No hay bloques de comida", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "No hay bloques de comida disponibles.", Toast.LENGTH_SHORT).show();
             }
         });
-        dialog.show(getParentFragmentManager(), "RecipeDialog");
+
+        dialog.show(getParentFragmentManager(), "RecipeDialogTag");
     }
 }

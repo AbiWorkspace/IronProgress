@@ -18,9 +18,16 @@ public class FoodBlock {
     public FoodBlock() {           // requerido por Gson / Firebase
         Log.d(TAG, "Constructor vacío llamado");
     }
+
     public FoodBlock(String title) {
         this.title = title;
         Log.d(TAG, "Constructor con título: " + title);
+    }
+
+    public FoodBlock(String title, List<FoodItem> items) {
+        this.title = title;
+        setItems(items); // reutiliza el setter para normalizar
+        Log.d(TAG, "Constructor con título+items: " + title + " (" + this.items.size() + " items)");
     }
 
     /* ---------- CRUD ITEMS ---------- */
@@ -29,22 +36,36 @@ public class FoodBlock {
         items.add(it);
         Log.d(TAG, "addItem: " + it.getName() + " añadido");
     }
+
     public void removeItem(FoodItem it) {
         if (it == null) return;
         items.remove(it);
     }
 
+    /** Setter requerido por DashboardFragment: nunca deja la lista en null. */
+    public void setItems(List<FoodItem> newItems) {
+        items.clear();
+        if (newItems != null) items.addAll(newItems);
+        Log.d(TAG, "setItems: tamaño ahora = " + items.size());
+    }
+
     /* ---------- GET / SET ---------- */
-    public String getTitle()                { return title; }
-    public void   setTitle(String t)        { this.title = t; }
-    public List<FoodItem> getItems()        { return items; }
+    public String getTitle() { return title; }
+
+    public void setTitle(String t) {
+        this.title = t;
+    }
+
+    /** Nunca retorna null. */
+    public List<FoodItem> getItems() { return items; }
 
     /* ===========================================================
        MÉTODO NECESARIO PARA EL ADAPTER --> CLONA PROFUNDAMENTE  */
     public FoodBlock deepCopy(String suffix) {
-        FoodBlock clone = new FoodBlock(this.title + " " + suffix);
+        FoodBlock clone = new FoodBlock((this.title == null ? "" : this.title) + " " + suffix);
 
         for (FoodItem it : this.items) {
+            if (it == null) continue;
             FoodItem copy = new FoodItem(
                     it.getName(),
                     it.getGrams(),
@@ -64,14 +85,17 @@ public class FoodBlock {
     }
 
     /* ---------- EQUALS & HASHCODE (para DiffUtil) ---------- */
-    @Override public boolean equals(Object o) {
+    @Override
+    public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof FoodBlock)) return false;
         FoodBlock fb = (FoodBlock) o;
         return Objects.equals(title, fb.title) &&
                 Objects.equals(items, fb.items);
     }
-    @Override public int hashCode() {
+
+    @Override
+    public int hashCode() {
         return Objects.hash(title, items);
     }
 }

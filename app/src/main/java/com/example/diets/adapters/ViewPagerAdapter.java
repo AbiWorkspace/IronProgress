@@ -1,16 +1,15 @@
 package com.example.diets.adapters;
-import static android.content.ContentValues.TAG;
+
+import android.os.Bundle;
 import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 
-
 import com.example.diets.fragments.DashboardFragment;
 import com.example.diets.fragments.DashboardWorkoutFragment;
-import com.example.diets.fragments.DashboardFragment;  // ✅ Asegurar que esta clase existe
-import com.example.diets.fragments.UserFormFragment;
 import com.example.diets.fragments.EntrenamientoFragment;
 import com.example.diets.fragments.UserFormFragment;
 
@@ -21,68 +20,95 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
 
     private final List<Fragment> fragmentList = new ArrayList<>();
 
-    public ViewPagerAdapter(@NonNull FragmentActivity fragmentActivity, boolean trainingFormCompleted, boolean firstTime) {
+    // Flags recibidos desde la Activity
+    private final boolean coachMode;
+    private final String targetUid;
+
+    public ViewPagerAdapter(@NonNull FragmentActivity fragmentActivity,
+                            boolean trainingFormCompleted,
+                            boolean firstTime,
+                            boolean coachMode,
+                            @NonNull String targetUid) {
         super(fragmentActivity);
 
-        Log.d("ViewPagerAdapter", "📌 Constructor llamado");
-        Log.d("ViewPagerAdapter", "➡️ trainingFormCompleted: " + trainingFormCompleted);
-        Log.d("ViewPagerAdapter", "➡️ firstTime: " + firstTime);
+        this.coachMode = coachMode;
+        this.targetUid = targetUid;
 
-        // 🔥 Manejo del formulario de entrenamiento
+        Log.d("ViewPagerAdapter - ctor", "trainingFormCompleted=" + trainingFormCompleted
+                + " | firstTime=" + firstTime
+                + " | coachMode=" + coachMode
+                + " | targetUid=" + targetUid);
+
+        // Página 0: Entrenamiento (dashboard de entrenamiento o formulario)
         if (trainingFormCompleted) {
-            Log.d("ViewPagerAdapter", "✅ Formulario de entrenamiento completado. Agregando DashboardWorkoutFragment.");
-            fragmentList.add(new DashboardWorkoutFragment());  // ✅ Muestra entrenamientos
+            Log.d("ViewPagerAdapter - ctor", "Agregando DashboardWorkoutFragment (entrenamiento listo)");
+            fragmentList.add(withArgs(new DashboardWorkoutFragment()));
         } else {
-            Log.d("ViewPagerAdapter", "❌ Formulario de entrenamiento incompleto. Agregando EntrenamientoFragment.");
-            fragmentList.add(new EntrenamientoFragment());  // ✅ Muestra formulario de entrenamiento
+            Log.d("ViewPagerAdapter - ctor", "Agregando EntrenamientoFragment (formulario entrenamiento)");
+            fragmentList.add(withArgs(new EntrenamientoFragment()));
         }
 
-        Log.d("ViewPagerAdapter", "Valor de first time " + firstTime);
-
+        // Página 1: Alimentación / Dashboard (o primer uso)
         if (firstTime) {
-            Log.d("ViewPagerAdapter", "✅ Es la primera vez. Agregando UserFormFragment.");
-            fragmentList.add(new UserFormFragment());  // ✅ Muestra formulario de usuario
+            Log.d("ViewPagerAdapter - ctor", "Agregando UserFormFragment (primera vez)");
+            fragmentList.add(withArgs(new UserFormFragment()));
         } else {
-            Log.d("ViewPagerAdapter", "❌ No es la primera vez. Agregando DashboardFragment.");
-            fragmentList.add(new DashboardFragment());  // ✅ Muestra el Dashboard normal
+            Log.d("ViewPagerAdapter - ctor", "Agregando DashboardFragment");
+            fragmentList.add(withArgs(new DashboardFragment()));
         }
 
-        Log.d("ViewPagerAdapter", "📌 Fragmentos agregados: " + fragmentList.size());
+        Log.d("ViewPagerAdapter - ctor", "Total fragments=" + fragmentList.size());
     }
 
+    /** Inyecta coachMode y targetUid como argumentos en el fragment. */
+    private Fragment withArgs(Fragment fragment) {
+        Bundle args = fragment.getArguments() != null
+                ? new Bundle(fragment.getArguments())
+                : new Bundle();
+        args.putBoolean("coachMode", coachMode);
+        args.putString("targetUid", targetUid);
+        fragment.setArguments(args);
+        return fragment;
+    }
 
-    /**
-     * Reemplaza un fragmento en una posición específica.
-     * Nota: Para que los cambios surtan efecto, asegúrate de recrear el adaptador o
-     * configurar nuevamente el ViewPager2 con el adaptador modificado.
-     */
+    /** Reemplaza un fragmento en una posición y notifica el cambio. */
     public void replaceFragment(int position, Fragment fragment) {
         if (position >= 0 && position < fragmentList.size()) {
-            fragmentList.set(position, fragment);
+            fragmentList.set(position, withArgs(fragment)); // asegurar args
+            notifyDataSetChanged();
+        } else {
+            Log.e("ViewPagerAdapter - replaceFragment", "Posición fuera de rango: " + position);
         }
     }
 
-    /**
-     * Agrega un nuevo fragmento al adaptador.
-     */
+    /** Agrega un fragmento con inyección de argumentos. */
     public void addFragment(Fragment fragment) {
-        fragmentList.add(fragment);
+        fragmentList.add(withArgs(fragment));
+        notifyDataSetChanged();
     }
 
-    /**
-     * Elimina un fragmento en una posición específica.
-     */
+    /** Elimina un fragmento en una posición. */
     public void removeFragment(int position) {
         if (position >= 0 && position < fragmentList.size()) {
             fragmentList.remove(position);
+            notifyDataSetChanged();
+        } else {
+            Log.e("ViewPagerAdapter - removeFragment", "Posición fuera de rango: " + position);
         }
     }
 
-    /**
-     * Obtiene un fragmento en una posición específica.
-     */
+    /** Obtiene el fragment en una posición. */
     public Fragment getFragment(int position) {
         return fragmentList.get(position);
+    }
+
+    /** Título para TabLayoutMediator. */
+    public CharSequence getPageTitle(int position) {
+        switch (position) {
+            case 0: return "Entrenamiento";
+            case 1: return "Alimentación";
+            default: return "Página " + position;
+        }
     }
 
     @NonNull
@@ -95,19 +121,18 @@ public class ViewPagerAdapter extends FragmentStateAdapter {
     public int getItemCount() {
         return fragmentList.size();
     }
+
+    // IDs estables basados en hash del fragmento
     @Override
     public long getItemId(int position) {
-        return fragmentList.get(position).hashCode(); // Genera un ID único para cada fragmento
+        return fragmentList.get(position).hashCode();
     }
 
     @Override
     public boolean containsItem(long itemId) {
-        for (Fragment fragment : fragmentList) {
-            if (fragment.hashCode() == itemId) {
-                return true;
-            }
+        for (Fragment f : fragmentList) {
+            if (f.hashCode() == itemId) return true;
         }
         return false;
     }
-
 }
