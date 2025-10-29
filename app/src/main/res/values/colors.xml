@@ -22,5 +22,6 @@
     <color name="hintColor">#BBBBBB</color>    <!-- Actualizado para coherencia -->
     <color name="transparent">#00000000</color>
     <color name="cardBackground">#1A1A1A</color>
+    <color name="brand_red">#E53935</color>
 
 </resources>

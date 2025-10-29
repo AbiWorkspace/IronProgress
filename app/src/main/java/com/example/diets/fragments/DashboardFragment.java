@@ -261,34 +261,7 @@ public class DashboardFragment extends Fragment {
 
     /* ==================== Metas (load/save/UI) ==================== */
 
-    private boolean loadGoalsFromPrefs() {
-        if (!isAdded() || getContext() == null) return false;
-        if (effectiveUid == null) {
-            goalsKcal = 0; goalsP = 0; goalsF = 0; goalsC = 0;
-            return false;
-        }
 
-        SharedPreferences p;
-        try {
-            p = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
-        } catch (IllegalStateException e) {
-            Log.e(TAG, "Error getting SharedPreferences in loadGoalsFromPrefs", e);
-            return false;
-        }
-
-        String prefix = effectiveUid + "_";
-        if (!p.contains(prefix + K_KCAL)) {
-            goalsKcal = 0; goalsP = 0; goalsF = 0; goalsC = 0;
-            return false;
-        }
-
-        goalsKcal = p.getFloat(prefix + K_KCAL, 0f);
-        goalsP    = p.getFloat(prefix + K_PROT, 0f);
-        goalsF    = p.getFloat(prefix + K_FAT , 0f);
-        goalsC    = p.getFloat(prefix + K_CARB, 0f);
-
-        return true;
-    }
 
     private void saveGoalsToPrefs() {
         if (effectiveUid == null || !isAdded() || getContext() == null) return;
@@ -482,8 +455,11 @@ public class DashboardFragment extends Fragment {
                                 kcalRef.setValue(kcalTodayValue);
                             }
 
+                            // Esta línea carga tus metas (incluyendo cambios manuales)
                             boolean prefsExistentes = loadGoalsFromPrefs();
 
+                            // Este 'if' SÓLO se ejecuta si NO hay metas guardadas,
+                            // poblando los valores desde Firebase por primera vez.
                             if (!prefsExistentes || goalsKcal <= 0) {
                                 goalsKcal = kcalTodayValue;
                                 // Métodos SIN argumentos (evita error de signatura)
@@ -499,20 +475,9 @@ public class DashboardFragment extends Fragment {
                                     goalsF = Math.round(goalsF * f);
                                 }
                                 saveGoalsToPrefs();
-                            } else {
-                                // Rebalanceo ligero si difiere mucho la meta de kcal vs caloriesToday
-                                if (Math.abs(kcalTodayValue - goalsKcal) >= 10) {
-                                    double currentTotalMacroKcal = goalsP * 4 + goalsC * 4 + goalsF * 9;
-                                    double factor = (currentTotalMacroKcal > 0) ? kcalTodayValue / currentTotalMacroKcal : 1.0;
-
-                                    goalsKcal = Math.round(kcalTodayValue);
-                                    goalsP = Math.round(goalsP * factor);
-                                    goalsC = Math.round(goalsC * factor);
-                                    goalsF = Math.round(goalsF * factor);
-                                    saveGoalsToPrefs();
-                                }
                             }
 
+                            // Muestra los valores cargados (ya sean de Firebase o tus cambios)
                             updateMacrosUI();
                             recalculateDayTotals();
 
@@ -578,7 +543,34 @@ public class DashboardFragment extends Fragment {
 
         ed.apply();
     }
+    private boolean loadGoalsFromPrefs() {
+        if (!isAdded() || getContext() == null) return false;
+        if (effectiveUid == null) {
+            goalsKcal = 0; goalsP = 0; goalsF = 0; goalsC = 0;
+            return false;
+        }
 
+        SharedPreferences p;
+        try {
+            p = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
+        } catch (IllegalStateException e) {
+            Log.e(TAG, "Error getting SharedPreferences in loadGoalsFromPrefs", e);
+            return false;
+        }
+
+        String prefix = effectiveUid + "_";
+        if (!p.contains(prefix + K_KCAL)) {
+            goalsKcal = 0; goalsP = 0; goalsF = 0; goalsC = 0;
+            return false;
+        }
+
+        goalsKcal = p.getFloat(prefix + K_KCAL, 0f);
+        goalsP    = p.getFloat(prefix + K_PROT, 0f);
+        goalsF    = p.getFloat(prefix + K_FAT , 0f);
+        goalsC    = p.getFloat(prefix + K_CARB, 0f);
+
+        return true;
+    }
     private void loadFoodBlocksForDate(LocalDate date) {
         if (!isAdded() || getContext() == null) return;
 
@@ -805,8 +797,11 @@ public class DashboardFragment extends Fragment {
         btnCancel.setOnClickListener(v -> dialog.dismiss());
 
         btnApply.setOnClickListener(v -> {
+            // Límite de aumento (1.10 = 10%)
+            final double MAX_CALORIE_INCREASE_FACTOR = 1.10;
             boolean hasInputError = false;
 
+            // --- 1. Parsear todos los valores ---
             double newKcal = -1.0;
             try {
                 String kcalStr = etKcal.getText().toString().trim();
@@ -821,28 +816,74 @@ public class DashboardFragment extends Fragment {
                 hasInputError = true;
             }
 
-            Double newProt = parseOrNull(etProt);
-            Double newCarb = parseOrNull(etCarb);
-            Double newFatV = parseOrNull(etFat);
+            // Parseamos lo que hay en las cajas
+            Double parsedProt = parseOrNull(etProt);
+            Double parsedCarb = parseOrNull(etCarb);
+            Double parsedFat  = parseOrNull(etFat);
 
             if (hasInputError) {
                 Toast.makeText(getContext(), "Corrige los valores inválidos.", Toast.LENGTH_SHORT).show();
                 return;
             }
 
+            // --- 2. Comprobar qué cambió REALMENTE ---
             boolean kcalChanged = Math.abs(newKcal - goalsKcal) > 0.1;
-            boolean protChanged = (newProt != null && Math.abs(newProt - goalsP) > 0.1) || (newProt == null && goalsP != 0);
-            boolean carbChanged = (newCarb != null && Math.abs(newCarb - goalsC) > 0.1) || (newCarb == null && goalsC != 0);
-            boolean fatChanged  = (newFatV != null && Math.abs(newFatV - goalsF) > 0.1) || (newFatV == null && goalsF != 0);
 
-            if (!kcalChanged && !protChanged && !carbChanged && !fatChanged) {
+
+            // Un macro cambió SÓLO SI el valor parseado (parsedProt)
+            // es diferente del valor original guardado (goalsP).
+            // También cuenta si el usuario borró el número (parsedProt == null).
+            boolean protChanged = (parsedProt != null && Math.abs(parsedProt - goalsP) > 0.1)
+                    || (parsedProt == null && goalsP != 0);
+            boolean carbChanged = (parsedCarb != null && Math.abs(parsedCarb - goalsC) > 0.1)
+                    || (parsedCarb == null && goalsC != 0);
+            boolean fatChanged  = (parsedFat  != null && Math.abs(parsedFat - goalsF) > 0.1)
+                    || (parsedFat  == null && goalsF != 0);
+
+            // Este booleano AHORA SÍ funciona bien
+            boolean onlyKcalChanged = kcalChanged && !protChanged && !carbChanged && !fatChanged;
+
+            // --- 3. Aplicar tu lógica ---
+            if (onlyKcalChanged) {
+                // ESCENARIO 1: El usuario SÓLO cambió las Kcal
+
+                double maxAllowedKcal = goalsKcal * MAX_CALORIE_INCREASE_FACTOR;
+
+                if (newKcal > maxAllowedKcal && goalsKcal > 0) {
+                    // 🛑 ¡AQUÍ ESTÁ TU TOAST! 🛑
+                    // Se pasó del 10% de AUMENTO
+                    Toast.makeText(getContext(),
+                            "El aumento excede el 10%. No se guardó.",
+                            Toast.LENGTH_LONG).show();
+                    // No cerramos el diálogo, el usuario debe corregir
+                    return;
+
+                } else {
+                    // Está dentro del rango (o es una disminución)
+                    // Guardamos SÓLO las Kcal. Los macros se quedan "tal cual".
+                    Log.d(TAG, "Guardando sólo Kcal, macros se quedan 'tal cual'.");
+                    goalsKcal = Math.round(newKcal);
+                    // No tocamos goalsP, goalsC, goalsF
+
+                    saveGoalsToPrefs();
+                    updateMacrosUI();
+                    recalculateDayTotals();
+                    dialog.dismiss();
+                }
+
+            } else {
+                // ESCENARIO 2: El usuario cambió macros (o no cambió nada)
+
+                if (!kcalChanged && !protChanged && !carbChanged && !fatChanged) {
+                    dialog.dismiss(); // No cambió nada en absoluto
+                    return;
+                }
+
+                // El usuario SÍ cambió macros, así que usamos el rebalanceo
+                Log.d(TAG, "Macros cambiados. Ejecutando rebalanceo automático.");
+                autoRebalanceMacros(newKcal, parsedProt, parsedCarb, parsedFat);
                 dialog.dismiss();
-                return;
             }
-
-            autoRebalanceMacros(newKcal, newProt, newCarb, newFatV);
-
-            dialog.dismiss();
         });
 
         dialog.show();

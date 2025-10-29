@@ -53,9 +53,11 @@ public class CreatedExercisesFragment extends Fragment implements
     private final List<Exercise> selectedExercises = new ArrayList<>();
     // IDs/keys que el adapter espera
     private final List<String> selectedExerciseIds = new ArrayList<>();
-
+    public interface OnExerciseSelectedListener {
+        void onExerciseSelected(Exercise exercise);
+    }
     private ExercisesAdapter adapter;
-    private MenuPopupFragment.OnExerciseSelectedListener listener;
+    private OnExerciseSelectedListener listener;
     private TrainingDay trainingDay; // Día de entrenamiento y su patrón
 
     // ===== Helpers de seguridad y archivo por usuario =====
@@ -63,9 +65,7 @@ public class CreatedExercisesFragment extends Fragment implements
         FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
         return (u != null) ? u.getUid() : null;
     }
-    private File file() {
-        return new File(requireContext().getFilesDir(), uid() + "_exercises.json");
-    }
+
     private boolean ready() { return isAdded() && getContext() != null; }
 
     @Nullable
@@ -139,8 +139,7 @@ public class CreatedExercisesFragment extends Fragment implements
         deleteExerciseButton.setOnClickListener(v -> showDeleteConfirmationDialog());
     }
 
-    public void setOnExerciseSelectedListener(MenuPopupFragment.OnExerciseSelectedListener listener) {
-        this.listener = listener;
+    public void setOnExerciseSelectedListener(OnExerciseSelectedListener listener) {        this.listener = listener;
     }
 
     private void showDeleteConfirmationDialog() {
@@ -170,10 +169,12 @@ public class CreatedExercisesFragment extends Fragment implements
         try (FileWriter writer = new FileWriter(file())) {
             new Gson().toJson(exercises, writer);
         } catch (IOException e) {
-            Log.e(TAG, "❌ Error al guardar ejercicios", e);
+            Log.e(TAG, "Error al guardar ejercicios", e);
         }
     }
-
+    private File file() {
+        return new File(requireContext().getFilesDir(), uid() + "_exercises.json");
+    }
     // Cargar ejercicios (si no hay archivo, el adapter YA está listo → no hay NPE)
     private void loadExercisesFromInternalStorage(@Nullable List<MovementPattern> movementPatterns) {
         Log.d(TAG, "loadExercisesFromInternalStorage: Iniciando carga desde almacenamiento interno.");
@@ -203,7 +204,7 @@ public class CreatedExercisesFragment extends Fragment implements
 
             if (adapter != null) adapter.notifyDataSetChanged();
         } catch (Exception e) {
-            Log.e(TAG, "❌ loadExercisesFromInternalStorage: Error al cargar ejercicios", e);
+            Log.e(TAG, " loadExercisesFromInternalStorage: Error al cargar ejercicios", e);
         }
     }
 
@@ -272,7 +273,7 @@ public class CreatedExercisesFragment extends Fragment implements
                     .commit();
             Log.d(TAG, "Fragmento de detalles insertado correctamente.");
         } catch (Exception e) {
-            Log.e(TAG, "❌ onExerciseClick: Excepción al abrir detalles: " + e.getMessage(), e);
+            Log.e(TAG, "onExerciseClick: Excepción al abrir detalles: " + e.getMessage(), e);
         }
     }
 

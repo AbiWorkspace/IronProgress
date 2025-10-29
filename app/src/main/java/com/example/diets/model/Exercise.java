@@ -71,9 +71,6 @@ public class Exercise implements Serializable {
                 (movementPatterns != null) ? new ArrayList<>(movementPatterns) : new ArrayList<>();
     }
 
-
-    /* ======================= MÉTODOS AUXILIARES ======================= */
-
     private static String cap(String s) {
         if (s == null || s.isEmpty()) return s;
         return s.substring(0, 1).toUpperCase(Locale.ROOT) +
@@ -99,8 +96,6 @@ public class Exercise implements Serializable {
         if (objs != null) for (Muscle m : objs) synergistMuscles.add(m.getName());
     }
 
-
-    /* ======================= GETTERS / SETTERS ======================= */
 
     public int getId() { return id; }
     public void setId(int id) { this.id = id; }
@@ -164,8 +159,6 @@ public class Exercise implements Serializable {
         }
     }
 
-    /* === Imágenes === */
-
     public List<String> getImages() { return images; }
     public void setImages(List<String> images) {
         this.images = (images != null) ? new ArrayList<>(images) : new ArrayList<>();
@@ -183,8 +176,6 @@ public class Exercise implements Serializable {
     public List<String> getImageGallery() { return imageGallery; }
     public void setImageGallery(List<String> imageGallery) { this.imageGallery = imageGallery; }
 
-    /* === Listas varias === */
-
     public List<String> getSynergistMuscles() { return synergistMuscles; }
     public void setSynergistMuscles(List<String> synergistMuscles) {
         this.synergistMuscles =
@@ -199,16 +190,11 @@ public class Exercise implements Serializable {
         this.movementPatterns = movementPatterns;
     }
 
-    /* === Series y origen === */
-
     public int getSeries() { return series; }
     public void setSeries(int series) { this.series = series; }
 
     public boolean isFromInternal() { return fromInternal; }
     public void setFromInternal(boolean fromInternal) { this.fromInternal = fromInternal; }
-
-
-    /* ======================= EQUALS / HASHCODE / TOSTRING ======================= */
 
     @Override
     public boolean equals(Object o) {

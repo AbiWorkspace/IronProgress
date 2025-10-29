@@ -31,8 +31,8 @@ import com.example.diets.adapters.SearchResultAdapter;
 import com.example.diets.dialogs.BarcodeScannerDialog;
 import com.example.diets.dialogs.GramsInputDialog;
 import com.example.diets.dialogs.RecipeDialog;
-import com.example.diets.model.FoodBlock;          // ✅ se mantiene para compatibilidad con otras clases
-import com.example.diets.model.FoodItem;          // ✅ se mantiene
+import com.example.diets.model.FoodBlock;
+import com.example.diets.model.FoodItem;
 import com.example.diets.network.OkHttpSingleton;
 import com.google.mlkit.common.model.DownloadConditions;
 import com.google.mlkit.nl.translate.TranslateLanguage;
@@ -216,7 +216,6 @@ public class FoodSearchFragment extends Fragment {
         if (!q.isEmpty()) searchFood(q);
     }
 
-
     /** Consulta OpenFoodFacts por código de barras sin bloquear UI
      *  y con búsqueda textual de respaldo si no se encuentra el producto. */
     private void searchFoodByBarcode(String barcode) {
@@ -252,8 +251,10 @@ public class FoodSearchFragment extends Fragment {
                                         "Código no encontrado. Mostrando resultados relacionados…",
                                         Toast.LENGTH_SHORT).show());
                     }
-                    // Fallback: ejecuta una búsqueda normal con el mismo texto
-                    searchFood(barcode);
+// Fallback: ejecuta una búsqueda normal en el hilo de UI
+                    if (isAdded()) {
+                        requireActivity().runOnUiThread(() -> searchFood(barcode));
+                    }
                     return;
                 }
 
@@ -346,11 +347,24 @@ public class FoodSearchFragment extends Fragment {
 
     private void searchFood(String query) {
         Log.d(TAG, "searchFood: " + query);
-        resultObjects.clear(); adapter.notifyDataSetChanged();
-        productResults.clear(); recipeResults.clear();
+
+        productResults.clear();
+        recipeResults.clear();
+
+        // Limpieza + notify en UI para evitar tocar vistas fuera del hilo principal
+        if (isAdded()) {
+            requireActivity().runOnUiThread(() -> {
+                resultObjects.clear();
+                adapter.notifyDataSetChanged();
+            });
+        } else {
+            resultObjects.clear();
+        }
+
         fetchProductsFromOpenFoodFacts(query);
-        fetchRecipesFromSpoonacular(query); // ← SEGURO
+        fetchRecipesFromSpoonacular(query);
     }
+
 
     // Si falta, agrega esto:
     private void fetchRecipesFromSpoonacular(String query) {
@@ -472,11 +486,18 @@ public class FoodSearchFragment extends Fragment {
                     rec.idMeal  = id;
 
                     translateRecipeFields(rec, () -> {
-                        recipeResults.add(rec);
-                        resultObjects.add(rec);
-                        if (isAdded())
-                            requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
+                        if (isAdded()) {
+                            requireActivity().runOnUiThread(() -> {
+                                recipeResults.add(rec);
+                                resultObjects.add(rec);
+                                adapter.notifyDataSetChanged();
+                            });
+                        } else {
+                            recipeResults.add(rec);
+                            resultObjects.add(rec);
+                        }
                     });
+
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error Spoonacular", e);
@@ -562,10 +583,8 @@ public class FoodSearchFragment extends Fragment {
                 Collections.sort(tempProducts, (a, b) ->
                         Integer.compare(relevanceScore(a.name, query), relevanceScore(b.name, query)));
 
-                productResults.addAll(tempProducts);
-                resultObjects.addAll(tempProducts);
-
-                final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición
+                // ⏱ fin medición (solo red/cálculo)
+                final long t1 = SystemClock.elapsedRealtime();
                 boolean success = !tempProducts.isEmpty();
                 Log.i("OFF_TIMING",
                         "term=" + query +
@@ -574,7 +593,18 @@ public class FoodSearchFragment extends Fragment {
                                 " source=red" +
                                 " count=" + tempProducts.size());
 
-                if (isAdded()) requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        productResults.addAll(tempProducts);
+                        resultObjects.addAll(tempProducts);
+                        adapter.notifyDataSetChanged();
+                    });
+                } else {
+                    // Si el fragment aún no está añadido, actualiza listas sin tocar la UI
+                    productResults.addAll(tempProducts);
+                    resultObjects.addAll(tempProducts);
+                }
+
 
             } catch (Exception e) {
                 final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición con error
@@ -787,3 +817,4 @@ public class FoodSearchFragment extends Fragment {
         public boolean isRecipe() { return "receta".equalsIgnoreCase(type); }
     }
 }
+

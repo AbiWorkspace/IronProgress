@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--  res/values/themes_overlay.xml  -->
+<!-- res/values/themes_overlay.xml -->
 <resources>
 
-    <!-- Overlay REAL que usamos en los diálogos Material‑3 -->
-    <style name="ThemeOverlay.Diets.Material3Bridge">
-        <!-- …los tres TextAppearance… -->
+    <!-- Overlay único para diálogos/overlays Material 3 -->
+    <style name="ThemeOverlay.Diets" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- (opcional) tus overrides aquí -->
+        <!-- <item name="materialAlertDialogBodyTextStyle">@style/TextAppearance.Material3.BodyMedium</item> -->
+        <!-- <item name="materialAlertDialogTitleTextStyle">@style/TextAppearance.Material3.TitleMedium</item> -->
     </style>
 
-    <!-- Alias para mantener compatibilidad con referencias antiguas -->
-    <style name="ThemeOverlay.Diets"
-        parent="ThemeOverlay.Diets.Material3Bridge"/>
-    <!-- ^––– ¡Sin más contenido! -->
 </resources>

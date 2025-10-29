@@ -89,7 +89,7 @@ public class ExerciseDistributionFragment extends Fragment {
     private void loadExerciseDistributions(LinearLayout recommendedContainer, LinearLayout notRecommendedContainer, int selectedDays) {
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser == null) {
-            Log.e(TAG, "❌ Usuario no autenticado. No se puede acceder a la base de datos.");
+            Log.e(TAG, "Usuario no autenticado. No se puede acceder a la base de datos.");
             return;
         }
 
@@ -98,7 +98,7 @@ public class ExerciseDistributionFragment extends Fragment {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!snapshot.exists()) {
-                    Log.e(TAG, "❌ No se encontraron distribuciones de ejercicios en la base de datos.");
+                    Log.e(TAG, "No se encontraron distribuciones de ejercicios en la base de datos.");
                     displayNoDistributionsMessage(recommendedContainer);
                     displayNoDistributionsMessage(notRecommendedContainer);
                     return;
@@ -110,7 +110,7 @@ public class ExerciseDistributionFragment extends Fragment {
                     if (exerciseDistribution != null) {
                         distributions.add(exerciseDistribution);
                     } else {
-                        Log.w(TAG, "⚠️ Distribución de ejercicios nula en la base de datos.");
+                        Log.w(TAG, "⚠Distribución de ejercicios nula en la base de datos.");
                     }
                 }
 
@@ -141,7 +141,7 @@ public class ExerciseDistributionFragment extends Fragment {
 
             @Override
             public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "❌ Error de base de datos: " + error.getMessage());
+                Log.e(TAG, "Error de base de datos: " + error.getMessage());
             }
         });
     }
@@ -155,6 +155,24 @@ public class ExerciseDistributionFragment extends Fragment {
         noDistributionsText.setTypeface(null, Typeface.BOLD);
         container.addView(noDistributionsText);
     }
+
+    // --- Helpers (agrega al final de la clase) ---
+    private static String stripIdPrefix(String s) {
+        if (s == null) return "";
+        // elimina "n:" (con espacios opcionales) al inicio
+        return s.replaceFirst("^\\s*\\d+\\s*:\\s*", "").trim();
+    }
+
+    private static List<String> cleanIdColonList(@Nullable List<String> in) {
+        List<String> out = new ArrayList<>();
+        if (in == null) return out;
+        for (String s : in) {
+            String name = stripIdPrefix(s);
+            if (!name.isEmpty()) out.add(name);
+        }
+        return out;
+    }
+
 
     private void displayDistributions(ExerciseDistribution distribution, LinearLayout container) {
         Context context = getContext();
@@ -217,12 +235,15 @@ public class ExerciseDistributionFragment extends Fragment {
             workedText.setTextSize(14);
             muscleInfoLayout.addView(workedText);
 
+
             TextView synergistsText = new TextView(context);
-            synergistsText.setText("Sinergistas: · " + TextUtils.join(" · ", pattern.getSynergistMuscles()));
+            List<String> synergies = cleanIdColonList(pattern.getSynergistMuscles());
+            synergistsText.setText("Sinergistas: " + (synergies.isEmpty() ? "—" : "· " + TextUtils.join(" · ", synergies)));
             synergistsText.setTextColor(Color.GRAY);
             synergistsText.setTextSize(14);
             synergistsText.setPadding(0, 8, 0, 8);
             muscleInfoLayout.addView(synergistsText);
+
 
             TextView toggleText = new TextView(context);
             toggleText.setText("Ver más");

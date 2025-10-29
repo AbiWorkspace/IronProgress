@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
 import com.google.android.material.navigation.NavigationView;
+import com.google.firebase.BuildConfig;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -28,6 +29,7 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
+
 public class UsersListActivity extends AppCompatActivity {
 
     private static final String TAG = "UsersListActivity";
@@ -139,11 +141,17 @@ public class UsersListActivity extends AppCompatActivity {
                 Log.i(TAG, "onDataChange: Finalizado. Enviando " + rows.size() + " usuarios al adaptador.");
                 adapter.submit(rows);
             }
-            @Override public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "¡¡ERROR AL LEER USUARIOS!!: ", error.toException());
-                Log.e(TAG, "MENSAJE: " + error.getMessage());
-                Log.e(TAG, "DETALLES: " + error.getDetails());
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // En debug mostramos un warning sin stacktrace
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Lectura de usuarios cancelada (DEBUG): " + error.getMessage());
+                    // Si quieres, puedes también mostrar detalles:
+                    // Log.w(TAG, "DETALLES (DEBUG): " + error.getDetails());
+                }
+                // No llamamos a error.toException(), así que NO hay traza larga.
             }
+
         });
     }
 

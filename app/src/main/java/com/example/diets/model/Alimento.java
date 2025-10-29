@@ -17,10 +17,8 @@ public class Alimento {
     private double hierro;
     private double vitaminaC;
 
-    // Constructor vacío requerido para Firebase
     public Alimento() {}
 
-    // Constructor completo
     public Alimento(String codigo, String nombre, String marcas, String categorias,
                     double calorias, double proteinas, double carbohidratos, double azucares,
                     double grasas, double grasasSaturadas, double fibra, double sodio,
@@ -42,7 +40,6 @@ public class Alimento {
         this.vitaminaC = vitaminaC;
     }
 
-    // Getters y setters
     public String getCodigo() {
         return codigo;
     }

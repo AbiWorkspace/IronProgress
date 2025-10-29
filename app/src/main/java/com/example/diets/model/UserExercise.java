@@ -107,7 +107,6 @@ public class UserExercise extends Exercise implements Serializable {
         this.exerciseSeriesList = new ArrayList<>();
     }
 
-    // =============== GETTERS/SETTERS CON LOGS ===============
 
     public boolean isCompleted() {
         Log.d("UserExercise", "isCompleted() llamado: " + isCompleted);

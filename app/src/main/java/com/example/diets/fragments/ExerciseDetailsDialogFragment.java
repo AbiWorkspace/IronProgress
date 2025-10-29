@@ -1,5 +1,6 @@
 package com.example.diets.fragments;
 
+import android.app.Dialog;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -11,19 +12,20 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
+import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.collection.LruCache;
 import androidx.fragment.app.DialogFragment;
+import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager2.widget.ViewPager2;
 
 import com.example.diets.R;
-import com.example.diets.adapters.ImagePagerAdapter;
 import com.example.diets.model.Exercise;
 import com.example.diets.model.ExerciseSeries;
-import com.example.diets.model.UserExercise;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.components.Description;
 import com.github.mikephil.charting.components.Legend;
@@ -42,20 +44,43 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- * Muestra un diálogo con todos los detalles de un ejercicio y una gráfica de progreso
- * basada en las series guardadas en Firebase.
+ * ExerciseDetailsDialogFragment — versión robusta
+ * - Flujo LOCAL (almacenamiento interno) si trae objeto Exercise.
+ * - Flujo REMOTO (Firebase) si trae exerciseIndex.
+ * - Si faltan ambos, se registra error y se cierra.
  */
 public class ExerciseDetailsDialogFragment extends DialogFragment {
 
-    private static final String ARG_EXERCISE = "exerciseIndex";
-    private static final String ARG_DAY      = "dayKey";
-    private static final String ARG_INTERNAL = "isFromInternal";
-    private static final String TAG          = "ExerciseDetailsDialogFragment";
+    private static final String TAG = "ExerciseDetailsDialog";
 
-    /* ──────────────────────────── vistas ──────────────────────────── */
+    /* ====== ARG KEYS ====== */
+    private static final String ARG_EXERCISE_INDEX = "exerciseIndex";   // key de userExercises
+    private static final String ARG_DAY            = "dayKey";
+    private static final String ARG_INTERNAL       = "isFromInternal";
+    private static final String ARG_UID            = "effectiveUid";
+    private static final String ARG_EXERCISE_OBJ   = "exercise";         // Serializable Exercise
+
+    /* ====== Parámetros de auditoría 6.4 ====== */
+    private static final int  IMAGE_MAX_DIM          = 1920;               // ≈1080p
+    private static final int  BASE64_THRESHOLD_BYTES = 1_500_000;          // 1.5 MB
+    private static final int  LRU_CACHE_MAX_BYTES    = 12 * 1024 * 1024;   // ~12 MB
+
+    // Cache LRU por proceso (≈12MB)
+    private static final LruCache<String, Bitmap> sBitmapCache =
+            new LruCache<String, Bitmap>(LRU_CACHE_MAX_BYTES) {
+                @Override protected int sizeOf(@NonNull String key, @NonNull Bitmap value) {
+                    return value.getByteCount();
+                }
+            };
+
+    /* ─────────── Vistas ─────────── */
     private TextView  textExerciseName;
     private TextView  textDescription;
     private TextView  textMusclesWorked;
@@ -70,21 +95,188 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private TextView  textExerciseType;
     private TextView  textPatternName;
 
-    /* ───────────────────────── estado ───────────────────────── */
-    private DatabaseReference           databaseReference;
-    private List<ExerciseSeries>        allSeriesData   = new ArrayList<>();
-    private List<Bitmap>                carouselBitmaps = new ArrayList<>();
-    private boolean                     isViewDestroyed = false;
-    private UserExercise                internalExercise;
+    /* ─────────── Estado ─────────── */
+    private DatabaseReference          databaseReference;
+    private final List<ExerciseSeries> allSeriesData    = new ArrayList<>();
+    private final List<Bitmap>         carouselBitmaps  = new ArrayList<>();
+    private final Set<String>          imageKeys        = new HashSet<>();
+    private boolean                    isViewDestroyed  = false;
 
-    /* argumentos */
-    private String  exerciseIndex;
+    private ImagePagerAdapter imageAdapter;
+
+    /* ─────────── Argumentos ─────────── */
+    private String  exerciseIndex;          // remoto
     private String  dayKey;
-    private boolean isFromInternal;
+    private boolean isFromInternal;         // indicador original (se recalcula)
+    private String  uidForQueries;
+    private Exercise internalExercise;      // local
 
-    /* ────────────────────────── binding de vistas ────────────────────────── */
+    /* ===================== Factories recomendados ===================== */
+
+    /** REMOTO (Firebase) */
+    public static ExerciseDetailsDialogFragment newRemote(@NonNull String exerciseIndex,
+                                                          @Nullable String dayKey,
+                                                          @Nullable String effectiveUid) {
+        ExerciseDetailsDialogFragment f = new ExerciseDetailsDialogFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_EXERCISE_INDEX, exerciseIndex);
+        if (!TextUtils.isEmpty(dayKey))       args.putString(ARG_DAY, dayKey);
+        if (!TextUtils.isEmpty(effectiveUid)) args.putString(ARG_UID, effectiveUid);
+        args.putBoolean(ARG_INTERNAL, false);
+        f.setArguments(args);
+        return f;
+    }
+
+    /** LOCAL (almacenamiento interno) */
+    public static ExerciseDetailsDialogFragment newLocal(@NonNull Exercise exercise,
+                                                         @Nullable String dayKey,
+                                                         @Nullable String effectiveUid) {
+        ExerciseDetailsDialogFragment f = new ExerciseDetailsDialogFragment();
+        Bundle args = new Bundle();
+        args.putSerializable(ARG_EXERCISE_OBJ, exercise);
+        if (!TextUtils.isEmpty(dayKey))       args.putString(ARG_DAY, dayKey);
+        if (!TextUtils.isEmpty(effectiveUid)) args.putString(ARG_UID, effectiveUid);
+        args.putBoolean(ARG_INTERNAL, true);
+        f.setArguments(args);
+        return f;
+    }
+
+    /* ====== Factories legacy (compat) ====== */
+    /** Remoto (legacy) */
+    public static ExerciseDetailsDialogFragment newInstance(String exerciseIndex,
+                                                            String dayKey,
+                                                            boolean isFromInternal) {
+        // Si alguien pasa isFromInternal=true aquí, forzamos remoto (evita confusión).
+        return newRemote(exerciseIndex, dayKey, null);
+    }
+
+    /** Remoto (legacy con UID) */
+    public static ExerciseDetailsDialogFragment newInstance(String exerciseIndex,
+                                                            String dayKey,
+                                                            boolean isFromInternal,
+                                                            @Nullable String effectiveUid) {
+        return newRemote(exerciseIndex, dayKey, effectiveUid);
+    }
+
+    /** Local (legacy) */
+    public static ExerciseDetailsDialogFragment newInstanceFromInternal(Exercise exercise,
+                                                                        @Nullable String dayKey,
+                                                                        @Nullable String effectiveUid) {
+        return newLocal(exercise, dayKey, effectiveUid);
+    }
+
+    /** Local (legacy simple) */
+    public static ExerciseDetailsDialogFragment newInstanceFromInternal(Exercise exercise) {
+        return newLocal(exercise, null, null);
+    }
+
+    public void setInternalExercise(Exercise ex) { this.internalExercise = ex; }
+
+    /* ===================== Ciclo de vida ===================== */
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setStyle(DialogFragment.STYLE_NORMAL, R.style.CustomDialogTheme);
+        databaseReference = FirebaseDatabase.getInstance().getReference();
+
+        Bundle args = getArguments();
+        if (args != null) {
+            exerciseIndex  = args.getString(ARG_EXERCISE_INDEX);
+            dayKey         = args.getString(ARG_DAY);
+            isFromInternal = args.getBoolean(ARG_INTERNAL, false);
+
+            // 🔧 IMPORTANTE:
+            // Solo sobrescribir internalExercise si REALMENTE viene en el Bundle.
+            if (args.containsKey(ARG_EXERCISE_OBJ)) {
+                Exercise exFromArgs = (Exercise) args.getSerializable(ARG_EXERCISE_OBJ);
+                if (exFromArgs != null) {
+                    internalExercise = exFromArgs;
+                }
+            }
+
+            String argUid = args.getString(ARG_UID, null);
+
+            if (!TextUtils.isEmpty(argUid)) {
+                uidForQueries = argUid;
+            } else {
+                FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+                uidForQueries = (u != null) ? u.getUid() : null;
+            }
+
+            // Recalcular flujo: si hay objeto → LOCAL; si no y hay index → REMOTO
+            if (internalExercise != null) {
+                isFromInternal = true;
+            } else if (!TextUtils.isEmpty(exerciseIndex)) {
+                isFromInternal = false;
+            }
+
+            Log.d(TAG, "onCreate: args → exerciseIndex=" + exerciseIndex
+                    + ", dayKey=" + dayKey
+                    + ", isFromInternal=" + isFromInternal
+                    + ", uidForQueries=" + uidForQueries
+                    + ", internalExercise=" + (internalExercise != null));
+        }
+    }
+
+    @Nullable
+    @Override
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+
+        View view = inflater.inflate(R.layout.dialog_exercise_details, container, false);
+        isViewDestroyed = false;
+
+        bindViews(view);
+        configureChartLookAndFeel();
+        setupSpinner();
+        setupCarouselAdapterIfNeeded();
+
+        View btnClose = view.findViewById(R.id.btnClose);
+        if (btnClose != null) btnClose.setOnClickListener(v -> dismiss());
+
+        boolean handled = false;
+
+        // 1) Flujo LOCAL si tenemos objeto
+        if (internalExercise != null) {
+            Log.d(TAG, "onCreateView: FLUJO LOCAL (internalExercise)");
+            populateInternalUI(view, internalExercise);
+            handled = true;
+        }
+
+        // 2) Si no, flujo REMOTO si hay index
+        if (!handled && !TextUtils.isEmpty(exerciseIndex)) {
+            Log.d(TAG, "onCreateView: FLUJO REMOTO Firebase (exerciseIndex=" + exerciseIndex + ")");
+            populateFirebaseUI(view);
+            handled = true;
+        }
+
+        // 3) Si nada, error claro y salir
+        if (!handled) {
+            Log.e(TAG, "Invocación inválida: faltan «exercise» (local) y «exerciseIndex» (remoto). "
+                    + "Usa newLocal(exercise, ...) para locales o newRemote(index, ...) para Firebase.");
+            dismiss();
+            return view;
+        }
+
+        // Patrón (si tenemos uid y dayKey)
+        if (!TextUtils.isEmpty(uidForQueries) && !TextUtils.isEmpty(dayKey)) {
+            loadMovementPattern(view, uidForQueries);
+        } else {
+            Log.d(TAG, "Patrón omitido (uidForQueries o dayKey vacío)");
+        }
+
+        return view;
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        isViewDestroyed = true;
+    }
+
+    /* ===================== Binding ===================== */
     private void bindViews(View view) {
-        Log.d(TAG, "bindViews: buscando y referenciando vistas.");
         textExerciseName      = view.findViewById(R.id.textExerciseName);
         textDescription       = view.findViewById(R.id.textDescription);
         textMusclesWorked     = view.findViewById(R.id.textMusclesWorked);
@@ -100,205 +292,115 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         textPatternName       = view.findViewById(R.id.textPatternName);
     }
 
-    /* ───────────────────────── factory methods ───────────────────────── */
-    public static ExerciseDetailsDialogFragment newInstance(String exerciseIndex,
-                                                            String dayKey,
-                                                            boolean isFromInternal) {
-        Log.d(TAG, "newInstance: creando fragmento con argumentos.");
-        ExerciseDetailsDialogFragment f = new ExerciseDetailsDialogFragment();
-        Bundle args = new Bundle();
-        args.putString(ARG_EXERCISE, exerciseIndex);
-        args.putString(ARG_DAY, dayKey);
-        args.putBoolean(ARG_INTERNAL, isFromInternal);
-        f.setArguments(args);
-        return f;
-    }
-
-    public static ExerciseDetailsDialogFragment newInstanceFromInternal(Exercise exercise) {
-        Log.d(TAG, "newInstanceFromInternal: creando fragmento para ejercicio interno.");
-        ExerciseDetailsDialogFragment f = new ExerciseDetailsDialogFragment();
-        Bundle args = new Bundle();
-        args.putSerializable("exercise", exercise);
-        args.putBoolean(ARG_INTERNAL, true);
-        f.setArguments(args);
-        return f;
-    }
-
-    /* ───────────────────────── ciclo de vida ───────────────────────── */
-    @Override
-    public void onCreate(@Nullable Bundle savedInstanceState) {
-        Log.d(TAG, "onCreate: inicializando fragmento.");
-        super.onCreate(savedInstanceState);
-        setStyle(DialogFragment.STYLE_NORMAL, R.style.CustomDialogTheme);
-        databaseReference = FirebaseDatabase.getInstance().getReference();
-
-        if (getArguments() != null) {
-            exerciseIndex    = getArguments().getString(ARG_EXERCISE);
-            dayKey           = getArguments().getString(ARG_DAY);
-            isFromInternal   = getArguments().getBoolean(ARG_INTERNAL, false);
-            internalExercise = (UserExercise) getArguments().getSerializable("exercise");
-
-            Log.d(TAG, "onCreate: argumentos recibidos. exerciseIndex=" + exerciseIndex
-                    + ", dayKey=" + dayKey + ", isFromInternal=" + isFromInternal);
-        }
-    }
-
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
-
-        Log.d(TAG, "onCreateView: inflando layout de diálogo.");
-        View view = inflater.inflate(R.layout.dialog_exercise_details, container, false);
-
-        bindViews(view);
-        configureChartLookAndFeel();
-        setupSpinner();
-
-        /* botón cerrar */
-        view.findViewById(R.id.btnClose).setOnClickListener(v -> {
-            Log.d(TAG, "onCreateView: Cerrar diálogo.");
-            dismiss();
-        });
-
-        if (isFromInternal && internalExercise != null) {
-            Log.d(TAG, "onCreateView: Cargando datos desde ejercicio interno.");
-            populateInternalUI(view, internalExercise);
-        } else {
-            Log.d(TAG, "onCreateView: Cargando datos desde Firebase.");
-            populateFirebaseUI(view);
-        }
-
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user != null && dayKey != null && !dayKey.isEmpty()) {
-            loadMovementPattern(view, user.getUid());   // solo lee y muestra texto
-        } else {
-            Log.d(TAG, "Patrón de movimiento omitido (usuario o dayKey nulo)");
-        }
-
-        return view;
-    }
-
-    public void setInternalExercise(UserExercise ue) { this.internalExercise = ue; }
-
-    /* ───────────────────────── población UI: ejercicio interno ───────────────────────── */
+    /* ===================== UI: LOCAL ===================== */
     private void populateInternalUI(View view, Exercise ex) {
+        String name          = ex.getName() != null ? ex.getName() : "";
+        String description   = ex.getDescription() != null ? ex.getDescription() : "Sin descripción";
+        String musclesWorked = ex.getMusclesWorked() != null ? ex.getMusclesWorked() : "";
+        List<String> synList = ex.getSynergistMuscles();
+        String movementType  = ex.getMovementType() != null ? ex.getMovementType() : "No especificado";
+        String equipmentType = ex.getEquipmentType() != null ? ex.getEquipmentType() : "No especificado";
+        String exerciseType  = ex.getExerciseType() != null ? ex.getExerciseType() : "No especificado";
 
-        Log.d(TAG, "populateInternalUI: poblando UI desde ejercicio interno.");
+        textExerciseName     .setText(name);
+        textDescription      .setText(description);
+        textMusclesWorked    .setText("Músculos trabajados: " + capitalizeWords(musclesWorked));
+        textSynergistMuscles .setText("Músculos sinérgicos: " +
+                ((synList != null && !synList.isEmpty())
+                        ? TextUtils.join(", ", synList)
+                        : "No especificados"));
+        textMovementType     .setText("Tipo de Movimiento: " + movementType);
+        textEquipmentType    .setText("Equipamiento: " + equipmentType);
+        textExerciseType     .setText("Tipo de Ejercicio: " + exerciseType);
 
-        /* textos básicos */
-        textExerciseName    .setText(ex.getName());
-        textDescription     .setText(ex.getDescription());
-        textMusclesWorked   .setText("Músculos trabajados: " + capitalizeWords(ex.getMusclesWorked()));
-        textSynergistMuscles.setText("Músculos sinérgicos: " + TextUtils.join(", ", ex.getSynergistMuscles()));
-        textMovementType    .setText("Tipo de Movimiento: " + ex.getMovementType());
-        textEquipmentType   .setText("Equipamiento: " + ex.getEquipmentType());
-        textExerciseType    .setText("Tipo de Ejercicio: " + ex.getExerciseType());
-
-        Log.d(TAG, "[INT] Datos recibidos → "
-                + "name=" + ex.getName()
-                + " | movementType="  + ex.getMovementType()
-                + " | equip="         + ex.getEquipmentType()
-                + " | exerciseType="  + ex.getExerciseType()
-                + " | muscles="       + ex.getMusclesWorked()
-                + " | synergists="    + ex.getSynergistMuscles()
-                + " | images#="       + (ex.getImages() != null ? ex.getImages().size() : 0));
-
-        /* imágenes */
+        // 1) Imágenes locales (si existen)
         List<String> base64List = ex.getImages();
-        if (base64List == null || base64List.isEmpty()) {
-            String single = ex.getImage();
-            if (single != null && !single.trim().isEmpty()) {
-                base64List = new ArrayList<>();
-                base64List.add(single);
-            }
+        if ((base64List == null || base64List.isEmpty()) && !TextUtils.isEmpty(ex.getImage())) {
+            base64List = new ArrayList<>();
+            base64List.add(ex.getImage());
         }
         if (base64List != null && !base64List.isEmpty()) {
-            Log.d(TAG, "populateInternalUI: cargando imágenes internas.");
-            cargarImagenesDesdeListaInterna(base64List);
-        } else {
-            Log.w(TAG, "populateInternalUI: ⚠️ No hay imágenes internas para: " + ex.getName());
+            cargarImagenesDesdeListaInterna(base64List, /*append=*/false);
         }
 
-        fetchSeriesDataPorNombre(ex.getName(), textPersonalRecord);
-
+        // 2) Merge con Firebase por nombre (agrega sin borrar las locales)
+        if (!TextUtils.isEmpty(ex.getName())) {
+            cargarImagenesFirebase(ex.getName(), /*append=*/true);
+            // Series por nombre
+            fetchSeriesDataPorNombre(ex.getName(), textPersonalRecord);
+        }
     }
 
-    /* ───────────────────────── población UI: Firebase ───────────────────────── */
+    /* ===================== UI: REMOTO (Firebase) ===================== */
     private void populateFirebaseUI(View view) {
-
-        Log.d(TAG, "populateFirebaseUI: poblando UI desde Firebase.");
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null || exerciseIndex == null || exerciseIndex.isEmpty()) {
-            Log.e(TAG, "populateFirebaseUI: No hay usuario o ID inválido");
+        if (TextUtils.isEmpty(uidForQueries) || TextUtils.isEmpty(exerciseIndex)) {
+            Log.e(TAG, "populateFirebaseUI: uidForQueries o exerciseIndex inválido.");
             dismiss();
             return;
         }
 
-        String uid = user.getUid();
         DatabaseReference ref = databaseReference
                 .child("users")
-                .child(uid)
+                .child(uidForQueries)
                 .child("userExercises")
                 .child(exerciseIndex);
 
-        Log.d(TAG, "populateFirebaseUI: 🌐 Cargando ejercicio Firebase: " + exerciseIndex);
         ref.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override public void onDataChange(@NonNull DataSnapshot snap) {
-
-                Log.d(TAG, "populateFirebaseUI:onDataChange: datos recibidos de Firebase.");
                 if (isViewDestroyed || getView() == null) return;
 
                 Exercise ex = snap.getValue(Exercise.class);
                 if (ex == null) {
-                    Log.e(TAG, "populateFirebaseUI:onDataChange: ❌ Ejercicio no encontrado en Firebase");
+                    Log.e(TAG, "populateFirebaseUI: ejercicio nulo en Firebase");
                     dismiss();
                     return;
                 }
 
                 bindFirebaseExercise(ex);
-                cargarImagenesFirebase(ex.getName());
-                fetchSeriesData(exerciseIndex, textPersonalRecord);
-                loadMovementPattern(view, uid);
 
+                // Imágenes por nombre
+                if (!TextUtils.isEmpty(ex.getName())) {
+                    cargarImagenesFirebase(ex.getName(), /*append=*/false);
+                }
+
+                // Series por key
+                fetchSeriesData(exerciseIndex, textPersonalRecord);
+
+                // RM estimado (del nodo ejercicio)
                 double rm = computeEstimatedRm(snap);
                 textRM.setText("RM Estimado: " + String.format("%.2f", rm) + " kg");
             }
             @Override public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "populateFirebaseUI:onCancelled: ❌ Error Firebase", error.toException());
+                Log.e(TAG, "populateFirebaseUI:onCancelled", error.toException());
                 dismiss();
             }
         });
     }
 
-    /* ───────────────────────── asigna campos básicos Firebase ───────────────────────── */
     private void bindFirebaseExercise(Exercise ex) {
+        String name          = ex.getName() != null ? ex.getName() : "";
+        String description   = ex.getDescription() != null ? ex.getDescription() : "Sin descripción";
+        String musclesWorked = ex.getMusclesWorked() != null ? ex.getMusclesWorked() : "";
+        List<String> synList = ex.getSynergistMuscles();
+        String movementType  = ex.getMovementType() != null ? ex.getMovementType() : "No especificado";
+        String equipmentType = ex.getEquipmentType() != null ? ex.getEquipmentType() : "No especificado";
+        String exerciseType  = ex.getExerciseType() != null ? ex.getExerciseType() : "No especificado";
 
-        Log.d(TAG, "bindFirebaseExercise: asignando datos básicos a vistas.");
-        textExerciseName.setText(ex.getName());
-        textDescription .setText(ex.getDescription());
-        textMusclesWorked.setText("Músculos trabajados: " + capitalizeWords(ex.getMusclesWorked()));
-        textSynergistMuscles.setText("Músculos sinérgicos: " + TextUtils.join(", ", ex.getSynergistMuscles()));
-        textMovementType .setText("Tipo de Movimiento: " + ex.getMovementType());
-        textEquipmentType.setText("Equipamiento: " + ex.getEquipmentType());
-        textExerciseType .setText("Tipo de Ejercicio: " + ex.getExerciseType());
-
-        Log.d(TAG, "[FB]  Datos recibidos → "
-                + "name=" + ex.getName()
-                + " | movementType="  + ex.getMovementType()
-                + " | equip="         + ex.getEquipmentType()
-                + " | exerciseType="  + ex.getExerciseType()
-                + " | muscles="       + ex.getMusclesWorked()
-                + " | synergists="    + ex.getSynergistMuscles());
+        textExerciseName     .setText(name);
+        textDescription      .setText(description);
+        textMusclesWorked    .setText("Músculos trabajados: " + capitalizeWords(musclesWorked));
+        textSynergistMuscles .setText("Músculos sinérgicos: " +
+                ((synList != null && !synList.isEmpty())
+                        ? TextUtils.join(", ", synList)
+                        : "No especificados"));
+        textMovementType     .setText("Tipo de Movimiento: " + movementType);
+        textEquipmentType    .setText("Equipamiento: " + equipmentType);
+        textExerciseType     .setText("Tipo de Ejercicio: " + exerciseType);
     }
 
-    /* ───────────────────────── patrón de movimiento ───────────────────────── */
+    /* ===================== Patrón de movimiento ===================== */
     private void loadMovementPattern(View view, String uid) {
-
-        Log.d(TAG, "loadMovementPattern: buscando patrón de movimiento para dayKey=" + dayKey);
-        if (dayKey == null || dayKey.isEmpty()) return;
-
+        if (TextUtils.isEmpty(dayKey) || TextUtils.isEmpty(uid)) return;
         databaseReference.child("users")
                 .child(uid)
                 .child("userMovementPatterns")
@@ -308,10 +410,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                     @Override public void onDataChange(@NonNull DataSnapshot ds) {
                         if (isViewDestroyed || getView() == null) return;
                         String nm = ds.getValue(String.class);
-                        if (nm != null) {
-                            textPatternName.setText("Patrón: " + nm);
-                            Log.d(TAG, "loadMovementPattern:onDataChange: patrón encontrado: " + nm);
-                        }
+                        if (nm != null) textPatternName.setText("Patrón: " + nm);
                     }
                     @Override public void onCancelled(@NonNull DatabaseError e) {
                         Log.e(TAG, "loadMovementPattern:onCancelled", e.toException());
@@ -319,94 +418,221 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                 });
     }
 
-    /* ───────────────────────── RM estimado ───────────────────────── */
-    private double computeEstimatedRm(DataSnapshot snap) {
-
-        Log.d(TAG, "computeEstimatedRm: calculando RM estimado.");
+    /* ===================== RM estimado ===================== */
+    private double computeEstimatedRm(@NonNull DataSnapshot snap) {
         Integer currentLoad = snap.child("currentLoad").getValue(Integer.class);
         Integer maxReps     = snap.child("maxReps")    .getValue(Integer.class);
         if (currentLoad == null || currentLoad <= 0) currentLoad = 1;
         if (maxReps     == null || maxReps     <= 0) maxReps     = 1;
-        double rm = currentLoad * (1 + (maxReps / 30.0));
-        Log.d(TAG, "computeEstimatedRm: RM=" + rm
-                + " (carga=" + currentLoad + ", reps=" + maxReps + ")");
-        return rm;
+        return currentLoad * (1 + (maxReps / 30.0));
     }
 
-    @Override
-    public void onDestroyView() {
-        Log.d(TAG, "onDestroyView: liberando recursos y marcando vista destruida.");
-        super.onDestroyView();
-        isViewDestroyed = true;
-    }
-
-    /* ───────────────────────── spinner RPE ───────────────────────── */
+    /* ===================== Spinner RPE ===================== */
     private void setupSpinner() {
-
-        Log.d(TAG, "setupSpinner: configurando spinner de RPE.");
+        if (spinnerRpeFilter == null) return;
         spinnerRpeFilter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(AdapterView<?> parent,
-                                                 View v, int position, long id) {
-                String selected = parent.getItemAtPosition(position).toString();
-                Log.d(TAG, "setupSpinner:onItemSelected: Se seleccionó RPE: " + selected);
+            @Override public void onItemSelected(AdapterView<?> parent, View v, int position, long id) {
+                String selected = String.valueOf(parent.getItemAtPosition(position));
                 try {
                     float rpeValue = Float.parseFloat(selected);
                     filterAndDrawChartByRpe(rpeValue);
-                } catch (NumberFormatException e) {
-                    Log.e(TAG, "setupSpinner:onItemSelected: Error parseando RPE", e);
+                } catch (NumberFormatException ignore) {
+                    // "Todos" u otro texto → todo
+                    drawProgressChart(allSeriesData);
                 }
             }
-            @Override public void onNothingSelected(AdapterView<?> parent) {
-                Log.d(TAG, "setupSpinner:onNothingSelected: No se seleccionó RPE.");
-            }
+            @Override public void onNothingSelected(AdapterView<?> parent) { }
         });
     }
 
-    /* ───────────────────────── imágenes internas ───────────────────────── */
-    private void cargarImagenesDesdeListaInterna(List<String> base64Images) {
+    /* ===================== Imágenes (decode+cache) ===================== */
 
-        Log.d(TAG, "cargarImagenesDesdeListaInterna: decodificando y mostrando imágenes internas.");
-        if (isViewDestroyed) {
-            Log.w(TAG, "cargarImagenesDesdeListaInterna: cancelado, vista destruida.");
-            return;
-        }
-        carouselBitmaps.clear();
+    private static int computeInSample(int w, int h, int maxDim) {
+        int inSample = 1;
+        while ((w / inSample) > maxDim || (h / inSample) > maxDim) inSample <<= 1;
+        return Math.max(1, inSample);
+    }
 
-        for (String base64 : base64Images) {
-            if (base64 == null || base64.trim().isEmpty()) continue;
-            try {
-                byte[] decoded = Base64.decode(base64.replaceAll("\\s", ""), Base64.DEFAULT);
-                Bitmap bmp = BitmapFactory.decodeByteArray(decoded, 0, decoded.length);
-                if (bmp != null) carouselBitmaps.add(bmp);
-            } catch (Exception e) {
-                Log.e(TAG, "cargarImagenesDesdeListaInterna: error decodificando imagen", e);
-            }
-        }
+    private static String keyOf(String base64NoWs) {
+        return "b64#" + (base64NoWs != null ? base64NoWs.hashCode() : 0);
+    }
 
-        if (!carouselBitmaps.isEmpty() && imageCarousel != null) {
-            ImagePagerAdapter adapter = new ImagePagerAdapter();
-            adapter.submit(carouselBitmaps);
-            imageCarousel.setAdapter(adapter);
-            Log.d(TAG, "cargarImagenesDesdeListaInterna: imágenes internas cargadas: "
-                    + carouselBitmaps.size());
-        } else {
-            Log.w(TAG, "cargarImagenesDesdeListaInterna: no hay imágenes válidas.");
+    private static int approxBytes(String base64NoWs) {
+        int len = (base64NoWs != null ? base64NoWs.length() : 0);
+        return (int) ((len * 3L) / 4L);
+    }
+
+    /** Limpia espacios y remueve prefijos tipo data URI si existen. */
+    @Nullable
+    private static String cleanBase64(@Nullable String raw) {
+        if (TextUtils.isEmpty(raw)) return null;
+        String s = raw.replaceAll("\\s", "");
+        int idx = s.indexOf("base64,");
+        if (idx >= 0) s = s.substring(idx + "base64,".length());
+        return s;
+    }
+
+    /** Decodifica con trazas ImageDecode (base64_len, out=WxH, inSample, t_ms). */
+    private static Bitmap decodeWithAudit(String base64NoWs, String origin, int maxDim) {
+        long t0 = System.currentTimeMillis();
+        int base64Len = (base64NoWs != null ? base64NoWs.length() : 0);
+        String outWH = "null";
+        int inSample = 1;
+        try {
+            byte[] bytes = Base64.decode(base64NoWs, Base64.DEFAULT);
+
+            BitmapFactory.Options probe = new BitmapFactory.Options();
+            probe.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.length, probe);
+
+            inSample = computeInSample(probe.outWidth, probe.outHeight, maxDim);
+
+            BitmapFactory.Options opts = new BitmapFactory.Options();
+            opts.inSampleSize = inSample;
+            Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
+
+            long dt = System.currentTimeMillis() - t0;
+            if (bmp != null) outWH = bmp.getWidth() + "x" + bmp.getHeight();
+
+            Log.d("ImageDecode", "origin=" + origin +
+                    " | base64_len=" + base64Len +
+                    " | out=" + outWH +
+                    " | inSample=" + inSample +
+                    " | t_ms=" + dt);
+
+            return bmp;
+        } catch (Throwable t) {
+            long dt = System.currentTimeMillis() - t0;
+            Log.e("ImageDecode", "origin=" + origin +
+                    " | fail | base64_len=" + base64Len +
+                    " | t_ms=" + dt, t);
+            return null;
         }
     }
 
-    /* ───────────────────────── descarga series (por key) ───────────────────────── */
-    private void fetchSeriesData(String exerciseId, TextView textPersonalRecord) {
+    /** Garantiza que el adapter del carrusel exista y tenga listener de clic. */
+    private void setupCarouselAdapterIfNeeded() {
+        if (imageCarousel == null) return;
+        if (imageCarousel.getAdapter() == null) {
+            imageAdapter = new ImagePagerAdapter();
+            imageAdapter.setOnImageClickListener((pos, bmp) -> showBitmapFullscreen(bmp));
+            imageCarousel.setAdapter(imageAdapter);
+        } else if (imageCarousel.getAdapter() instanceof ImagePagerAdapter) {
+            imageAdapter = (ImagePagerAdapter) imageCarousel.getAdapter();
+        }
+    }
 
+    /** Mostrar imagen a pantalla completa (tap para cerrar). */
+    private void showBitmapFullscreen(@NonNull Bitmap bmp) {
+        if (!isAdded()) return;
+        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        ImageView iv = new ImageView(requireContext());
+        iv.setBackgroundColor(Color.BLACK);
+        iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        iv.setImageBitmap(bmp);
+        iv.setOnClickListener(v -> dialog.dismiss());
+        dialog.setContentView(iv);
+        dialog.show();
+    }
+
+    /** Carga lista de base64 y agrega al carrusel; si append=false, limpia primero. */
+    private void cargarImagenesDesdeListaInterna(List<String> base64Images, boolean append) {
+        setupCarouselAdapterIfNeeded();
+        if (imageAdapter == null) return;
+
+        if (!append) { carouselBitmaps.clear(); imageKeys.clear(); }
+        imageAdapter.submit(new ArrayList<>(carouselBitmaps)); // publicar estado inicial
+
+        new Thread(() -> {
+            for (String raw : base64Images) {
+                String b64 = cleanBase64(raw);
+                if (TextUtils.isEmpty(b64)) continue;
+
+                String key = keyOf(b64);
+                if (imageKeys.contains(key)) continue;
+
+                Bitmap cached = sBitmapCache.get(key);
+                Bitmap bmp;
+                if (cached != null) {
+                    bmp = cached;
+                } else {
+                    int bytes = approxBytes(b64);
+                    if (bytes > BASE64_THRESHOLD_BYTES) {
+                        Log.d("ImageDecode", "origin=Carousel | heavy=true | approxBytes=" + bytes);
+                    }
+                    bmp = decodeWithAudit(b64, "ExerciseDetailsDialog/Carousel", IMAGE_MAX_DIM);
+                    if (bmp != null) sBitmapCache.put(key, bmp);
+                }
+
+                if (bmp != null) {
+                    imageKeys.add(key);
+                    synchronized (carouselBitmaps) { carouselBitmaps.add(bmp); }
+                    if (isAdded() && getActivity() != null) {
+                        getActivity().runOnUiThread(() -> {
+                            if (!isViewDestroyed && imageAdapter != null) {
+                                imageAdapter.submit(new ArrayList<>(carouselBitmaps));
+                            }
+                        });
+                    }
+                }
+            }
+        }).start();
+    }
+
+    /** Wrapper compatibilidad (limpia y carga) */
+    private void cargarImagenesDesdeListaInterna(List<String> base64Images) {
+        cargarImagenesDesdeListaInterna(base64Images, /*append=*/false);
+    }
+
+    /** Firebase: obtiene base64 por nombre y agrega (append controla si limpia o suma). */
+    private void cargarImagenesFirebase(String nombreEjercicio, boolean append) {
+        if (TextUtils.isEmpty(nombreEjercicio)) return;
+        Log.d(TAG, "cargarImagenesFirebase: iniciando para " + nombreEjercicio + " (append=" + append + ")");
+        DatabaseReference imagesRef = FirebaseDatabase.getInstance().getReference("exerciseImages");
+        imagesRef.orderByChild("name").equalTo(nombreEjercicio)
+                .addListenerForSingleValueEvent(new ValueEventListener() {
+                    @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
+                        if (isViewDestroyed || getView() == null) return;
+
+                        List<String> base64List = new ArrayList<>();
+                        for (DataSnapshot n : snapshot.getChildren()) {
+                            DataSnapshot imgs = n.child("images");
+                            for (DataSnapshot img : imgs.getChildren()) {
+                                String b64 = img.getValue(String.class);
+                                if (!TextUtils.isEmpty(b64)) base64List.add(b64);
+                            }
+                            break; // primer match por nombre
+                        }
+
+                        if (!base64List.isEmpty()) {
+                            Log.d(TAG, "cargarImagenesFirebase: encontradas " + base64List.size() + " imágenes.");
+                            cargarImagenesDesdeListaInterna(base64List, /*append=*/append);
+                        } else {
+                            Log.w(TAG, "cargarImagenesFirebase: sin imágenes válidas.");
+                        }
+                    }
+                    @Override public void onCancelled(@NonNull DatabaseError error) {
+                        Log.e(TAG, "cargarImagenesFirebase:onCancelled", error.toException());
+                    }
+                });
+    }
+
+    /** Wrapper compatibilidad (limpia y carga) */
+    private void cargarImagenesFirebase(String nombreEjercicio) {
+        cargarImagenesFirebase(nombreEjercicio, /*append=*/false);
+    }
+
+    /* ===================== Series / Chart ===================== */
+    private void fetchSeriesData(String exerciseId, TextView textPersonalRecord) {
         Log.d(TAG, "fetchSeriesData: Iniciando descarga de series para: " + exerciseId);
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Log.e(TAG, "fetchSeriesData: usuario no autenticado.");
+        if (TextUtils.isEmpty(uidForQueries)) {
+            Log.e(TAG, "fetchSeriesData: uidForQueries vacío.");
             return;
         }
 
         DatabaseReference seriesRef = databaseReference
                 .child("users")
-                .child(user.getUid())
+                .child(uidForQueries)
                 .child("userExercises")
                 .child(exerciseId)
                 .child("seriesData");
@@ -415,19 +641,13 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
 
         seriesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-
-                Log.d(TAG, "fetchSeriesData:onDataChange: Series descargadas.");
-                if (isViewDestroyed || getView() == null) {
-                    Log.w(TAG, "fetchSeriesData:onDataChange: vista destruida, se ignora.");
-                    return;
-                }
+                if (isViewDestroyed || getView() == null) return;
 
                 double personalRecord = 0;
                 double bestRm = 0;
                 ExerciseSeries bestSeries = null;
 
                 for (DataSnapshot seriesSnapshot : dataSnapshot.getChildren()) {
-
                     Integer seriesNumber = seriesSnapshot.child("seriesNumber").getValue(Integer.class);
                     Integer reps        = seriesSnapshot.child("reps").getValue(Integer.class);
                     Double  weight      = seriesSnapshot.child("weight").getValue(Double.class);
@@ -443,30 +663,22 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                             bestRm = rm;
                             bestSeries = newSeries;
                         }
-
-                        Log.d(TAG, "Serie cargada: #" + seriesNumber + " | "
-                                + weight + " kg x " + reps + " reps | RPE=" + rpe
-                                + " | 1RM=" + String.format("%.2f", rm));
                     }
                 }
 
-                /* texto PR */
-                textPersonalRecord.setText("Personal Record: "
-                        + String.format("%.2f", personalRecord) + " kg");
+                Collections.sort(allSeriesData, Comparator.comparingInt(ExerciseSeries::getSeriesNumber));
+
+                textPersonalRecord.setText("Personal Record: " + String.format("%.2f", personalRecord) + " kg");
                 textPersonalRecord.setTextColor(Color.parseColor("#BBBBBB"));
 
-                /* volumen total */
                 TextView textVolume = getView().findViewById(R.id.textVolume);
                 if (textVolume != null) {
                     double totalVolume = 0;
-                    for (ExerciseSeries s : allSeriesData)
-                        totalVolume += s.getWeight() * s.getReps();
-                    textVolume.setText("Volumen Total: "
-                            + String.format("%.2f", totalVolume) + " kg");
+                    for (ExerciseSeries s : allSeriesData) totalVolume += s.getWeight() * s.getReps();
+                    textVolume.setText("Volumen Total: " + String.format("%.2f", totalVolume) + " kg");
                     textVolume.setTextColor(Color.parseColor("#BBBBBB"));
                 }
 
-                /* mejor serie */
                 TextView textBestSeries = getView().findViewById(R.id.textBestSeries);
                 if (textBestSeries != null) {
                     if (bestSeries != null) {
@@ -485,7 +697,6 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                     textRM.setText("RM Estimado: " + String.format("%.2f", bestRm) + " kg");
                 }
 
-
                 drawProgressChart(allSeriesData);
             }
             @Override public void onCancelled(@NonNull DatabaseError error) {
@@ -494,16 +705,14 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         });
     }
 
-    /* ───────────────────────── descarga series (por nombre) ───────────────────────── */
-    private void fetchSeriesDataPorNombre(String nombreEjercicio,
-                                          TextView textPersonalRecord) {
-
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) return;
-
+    private void fetchSeriesDataPorNombre(String nombreEjercicio, TextView textPersonalRecord) {
+        if (TextUtils.isEmpty(uidForQueries)) {
+            Log.e(TAG, "fetchSeriesDataPorNombre: uidForQueries vacío.");
+            return;
+        }
         DatabaseReference ref = databaseReference
                 .child("users")
-                .child(user.getUid())
+                .child(uidForQueries)
                 .child("userExercises");
 
         ref.orderByChild("name").equalTo(nombreEjercicio)
@@ -516,7 +725,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                                 return;
                             }
                         }
-                        Log.w(TAG, "❌ No se encontraron series para «" + nombreEjercicio + "»");
+                        Log.w(TAG, "No se encontraron series para «" + nombreEjercicio + "»");
                     }
                     @Override public void onCancelled(@NonNull DatabaseError e) {
                         Log.e(TAG, "fetchSeriesDataPorNombre:onCancelled", e.toException());
@@ -524,27 +733,23 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
                 });
     }
 
-    /* ───────────────────────── filtrar y dibujar gráfica ───────────────────────── */
     private void filterAndDrawChartByRpe(float rpeFilter) {
-
-        Log.d(TAG, "filterAndDrawChartByRpe: filtrando por RPE " + rpeFilter);
         if (allSeriesData.isEmpty()) {
             chartExerciseProgress.clear();
             chartExerciseProgress.invalidate();
             return;
         }
-
         List<ExerciseSeries> filtered = new ArrayList<>();
         for (ExerciseSeries s : allSeriesData)
             if ((float) s.getRpe() == rpeFilter) filtered.add(s);
 
-        drawProgressChart(filtered);
+        drawProgressChart(filtered.isEmpty() ? allSeriesData : filtered);
     }
 
     private void drawProgressChart(List<ExerciseSeries> seriesData) {
+        if (chartExerciseProgress == null) return;
 
-        Log.d(TAG, "drawProgressChart: dibujando gráfica (" + seriesData.size() + " series)");
-        if (seriesData.isEmpty()) {
+        if (seriesData == null || seriesData.isEmpty()) {
             chartExerciseProgress.setNoDataText("No hay datos suficientes");
             chartExerciseProgress.setNoDataTextColor(Color.YELLOW);
             chartExerciseProgress.clear();
@@ -552,11 +757,14 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
             return;
         }
 
+        List<ExerciseSeries> ordered = new ArrayList<>(seriesData);
+        Collections.sort(ordered, Comparator.comparingInt(ExerciseSeries::getSeriesNumber));
+
         List<Entry> entries = new ArrayList<>();
         float bestRM = 0;
         Entry bestEntry = null;
 
-        for (ExerciseSeries s : seriesData) {
+        for (ExerciseSeries s : ordered) {
             float x = s.getSeriesNumber();
             float y = (float) (s.getWeight() * (1 + (s.getReps() / 30.0)));
             Entry e = new Entry(x, y);
@@ -574,7 +782,9 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         dataSet.setDrawValues(true);
 
         if (bestEntry != null) {
-            LineDataSet highlight = new LineDataSet(List.of(bestEntry), "Mejor Serie");
+            List<Entry> bestList = new ArrayList<>();
+            bestList.add(bestEntry);
+            LineDataSet highlight = new LineDataSet(bestList, "Mejor Serie");
             highlight.setColor(Color.RED);
             highlight.setCircleColor(Color.RED);
             highlight.setCircleRadius(6f);
@@ -586,10 +796,9 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         chartExerciseProgress.invalidate();
     }
 
-    /* ───────────────────────── look & feel LineChart ───────────────────────── */
     private void configureChartLookAndFeel() {
+        if (chartExerciseProgress == null) return;
 
-        Log.d(TAG, "configureChartLookAndFeel: aplicando estilo.");
         Description d = new Description();
         d.setText("Progreso de Cargas (RM Estimado)");
         d.setTextColor(Color.WHITE);
@@ -623,57 +832,64 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
         chartExerciseProgress.getAxisRight().setEnabled(false);
     }
 
-    /* ───────────────────────── aux ───────────────────────── */
+    /* ===================== Aux ===================== */
     private String capitalizeWords(String text) {
-
         if (text == null || text.isEmpty()) return "";
         String[] w = text.split("\\s+");
         StringBuilder sb = new StringBuilder();
         for (String s : w) {
-            if (s.length() > 1)
+            if (s.length() > 1) {
                 sb.append(Character.toUpperCase(s.charAt(0)))
-                        .append(s.substring(1).toLowerCase()).append(" ");
-            else
+                        .append(s.substring(1).toLowerCase())
+                        .append(" ");
+            } else {
                 sb.append(s.toUpperCase()).append(" ");
+            }
         }
         return sb.toString().trim();
     }
 
-    /* ───────────────────────── imágenes Firebase ───────────────────────── */
-    private void cargarImagenesFirebase(String nombreEjercicio) {
+    /* ===================== Adaptador carrusel ===================== */
+    private static class ImagePagerAdapter extends RecyclerView.Adapter<ImagePagerAdapter.VH> {
+        private final List<Bitmap> data = new ArrayList<>();
 
-        Log.d(TAG, "cargarImagenesFirebase: iniciando para " + nombreEjercicio);
-        DatabaseReference imagesRef = FirebaseDatabase.getInstance()
-                .getReference("exerciseImages");
+        interface OnImageClickListener { void onClick(int position, Bitmap bmp); }
+        private OnImageClickListener listener;
 
-        imagesRef.orderByChild("name").equalTo(nombreEjercicio)
-                .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        if (isViewDestroyed || getView() == null) return;
+        void setOnImageClickListener(OnImageClickListener l) { this.listener = l; }
 
-                        for (DataSnapshot data : snapshot.getChildren()) {
-                            DataSnapshot imagesNode = data.child("images");
+        void submit(List<Bitmap> newList) {
+            data.clear();
+            if (newList != null) data.addAll(newList);
+            notifyDataSetChanged();
+        }
 
-                            List<String> base64List = new ArrayList<>();
-                            for (DataSnapshot imgSnap : imagesNode.getChildren()) {
-                                String b64 = imgSnap.getValue(String.class);
-                                if (b64 != null && !b64.trim().isEmpty())
-                                    base64List.add(b64);
-                            }
+        @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            ImageView iv = new ImageView(parent.getContext());
+            iv.setLayoutParams(new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            iv.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            iv.setBackgroundColor(Color.BLACK);
+            return new VH(iv);
+        }
 
-                            if (!base64List.isEmpty()) {
-                                Log.d(TAG, "cargarImagenesFirebase: encontradas "
-                                        + base64List.size() + " imágenes.");
-                                cargarImagenesDesdeListaInterna(base64List);
-                            } else {
-                                Log.w(TAG, "cargarImagenesFirebase: sin imágenes válidas.");
-                            }
-                            break;
-                        }
-                    }
-                    @Override public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e(TAG, "cargarImagenesFirebase:onCancelled", error.toException());
-                    }
-                });
+        @Override public void onBindViewHolder(@NonNull VH holder, int position) {
+            Bitmap bmp = data.get(position);
+            holder.iv.setImageBitmap(bmp);
+            holder.iv.setOnClickListener(v -> {
+                if (listener != null) listener.onClick(holder.getAdapterPosition(), bmp);
+            });
+        }
+
+        @Override public int getItemCount() { return data.size(); }
+
+        static class VH extends RecyclerView.ViewHolder {
+            ImageView iv;
+            VH(@NonNull View itemView) {
+                super(itemView);
+                iv = (ImageView) itemView;
+            }
+        }
     }
+
 }

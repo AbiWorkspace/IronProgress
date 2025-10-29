@@ -24,22 +24,11 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import java.util.List;
 
 public class MenuPopupFragment extends DialogFragment {
-    public interface OnExerciseSelectedListener {
-        void onExerciseSelected(Exercise exercise);
-    }
 
-    private OnExerciseSelectedListener listener;
+
     private TrainingDay trainingDay;
 
-    @Override
-    public void onAttach(@NonNull Context context) {
-        super.onAttach(context);
-        if (context instanceof OnExerciseSelectedListener) {
-            listener = (OnExerciseSelectedListener) context;
-        } else {
-            throw new RuntimeException(context.toString() + " must implement OnExerciseSelectedListener");
-        }
-    }
+
 
     @Nullable
     @Override

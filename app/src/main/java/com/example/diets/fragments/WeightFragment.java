@@ -212,9 +212,7 @@ public class WeightFragment extends Fragment {
                 });
     }
 
-    /**
-     * Habilita swipe-to-delete a la DERECHA con fondo rojo e ícono 🗑️
-     */
+
     private void attachSwipeToDelete() {
         ItemTouchHelper.SimpleCallback cb = new ItemTouchHelper.SimpleCallback(0,
                 ItemTouchHelper.RIGHT) {

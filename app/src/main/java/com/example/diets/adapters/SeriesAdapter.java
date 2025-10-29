@@ -1,28 +1,38 @@
 package com.example.diets.adapters;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.Spanned;
 import android.text.TextWatcher;
 import android.text.format.DateFormat;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.diets.R;
 import com.example.diets.model.ExerciseSeries;
 import com.example.diets.model.ProgresionDinamica;
 import com.example.diets.model.UserExercise;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.shape.CornerFamily;
+import com.google.android.material.shape.MaterialShapeDrawable;
+import com.google.android.material.shape.ShapeAppearanceModel;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
@@ -87,7 +97,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         this.parentAdapter = parentAdapter;
 
         /* 🆕  snapshot de la tabla ‘real’  */
-        baseSeries.addAll(seriesList);      // ← copia profunda NO necesaria
+        baseSeries.addAll(seriesList);
     }
 
 
@@ -242,7 +252,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
 
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {                            // 0) seguridad
-            Log.e(TAG, "❌ Usuario no autenticado.");
+            Log.e(TAG, "Usuario no autenticado.");
             if (onFinished != null) onFinished.run();
             return;
         }
@@ -258,7 +268,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         ref.get().addOnCompleteListener(task -> {
 
             if (!task.isSuccessful()) {                // 1‑a error de red
-                Log.e(TAG, "❌ Error leyendo historial", task.getException());
+                Log.e(TAG, "Error leyendo historial", task.getException());
                 if (onFinished != null) onFinished.run();
                 return;
             }
@@ -364,8 +374,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
                 .child("seriesData");
 
         ref.setValue(list, (error, _ref) -> {
-            if (error != null) Log.e(TAG,"❌ No se pudo subir", error.toException());
-            else               Log.d(TAG,"✅ Sesión subida ("+list.size()+")");
+            if (error != null) Log.e(TAG,"No se pudo subir", error.toException());
+            else               Log.d(TAG,"Sesión subida ("+list.size()+")");
             if (onFinished != null) onFinished.run();
         });
     }
@@ -565,22 +575,84 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
             v.setOnLongClickListener(l->{
                 int pos=getBindingAdapterPosition();
                 if(pos!=RecyclerView.NO_POSITION){
-                    new AlertDialog.Builder(v.getContext())
-                            .setTitle("Eliminar serie")
-                            .setMessage("¿Deseas eliminar esta serie?")
-                            .setPositiveButton("Eliminar",(d,w)->{
+                    showConfirmDialog(
+                            v.getContext(),
+                            "Eliminar serie",
+                            "¿Deseas eliminar esta serie?",
+                            "Sí, eliminar",
+                            () -> {
+                                // --- MISMA FUNCIONALIDAD ---
                                 adapter.seriesList.remove(pos);
                                 adapter.reindexSeries();
-                                parentAdapter.updateSeriesCount(exerciseName,
-                                        adapter.seriesList.size());
-                            })
-                            .setNegativeButton("Cancelar",null)
-                            .show();
+                                parentAdapter.updateSeriesCount(exerciseName, adapter.seriesList.size());
+                            },
+                            "Cancelar",
+                            null
+                    );
+
                 }
                 return true;
             });
         }
+        private void showConfirmDialog(Context ctx,
+                                       String title,
+                                       String message,
+                                       String positiveText,
+                                       Runnable onPositive,
+                                       String negativeText,
+                                       Runnable onNegative) {
+            AlertDialog dialog = new MaterialAlertDialogBuilder(ctx, R.style.CustomAlertDialog)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setNegativeButton(negativeText, (d, w) -> { if (onNegative != null) onNegative.run(); })
+                    .setPositiveButton(positiveText, (d, w) -> { if (onPositive != null) onPositive.run(); })
+                    .create();
 
+            dialog.setOnShowListener(dlg -> {
+                Button neg = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+                Button pos = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+
+                styleFilledRedPill(neg, ctx);
+                styleFilledRedPill(pos, ctx);
+
+                // margen entre botones para que se vean como en la captura
+                LinearLayout parent = (LinearLayout) neg.getParent();
+                if (parent != null) {
+                    parent.setShowDividers(LinearLayout.SHOW_DIVIDER_NONE);
+                    int m = (int) dp(ctx, 8);
+                    LinearLayout.LayoutParams lpNeg = (LinearLayout.LayoutParams) neg.getLayoutParams();
+                    LinearLayout.LayoutParams lpPos = (LinearLayout.LayoutParams) pos.getLayoutParams();
+                    if (lpNeg != null) lpNeg.setMargins(0, m, m, 0);
+                    if (lpPos != null) lpPos.setMargins(0, m, 0, 0);
+                    neg.setLayoutParams(lpNeg);
+                    pos.setLayoutParams(lpPos);
+                }
+            });
+
+            dialog.show();
+        }
+        // Botón "pill" rojo, texto blanco
+        private void styleFilledRedPill(Button b, Context ctx) {
+            if (b == null) return;
+            b.setAllCaps(false);
+            b.setTextColor(ContextCompat.getColor(ctx, android.R.color.white));
+            b.setMinHeight((int) dp(ctx, 40));
+            b.setPadding((int) dp(ctx, 18), (int) dp(ctx, 10), (int) dp(ctx, 18), (int) dp(ctx, 10));
+
+            float radius = dp(ctx, 24); // pill
+            ShapeAppearanceModel shape = new ShapeAppearanceModel()
+                    .toBuilder()
+                    .setAllCorners(CornerFamily.ROUNDED, radius)
+                    .build();
+
+            MaterialShapeDrawable bg = new MaterialShapeDrawable(shape);
+            bg.setFillColor(ColorStateList.valueOf(ContextCompat.getColor(ctx, R.color.brand_red)));
+            ViewCompat.setBackground(b, bg);
+        }
+
+        private float dp(Context ctx, float v) {
+            return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, ctx.getResources().getDisplayMetrics());
+        }
         void bind(ExerciseSeries s){
             isUpdating = true;
 

@@ -3,22 +3,28 @@ package com.example.diets.adapters;
 import static androidx.core.content.ContentProviderCompat.requireContext;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.util.Base64;
 import android.util.Log;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -31,6 +37,10 @@ import com.example.diets.model.Exercise;
 import com.example.diets.model.ExerciseSeries;
 import com.example.diets.model.ProgresionDinamica;
 import com.example.diets.model.UserExercise;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.shape.CornerFamily;
+import com.google.android.material.shape.MaterialShapeDrawable;
+import com.google.android.material.shape.ShapeAppearanceModel;
 import com.google.common.reflect.TypeToken;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
@@ -52,7 +62,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
-
+// imports necesarios
+import android.content.Context;
+import androidx.appcompat.app.AlertDialog;
 public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAdapter.ExerciseViewHolder> {
 
     private static final String TAG = "TrainingDetailAdapter";
@@ -63,7 +75,12 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
     private final Context                      context;
     private final String                       dayKey;
     private final FragmentManager              fragmentManager;
-
+    private static final int BTN_MIN_HEIGHT_DP = 26;   // antes 40
+    private static final int BTN_PAD_H_DP     = 10;   // antes 18
+    private static final int BTN_PAD_V_DP     = 4;    // antes 10
+    private static final int PILL_RADIUS_DP   = 10;   // antes 24
+    private static final int SPACING_BETWEEN  = 20;   // separación entre botones
+    private static final int BUTTONS_TOP_M    = 8;    // margen superior fila botones
     private final Map<String, SeriesAdapter> seriesAdapters = new HashMap<>();
     private final Map<String, UserExercise>  exerciseMap    = new HashMap<>();
 
@@ -84,24 +101,23 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
     // 1) declara el campo en la cabecera de la clase
     private boolean dynamicEnabled;   // ← nuevo
 
-    // 2) ajusta TU MISMO constructor
+    private final String effectiveUid; //
+
     public TrainingDetailAdapter(List<UserExercise> exercises,
-                                 RecyclerView       recyclerView,
-                                 String             dayKey,
-                                 Context            context,
-                                 FragmentManager    fragmentManager) {
-
-        Log.d(TAG, "Constructor: ejercicios=" + exercises.size());
-
-        this.exercises       = exercises;
-        this.recyclerView    = recyclerView;
-        this.dayKey          = dayKey;
-        this.context         = context;
-        this.fragmentManager = fragmentManager;
-
-        // ⬇️  NUEVA línea: leemos la preferencia
-        this.dynamicEnabled  = Prefs.isDynamicEnabled(context);
+                                 RecyclerView rv,
+                                 String dayKey,
+                                 Context ctx,
+                                 FragmentManager fm,
+                                 String effectiveUid) {
+        this.exercises = exercises;
+        this.recyclerView = rv;
+        this.dayKey = dayKey;
+        this.context = ctx;
+        this.fragmentManager = fm;
+        this.effectiveUid = effectiveUid;
+        this.dynamicEnabled = Prefs.isDynamicEnabled(ctx);
     }
+
 
 
     /* ---------------- Métodos de acceso requeridos por otros componentes --------------- */
@@ -173,6 +189,20 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         return new ExerciseViewHolder(v);
     }
 
+    // --- Soporte para reemplazar el dataset desde el Fragment ---
+    public void setExercises(@NonNull List<UserExercise> newList) {
+        if (newList == null) {
+            this.exercises.clear();
+            notifyDataSetChanged();
+            return;
+        }
+        this.exercises.clear();
+        this.exercises.addAll(newList);
+        notifyDataSetChanged();
+    }
+
+
+
     @Override
     public void onBindViewHolder(@NonNull ExerciseViewHolder holder, int position) {
         UserExercise ue = exercises.get(position);
@@ -226,13 +256,37 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
 
 
 
-    private void abrirDetalles(UserExercise ue) {
-        ExerciseDetailsDialogFragment dlg =
-                ExerciseDetailsDialogFragment.newInstance(
-                        null, dayKey, ue.isFromInternal());
-        dlg.setInternalExercise(ue);
-        dlg.show(fragmentManager, "exerciseDetails");
+    /* --- Abrir detalles desde el adapter (fuera del ViewHolder) --- */
+    private void abrirDetalles(@NonNull UserExercise ue) {
+        if (ue.isFromInternal()) {
+            ExerciseDetailsDialogFragment dlg =
+                    ExerciseDetailsDialogFragment.newInstance(null, dayKey, true, effectiveUid);
+            dlg.setInternalExercise(ue);
+            dlg.show(fragmentManager, "exerciseDetails");
+            return;
+        }
+
+        String cachedKey = firebaseKeysPorNombre.get(ue.getName());
+        if (cachedKey != null) {
+            ExerciseDetailsDialogFragment
+                    .newInstance(cachedKey, dayKey, false, effectiveUid)
+                    .show(fragmentManager, "exerciseDetails");
+            return;
+        }
+
+        // 🔧 Obtener la key y abrir el diálogo dentro del callback (NO usar 'k' fuera)
+        fetchKeyIfNeeded(ue.getName(), effectiveUid, key -> {
+            if (key != null) {
+                ExerciseDetailsDialogFragment
+                        .newInstance(key, dayKey, false, effectiveUid)
+                        .show(fragmentManager, "exerciseDetails");
+            } else {
+                Log.e(TAG, "abrirDetalles: no se encontró key para " + ue.getName());
+            }
+        });
     }
+
+
 
     @Override
     public int getItemCount() { return exercises.size(); }
@@ -378,15 +432,20 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                 if (menuItem.getItemId() == R.id.action_delete) {
                     int p = getBindingAdapterPosition();
                     if (p != RecyclerView.NO_POSITION) {
-                        new AlertDialog.Builder(itemView.getContext())
-                                .setTitle("Eliminar ejercicio")
-                                .setMessage("¿Eliminar " + ex.getName() + "?")
-                                .setPositiveButton("Eliminar", (d, w) -> {
+                        showConfirmDialog(
+                                itemView.getContext(),
+                                "Eliminar ejercicio",
+                                "¿Eliminar " + ex.getName() + "?",
+                                "Sí, eliminar",
+                                () -> {
                                     pendingDeletionExercises.add(exercises.remove(p));
                                     notifyItemRemoved(p);
-                                })
-                                .setNegativeButton("Cancelar", null)
-                                .show();
+                                },
+                                "Cancelar",
+                                null
+                        );
+
+
                     }
                     return true;
                 }
@@ -446,86 +505,133 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
 
 
 
-        private void openDetails(UserExercise ex) {
+        private void showConfirmDialog(Context ctx,
+                                       String title,
+                                       String message,
+                                       String positiveText,
+                                       Runnable onPositive,
+                                       String negativeText,
+                                       Runnable onNegative) {
+            AlertDialog dialog = new MaterialAlertDialogBuilder(ctx, R.style.CustomAlertDialog)
+                    .setTitle(title)
+                    .setMessage(message)
+                    .setNegativeButton(negativeText, (d, w) -> { if (onNegative != null) onNegative.run(); })
+                    .setPositiveButton(positiveText, (d, w) -> { if (onPositive != null) onPositive.run(); })
+                    .create();
+
+            dialog.setOnShowListener(dlg -> {
+                Button neg = dialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+                Button pos = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+
+                styleFilledRedPill(neg, ctx);
+                styleFilledRedPill(pos, ctx);
+
+                // margen entre botones para que se vean como en la captura
+                LinearLayout parent = (LinearLayout) neg.getParent();
+                if (parent != null) {
+                    parent.setShowDividers(LinearLayout.SHOW_DIVIDER_NONE);
+                    int m = (int) dp(ctx, 8);
+                    LinearLayout.LayoutParams lpNeg = (LinearLayout.LayoutParams) neg.getLayoutParams();
+                    LinearLayout.LayoutParams lpPos = (LinearLayout.LayoutParams) pos.getLayoutParams();
+                    if (lpNeg != null) lpNeg.setMargins(0, m, m, 0);
+                    if (lpPos != null) lpPos.setMargins(0, m, 0, 0);
+                    neg.setLayoutParams(lpNeg);
+                    pos.setLayoutParams(lpPos);
+                }
+            });
+
+            dialog.show();
+        }
+        // Botón "pill" rojo, texto blanco
+        private void styleFilledRedPill(Button b, Context ctx) {
+            if (b == null) return;
+            b.setAllCaps(false);
+            b.setTextColor(ContextCompat.getColor(ctx, android.R.color.white));
+            b.setMinHeight((int) dp(ctx, 40));
+            b.setPadding((int) dp(ctx, 18), (int) dp(ctx, 10), (int) dp(ctx, 18), (int) dp(ctx, 10));
+
+            float radius = dp(ctx, 24); // pill
+            ShapeAppearanceModel shape = new ShapeAppearanceModel()
+                    .toBuilder()
+                    .setAllCorners(CornerFamily.ROUNDED, radius)
+                    .build();
+
+            MaterialShapeDrawable bg = new MaterialShapeDrawable(shape);
+            bg.setFillColor(ColorStateList.valueOf(ContextCompat.getColor(ctx, R.color.brand_red)));
+            ViewCompat.setBackground(b, bg);
+        }
+
+        private float dp(Context ctx, float v) {
+            return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, ctx.getResources().getDisplayMetrics());
+        }
+
+
+            private void openDetails(@NonNull UserExercise ex) {
             FragmentManager fm = ((FragmentActivity) itemView.getContext()).getSupportFragmentManager();
 
             if (ex.isFromInternal()) {
                 Log.d(TAG, "📦 Es interno → enviando objeto completo a diálogo.");
-                Bundle args = new Bundle();
-                args.putSerializable("exercise", ex);
-                args.putString("dayKey", dayKey);
-                args.putBoolean("isFromInternal", true);
-                ExerciseDetailsDialogFragment dialog = new ExerciseDetailsDialogFragment();
-                dialog.setArguments(args);
-                dialog.show(fm, "ExerciseDetailsDialog");
+                ExerciseDetailsDialogFragment dlg =
+                        ExerciseDetailsDialogFragment.newInstance(null, dayKey, true, TrainingDetailAdapter.this.effectiveUid);
+                dlg.setInternalExercise(ex);
+                dlg.show(fm, "ExerciseDetailsDialog");
                 return;
             }
 
             String cachedKey = firebaseKeysPorNombre.get(ex.getName());
             if (cachedKey != null) {
                 ExerciseDetailsDialogFragment
-                        .newInstance(cachedKey, dayKey, false)
+                        .newInstance(cachedKey, dayKey, false, TrainingDetailAdapter.this.effectiveUid)
                         .show(fm, "ExerciseDetailsDialog");
-            } else {
-                pendingOpenDetails = true;
-                fetchKeyIfNeeded(ex.getName(), key -> {
-                    if (key != null) {
-                        seriesAdapter.cargarUltimasSeriesDesdeFirebase(key, context, () -> {
+                return;
+            }
 
-                            seriesAdapter.commitAllEdits();            // refresca cache-UI
-                            rvSeries.setAdapter(seriesAdapter);        // siempre
+            // Resolver key y abrir diálogo dentro del callback
+            fetchKeyIfNeeded(ex.getName(), TrainingDetailAdapter.this.effectiveUid, key -> {
+                if (key == null) {
+                    Log.e(TAG, "openDetails: No se encontró clave Firebase para '" + ex.getName() + "'");
+                    return;
+                }
 
-                            if (!TrainingDetailAdapter.this.dynamicEnabled) {
-                                Log.d(TAG, "Dinámica OFF → se conserva la tabla original");
-                                return;                           // ⬅️  ¡nada de sugerencias!
-                            }
+                seriesAdapter.cargarUltimasSeriesDesdeFirebase(key, context, () -> {
+                    seriesAdapter.commitAllEdits();
+                    rvSeries.setAdapter(seriesAdapter);
 
-                            /* ---------- feedback + historial ---------- */
-                            List<ExerciseSeries> comp  = new ArrayList<>();
-                            ExerciseSeries best = seriesAdapter.getBestHistorySerie();
-                            if (best != null) comp.add(best);
-                            comp.addAll(seriesAdapter.getUpdatedSeriesList());
+                    if (!TrainingDetailAdapter.this.dynamicEnabled) {
+                        Log.d(TAG, "Dinámica OFF → se conserva la tabla original");
+                    } else {
+                        List<ExerciseSeries> comp  = new ArrayList<>();
+                        ExerciseSeries best = seriesAdapter.getBestHistorySerie();
+                        if (best != null) comp.add(best);
+                        comp.addAll(seriesAdapter.getUpdatedSeriesList());
 
-                            Log.d(TAG,
-                                    "PD-IN  ➜ best="
-                                            + (best==null? "null":best.toSimple())
-                                            + "  comp=" + comp.size()
-                                            + "  hist=" + seriesAdapter.getHistorialSeries().size());
+                        List<ProgresionDinamica.Serie> sug =
+                                ProgresionDinamica.sugerirSeries(
+                                        context,
+                                        ex,
+                                        comp,
+                                        seriesAdapter.getHistorialSeries(),
+                                        ProgresionDinamica.NivelUsuario.INTERMEDIO,
+                                        2.5f);
 
-                            List<ProgresionDinamica.Serie> sug =
-                                    ProgresionDinamica.sugerirSeries(
-                                            context,
-                                            ex,
-                                            comp,
-                                            seriesAdapter.getHistorialSeries(),
-                                            ProgresionDinamica.NivelUsuario.INTERMEDIO,
-                                            2.5f);
-
-                            /* fallback inicial */
-                            if (sug.isEmpty()) {
-                                float ref = best != null ? (float) best.getWeight()
-                                        : (float) ex.getWeight();
-                                sug = ProgresionDinamica.generarSeriesInicio(
-                                        ref,
-                                        ProgresionDinamica.TipoEjercicio.MULTIARTICULAR,
-                                        3);
-                            }
-
-                            /* 🚫 NO sustituimos la lista si no hay sugerencias válidas */
-                            if (!sug.isEmpty()) {
-                                seriesAdapter.setFromSuggest(sug);
-                            }
-                        });
-
-
-
-
+                        if (sug.isEmpty()) {
+                            float ref = best != null ? (float) best.getWeight() : (float) ex.getWeight();
+                            sug = ProgresionDinamica.generarSeriesInicio(
+                                    ref,
+                                    ProgresionDinamica.TipoEjercicio.MULTIARTICULAR,
+                                    3);
+                        }
+                        if (!sug.isEmpty()) seriesAdapter.setFromSuggest(sug);
                     }
 
+                    // 🔓 Abrir el diálogo ya con la key resuelta y el UID correcto
+                    ExerciseDetailsDialogFragment
+                            .newInstance(key, dayKey, false, TrainingDetailAdapter.this.effectiveUid)
+                            .show(fm, "ExerciseDetailsDialog");
                 });
-
-            }
+            });
         }
+
 
         public ProgresionDinamica.Serie calcularSiguienteSerieSugerida(UserExercise ex, List<ExerciseSeries> todasLasSeries) {
             // Puedes parametrizar esto según la UI/usuario:
@@ -660,38 +766,74 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
 
     private interface KeyCb { void onOk(String key); }
 
-    private void fetchKeyIfNeeded(String exerciseName, KeyCb cb) {
-        if (firebaseKeysPorNombre.containsKey(exerciseName)) {
-            cb.onOk(firebaseKeysPorNombre.get(exerciseName));
-            return;
-        }
+    // Sobrecarga NUEVA: permite pasar el UID del cliente (modo coach).
+    private void fetchKeyIfNeeded(@NonNull String exerciseName,
+                                  @Nullable String targetUid,
+                                  @NonNull KeyCb cb) {
+        try {
+            if (exerciseName.trim().isEmpty()) {
+                cb.onOk(null);
+                return;
+            }
 
-        DatabaseReference ref = FirebaseDatabase.getInstance()
-                .getReference("users")
-                .child(Objects.requireNonNull(FirebaseAuth.getInstance().getUid()))
-                .child("userExercises");
+            // Caché por nombre (compatibilidad con tu código actual)
+            if (firebaseKeysPorNombre.containsKey(exerciseName)) {
+                cb.onOk(firebaseKeysPorNombre.get(exerciseName));
+                return;
+            }
 
-        ref.orderByChild("name").equalTo(exerciseName)
-                .addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot s) {
-                        for (DataSnapshot c : s.getChildren()) {
-                            String k = c.getKey();
-                            if (k != null) {
-                                firebaseKeysPorNombre.put(exerciseName, k);
-                                cb.onOk(k);
-                                return;
+            // Determina el UID a usar: el del cliente (coach) o el actual
+            String uid = (targetUid != null && !targetUid.trim().isEmpty())
+                    ? targetUid.trim()
+                    : (FirebaseAuth.getInstance().getCurrentUser() != null
+                    ? FirebaseAuth.getInstance().getCurrentUser().getUid()
+                    : null);
+
+            if (uid == null) {
+                Log.e(TAG, "fetchKeyIfNeeded: UID nulo (no autenticado ni targetUid).");
+                cb.onOk(null);
+                return;
+            }
+
+            final String uidToUse = uid; // efectivamente final para la inner class
+
+            DatabaseReference ref = FirebaseDatabase.getInstance()
+                    .getReference("users")
+                    .child(uidToUse)
+                    .child("userExercises");
+
+            ref.orderByChild("name").equalTo(exerciseName)
+                    .addListenerForSingleValueEvent(new ValueEventListener() {
+                        @Override
+                        public void onDataChange(@NonNull DataSnapshot s) {
+                            for (DataSnapshot c : s.getChildren()) {
+                                String k = c.getKey();
+                                if (k != null) {
+                                    firebaseKeysPorNombre.put(exerciseName, k);
+                                    cb.onOk(k);
+                                    return;
+                                }
                             }
+                            cb.onOk(null);
                         }
-                        cb.onOk(null);
-                    }
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError e) {
-                        Log.e(TAG, "fetchKeyIfNeeded:onCancelled", e.toException());
-                        cb.onOk(null);
-                    }
-                });
+
+                        @Override
+                        public void onCancelled(@NonNull DatabaseError e) {
+                            Log.e(TAG, "fetchKeyIfNeeded:onCancelled", e.toException());
+                            cb.onOk(null);
+                        }
+                    });
+        } catch (Exception ex) {
+            Log.e(TAG, "fetchKeyIfNeeded: excepción", ex);
+            cb.onOk(null);
+        }
     }
+
+    // Versión ORIGINAL preservada para no romper llamadas existentes.
+    private void fetchKeyIfNeeded(@NonNull String exerciseName, @NonNull KeyCb cb) {
+        fetchKeyIfNeeded(exerciseName, null, cb);
+    }
+
 
     /* ------------------------ util: borrar internos ------------------------- */
 
