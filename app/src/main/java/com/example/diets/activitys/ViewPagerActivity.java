@@ -26,6 +26,7 @@ import com.example.diets.fragments.SelectExercisesFragment;
 import com.example.diets.fragments.TrainingDetailFragment;
 import com.example.diets.fragments.WeightFragment;
 import com.example.diets.model.Exercise;
+import com.example.diets.model.UserScope;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
@@ -46,6 +47,10 @@ public class ViewPagerActivity extends AppCompatActivity
     private ViewPagerAdapter adapter;
     private OnBackPressedCallback onBackPressedCallback;
 
+    // ⬅️ NUEVO: banderas de impersonación
+    private boolean coachMode = false;
+    private String activeUid = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -57,26 +62,40 @@ public class ViewPagerActivity extends AppCompatActivity
         drawerLayout = findViewById(R.id.drawer_layout);
         NavigationView navigationView = findViewById(R.id.nav_view);
 
-        // 🔥 Ya no usaremos estos extras (los dejamos comentados por claridad)
-        // boolean trainingFormCompleted = getIntent().getBooleanExtra("trainingFormCompleted", false);
-        // boolean firstTime = getIntent().getBooleanExtra("firstTime", true);
+        // ⬅️ NUEVO: leer extras e iniciar el UserScope
+        coachMode = getIntent().getBooleanExtra("coachMode", false);
+        String targetUid = getIntent().getStringExtra("targetUid");
+        UserScope.start(targetUid, coachMode);
 
-        // 🔥 Obtener UID del usuario autenticado
-        String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(uid);
+        // ⬅️ NUEVO: usar SIEMPRE el UID activo del scope
+        activeUid = UserScope.getActiveUid();
+        if (activeUid == null) {
+            // Sin sesión válida
+            FirebaseAuth.getInstance().signOut();
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+            return;
+        }
+
+        DatabaseReference userRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(activeUid);
 
         // 🔥 Consultar isFirstTime y trainingFormCompleted juntos
         userRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 Boolean firstTimeValue = snapshot.child("isFirstTime").getValue(Boolean.class);
-
                 boolean firstTime = firstTimeValue != null && firstTimeValue;
 
                 boolean trainingFormCompleted = snapshot.child("trainingFormCompleted").getValue(Boolean.class) != null
                         && snapshot.child("trainingFormCompleted").getValue(Boolean.class);
 
-                Log.d("ViewPagerActivity", "✅ Valores desde Firebase -> isFirstTime: " + firstTime + ", trainingFormCompleted: " + trainingFormCompleted);
+                Log.d("ViewPagerActivity",
+                        "✅ UID=" + activeUid +
+                                " isFirstTime=" + firstTime +
+                                " trainingFormCompleted=" + trainingFormCompleted +
+                                " coachMode=" + coachMode);
 
                 // ✅ Configurar el ViewPager con valores reales
                 adapter = new ViewPagerAdapter(ViewPagerActivity.this, trainingFormCompleted, firstTime);
@@ -108,16 +127,13 @@ public class ViewPagerActivity extends AppCompatActivity
         navigationView.setNavigationItemSelectedListener(item -> {
             if (item.getItemId() == R.id.nav_logout) {
                 Log.d("ViewPagerActivity", "🔓 Cerrar sesión presionado");
-
-                // Cerrar sesión en Firebase
                 FirebaseAuth.getInstance().signOut();
+                UserScope.clear(); // ⬅️ limpiar scope al salir
 
-                // Redirigir a la pantalla de login
                 Intent intent = new Intent(ViewPagerActivity.this, MainActivity.class);
                 intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                 startActivity(intent);
                 finish();
-
                 return true;
             }
             return false;
@@ -204,6 +220,7 @@ public class ViewPagerActivity extends AppCompatActivity
         fragment.setArguments(data);
         replaceFragmentInViewPager(0, fragment);
     }
+
     public void switchToDashboardFragment() {
         DashboardFragment dashboardFragment = new DashboardFragment();
         replaceFragmentInViewPager(1, dashboardFragment); // pestaña de alimentación
@@ -263,6 +280,7 @@ public class ViewPagerActivity extends AppCompatActivity
             mostrarDialogoSalida();
         }
     }
+
     public void switchToWeightFragment() {
         WeightFragment weightFragment = new WeightFragment();
         replaceFragmentInViewPager(1, weightFragment); // <- va en la pestaña de Alimentación
@@ -300,6 +318,15 @@ public class ViewPagerActivity extends AppCompatActivity
                 Log.d("ViewPagerActivity", "⚠️ No hay más fragmentos. Mostrando diálogo de salida.");
                 mostrarDialogoSalida();
             }
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // ⬅️ NUEVO: limpiar scope si veníamos en modo coach
+        if (UserScope.isCoachMode()) {
+            UserScope.clear();
         }
     }
 }

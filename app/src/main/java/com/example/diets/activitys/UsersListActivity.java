@@ -2,6 +2,7 @@ package com.example.diets.activitys;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,8 +28,9 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
-
 public class UsersListActivity extends AppCompatActivity {
+
+    private static final String TAG = "UsersListActivity";
 
     private RecyclerView recycler;
     private UsersAdapter adapter;
@@ -50,6 +52,7 @@ public class UsersListActivity extends AppCompatActivity {
         if (navView != null) {
             navView.setNavigationItemSelectedListener(item -> {
                 if (item.getItemId() == R.id.nav_logout) {
+                    Log.d(TAG, "Cerrando sesión...");
                     FirebaseAuth.getInstance().signOut();
                     Intent i = new Intent(this, MainActivity.class);
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -57,7 +60,6 @@ public class UsersListActivity extends AppCompatActivity {
                     finish();
                     return true;
                 }
-                // Otros ítems (si los hay)…
                 drawer.closeDrawer(GravityCompat.START);
                 return true;
             });
@@ -69,30 +71,79 @@ public class UsersListActivity extends AppCompatActivity {
         adapter = new UsersAdapter();
         recycler.setAdapter(adapter);
 
+        final String myUid = FirebaseAuth.getInstance().getCurrentUser() != null
+                ? FirebaseAuth.getInstance().getCurrentUser().getUid()
+                : null;
+
+        Log.d(TAG, "onCreate: Coach/Admin UID: " + (myUid != null ? myUid : "¡¡ERROR: NULL!!"));
+
         usersRef = FirebaseDatabase.getInstance().getReference("users");
         usersRef.addValueEventListener(new ValueEventListener() {
             @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
+                Log.d(TAG, "onDataChange: Se encontraron " + snapshot.getChildrenCount() + " nodos de usuario en total.");
+
                 List<UserRow> rows = new ArrayList<>();
                 for (DataSnapshot u : snapshot.getChildren()) {
                     String uid   = u.getKey();
+                    Log.v(TAG, "Procesando UID: " + uid);
+
+                    // ⛔ Omitirme a mí mismo (opcional, recomendado)
+                    if (myUid != null && myUid.equals(uid)) {
+                        Log.w(TAG, "-> Omitiendo usuario " + uid + " (Soy yo, el coach/admin).");
+                        continue;
+                    }
+
+                    // ⛔ Omitir coaches / admins
+                    String role = u.child("role").getValue(String.class);
+                    Log.v(TAG, "-> UID: " + uid + ", Role: " + (role != null ? role : "null"));
+
+                    if (role != null) {
+                        String r = role.trim().toLowerCase();
+                        if ("coach".equals(r) || "admin".equals(r)) {
+                            Log.w(TAG, "-> Omitiendo usuario " + uid + " (es " + r + ").");
+                            continue;
+                        }
+                    }
+                    // (Si role es null, lo tratamos como "user" y sí se lista)
+
                     String first = u.child("firstName").getValue(String.class);
                     String last  = u.child("lastName").getValue(String.class);
                     String email = u.child("email").getValue(String.class);
 
                     Boolean train = u.child("trainingFormCompleted").getValue(Boolean.class);
-                    Boolean food  = u.child("foodFormCompleted").getValue(Boolean.class);
+
+                    // --- INICIO DE LA MODIFICACIÓN ---
+                    // Se cambia la lógica: ya no se usa 'foodFormCompleted'.
+                    // Ahora se lee 'isFirstTime'.
+                    Boolean isFirstTime  = u.child("isFirstTime").getValue(Boolean.class);
 
                     boolean trainingDone = train != null && train;
-                    boolean foodDone     = food  != null && food;
+
+                    // El formulario de comida se considera "hecho" (true) SÓLO SI 'isFirstTime' es 'false'.
+                    // Si 'isFirstTime' es 'true' o es 'null' (no existe),
+                    // entonces 'foodDone' será 'false' (no completo).
+                    boolean foodDone = (isFirstTime != null && !isFirstTime);
+                    // --- FIN DE LA MODIFICACIÓN ---
+
+
+                    // Log actualizado para depuración
+                    Log.i(TAG, "==> AÑADIENDO usuario: " + first + " " + last + " (UID: " + uid + ")");
+                    Log.d(TAG, "    -> trainDone: " + trainingDone + ", isFirstTime: " + isFirstTime + ", foodDone (calculado): " + foodDone);
+
 
                     rows.add(new UserRow(uid,
                             (first == null ? "" : first) + " " + (last == null ? "" : last),
                             email == null ? "" : email,
-                            trainingDone, foodDone));
+                            trainingDone, foodDone)); // Se pasa el nuevo valor de foodDone
                 }
+                Log.i(TAG, "onDataChange: Finalizado. Enviando " + rows.size() + " usuarios al adaptador.");
                 adapter.submit(rows);
             }
-            @Override public void onCancelled(@NonNull DatabaseError error) { }
+            @Override public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "¡¡ERROR AL LEER USUARIOS!!: ", error.toException());
+                Log.e(TAG, "MENSAJE: " + error.getMessage());
+                Log.e(TAG, "DETALLES: " + error.getDetails());
+            }
         });
     }
 
@@ -113,6 +164,7 @@ public class UsersListActivity extends AppCompatActivity {
             this.uid = uid; this.name = name; this.email = email;
             this.trainingDone = trainingDone; this.foodDone = foodDone;
         }
+        // Esta función 'ready()' ahora usará la nueva lógica de 'foodDone' automáticamente
         boolean ready() { return trainingDone && foodDone; }
     }
 
@@ -129,19 +181,23 @@ public class UsersListActivity extends AppCompatActivity {
 
         @Override public void onBindViewHolder(@NonNull UserVH h, int pos) {
             UserRow r = data.get(pos);
-            h.name.setText(r.name);
+            h.name.setText(r.name.trim());
             h.email.setText(r.email);
             h.trainStatus.setText(r.trainingDone ? "Entrenamiento: ✔" : "Entrenamiento: ✖");
+
+            // Esta línea ahora muestra el estado basado en 'isFirstTime'
             h.foodStatus.setText(r.foodDone ? "Alimentación: ✔" : "Alimentación: ✖");
 
+            // Esta lógica también se actualiza automáticamente
             h.open.setEnabled(r.ready());
             h.open.setAlpha(r.ready() ? 1f : 0.4f);
             h.open.setOnClickListener(v -> {
-                if (!r.ready()) return;
-                // Abre el dashboard del usuario (usa tu Activity real)
+                if (!r.ready()) return;  // solo si completó ambos formularios
+                Log.d(TAG, "Abriendo dashboard para UID: " + r.uid);
+
                 Intent i = new Intent(UsersListActivity.this, ViewPagerActivity.class);
                 i.putExtra("coachMode", true);
-                i.putExtra("userId", r.uid);
+                i.putExtra("targetUid", r.uid);   // <-- UID del cliente a editar
                 startActivity(i);
             });
         }
