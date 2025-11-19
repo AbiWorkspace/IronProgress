@@ -373,7 +373,9 @@ public class FoodSearchFragment extends Fragment {
     private void fetchRecipesFromSpoonacularRetry(String query, int intento) {
         new Thread(() -> {
             try {
-                final String key = "04e23d7cf29c4324bbba0799fdbfba61";  // ← tu API-key
+                // CLAVE DOCUMENTADA (Coincide con Manual Técnico)
+                final String key = "04e23d7cf29c4324bbba0799fdbfba61";
+
                 StringBuilder url = new StringBuilder("https://api.spoonacular.com/recipes/complexSearch")
                         .append("?query=").append(URLEncoder.encode(query, "UTF-8"))
                         .append("&number=30")
@@ -387,7 +389,25 @@ public class FoodSearchFragment extends Fragment {
 
                 OkHttpClient cli = OkHttpSingleton.get();
                 Response rsp = cli.newCall(new Request.Builder().url(url.toString()).build()).execute();
-                if (!rsp.isSuccessful()) throw new IOException("HTTP " + rsp.code());
+
+                // --- CORRECCIÓN AUDITORÍA: MANEJO ESPECÍFICO DE ERRORES (Doc: SPOON-03) ---
+                if (!rsp.isSuccessful()) {
+                    // Caso Cuota Excedida (Documentado en Integración Técnica)
+                    if (rsp.code() == 402) {
+                        Log.e(TAG, "Spoonacular 402: Cuota diaria excedida.");
+                        if (isAdded()) {
+                            requireActivity().runOnUiThread(() ->
+                                    Toast.makeText(getContext(),
+                                            "Límite de recetas alcanzado (Cuota diaria). Intenta mañana.",
+                                            Toast.LENGTH_LONG).show()
+                            );
+                        }
+                        return; // NO reintentar si es error de cuota
+                    }
+                    // Otros errores HTTP
+                    throw new IOException("HTTP " + rsp.code());
+                }
+                // ---------------------------------------------------------------------------
 
                 JSONArray arr = new JSONObject(rsp.body().string()).optJSONArray("results");
                 if (arr == null) return;
@@ -423,48 +443,27 @@ public class FoodSearchFragment extends Fragment {
                     String name   = r.optString("title", "Receta");
                     String img    = r.optString("image", "");
 
-                    /* ---------- INSTRUCCIONES CON TRAZA DETALLADA ---------- */
+                    /* ---------- INSTRUCCIONES (Lógica de Fallbacks Documentada) ---------- */
                     String instr = r.optString("instructions", "");
                     if (!instr.isEmpty()) {
-                        Log.d(TAG, "[SPOON] id=" + id +
-                                " → instrucciones directas len=" + instr.length());
                         instr = Html.fromHtml(instr, Html.FROM_HTML_MODE_LEGACY).toString();
                     } else {
-                        Log.w(TAG, "[SPOON] id=" + id +
-                                " → sin 'instructions' – buscando alternativas");
-
-                        // a) Paso-a-paso (analyzedInstructions)
+                        // Fallback 1: analyzedInstructions
                         JSONArray analyzed = r.optJSONArray("analyzedInstructions");
                         if (analyzed != null && analyzed.length() > 0) {
                             JSONArray steps = analyzed.getJSONObject(0).optJSONArray("steps");
                             if (steps != null && steps.length() > 0) {
                                 StringBuilder sb = new StringBuilder();
                                 for (int k = 0; k < steps.length(); k++)
-                                    sb.append(steps.getJSONObject(k)
-                                                    .optString("step", ""))
-                                            .append(". ");
+                                    sb.append(steps.getJSONObject(k).optString("step", "")).append(". ");
                                 instr = sb.toString().trim();
-                                Log.d(TAG, "[SPOON] id=" + id +
-                                        " → obtenido de analyzedInstructions len=" + instr.length());
-                            } else {
-                                Log.w(TAG, "[SPOON] id=" + id +
-                                        " → analyzedInstructions vacío");
                             }
-                        } else {
-                            Log.w(TAG, "[SPOON] id=" + id +
-                                    " → analyzedInstructions nulo");
                         }
-
-                        // b) Summary como último recurso
+                        // Fallback 2: Summary
                         if (instr.isEmpty()) {
                             String summary = r.optString("summary", "");
                             if (!summary.isEmpty()) {
                                 instr = Html.fromHtml(summary, Html.FROM_HTML_MODE_LEGACY).toString();
-                                Log.d(TAG, "[SPOON] id=" + id +
-                                        " → tomado de summary len=" + instr.length());
-                            } else {
-                                Log.w(TAG, "[SPOON] id=" + id +
-                                        " → summary también vacío – receta queda sin instrucciones");
                             }
                         }
                     }
@@ -492,15 +491,17 @@ public class FoodSearchFragment extends Fragment {
                     });
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Error Spoonacular", e);
-                if (isAdded())
-                    requireActivity().runOnUiThread(() ->
-                            Toast.makeText(getContext(), "Error Spoonacular", Toast.LENGTH_SHORT).show());
+                Log.e(TAG, "Error Spoonacular: " + e.getMessage()); // Log seguro (no imprime API Key)
 
                 // Retry automático SOLO si es IOException y no se ha excedido el máximo
                 if (e instanceof IOException && intento < 3) {
                     try { Thread.sleep(1200); } catch (InterruptedException ignored) {}
                     fetchRecipesFromSpoonacularRetry(query, intento + 1);
+                } else {
+                    // Solo mostrar Toast si ya fallaron todos los intentos y NO fue error 402 (ya manejado arriba)
+                    if (isAdded())
+                        requireActivity().runOnUiThread(() ->
+                                Toast.makeText(getContext(), "Error de conexión con recetas", Toast.LENGTH_SHORT).show());
                 }
             }
         }).start();
