@@ -1,14 +1,9 @@
 package com.example.diets.model;
 
 import static android.content.ContentValues.TAG;
-
 import android.util.Log;
-
 import com.google.firebase.database.IgnoreExtraProperties;
-
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @IgnoreExtraProperties
@@ -18,31 +13,36 @@ public class User {
     private String firstName;
     private String lastName;
     private String email;
-    private String password;
+
+    // ✅ Nuevo campo Rol
+    private String role;
+
     private int age;
     private double weight;
     private double height;
     private String gender;
     private String activityLevel;
     private String goal;
-    private final int type_of_user = 1; // 1 for user, 2 for admin
-    private boolean firstTime; // Nuevo campo para indicar si es la primera vez
-    private double caloriesToday; // Calorías de hoy
-    private double proteinToday; // Proteínas de hoy
-    private double fatToday; // Grasas de hoy
-    private double carbToday; // Carbohidratos de hoy
-    private boolean isAdmin;
-    private double latitude; // Coordenada de latitud
-    private double longitude; // Coordenada de longitud
-    private String profilePhotoUrl; // URL de la foto de perfil
+
+    // Eliminado type_of_user para evitar confusiones, usamos 'role'
+
+    private boolean firstTime;
+    private double caloriesToday;
+    private double proteinToday;
+    private double fatToday;
+    private double carbToday;
+
+    private double latitude;
+    private double longitude;
+    private String profilePhotoUrl;
     private String profilePhoto;
-    private boolean trainingFormCompleted; // Nueva propiedad
+    private boolean trainingFormCompleted;
 
-
-    // Nuevas propiedades para ejercicios y patrones de movimiento del usuario
+    // Propiedades para ejercicios
     private Map<String, UserExercise> userExercises;
     private Map<String, UserMovementPattern> userMovementPatterns;
-    // Constructor sin argumentos requerido por Firebase
+
+    // --- CONSTRUCTOR VACÍO (Requerido por Firebase) ---
     public User() {
         this.firstTime = true;
         this.caloriesToday = 0.0;
@@ -52,38 +52,48 @@ public class User {
         this.latitude = 0.0;
         this.longitude = 0.0;
         this.profilePhotoUrl = "default";
-        this.userExercises = new HashMap<>(); // cambio aquí 👈
-        this.userMovementPatterns = new HashMap<>(); // cambio aquí 👈
+        this.userExercises = new HashMap<>();
+        this.userMovementPatterns = new HashMap<>();
         this.trainingFormCompleted = false;
+        this.role = "user"; // Valor por defecto
     }
 
-
-    // Constructor con argumentos
-    public User(String firstName, String lastName, String email, String password, int age, double weight, double height, String gender, String activityLevel, String goal) {
+    // --- CONSTRUCTOR CON ARGUMENTOS (Sin Password) ---
+    public User(String firstName, String lastName, String email, int age, double weight, double height, String gender, String activityLevel, String goal) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
-        this.password = password;
         this.age = age;
         this.weight = weight;
         this.height = height;
         this.gender = gender;
         this.activityLevel = activityLevel;
         this.goal = goal;
-        this.firstTime = true; // Por defecto, es la primera vez
+        this.firstTime = true;
         this.caloriesToday = 0.0;
         this.proteinToday = 0.0;
         this.fatToday = 0.0;
         this.carbToday = 0.0;
-        this.latitude = 0.0; // Inicialización predeterminada
-        this.longitude = 0.0; // Inicialización predeterminada
-        this.profilePhotoUrl = "default"; // Inicialización predeterminada
+        this.latitude = 0.0;
+        this.longitude = 0.0;
+        this.profilePhotoUrl = "default";
         this.userExercises = new HashMap<>();
         this.userMovementPatterns = new HashMap<>();
-
-        this.trainingFormCompleted = false; // Inicialización predeterminada
-
+        this.trainingFormCompleted = false;
+        this.role = "user"; // Valor por defecto
     }
+
+    // --- GETTERS Y SETTERS (Aquí estaban faltando los del Rol) ---
+
+    // ✅ ESTOS SON LOS QUE FALTABAN Y CAUSABAN EL ERROR
+    public String getRole() {
+        return role != null ? role : "user";
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+    // ---------------------------------------------------------
 
     public Map<String, UserExercise> getUserExercises() {
         return userExercises;
@@ -109,256 +119,120 @@ public class User {
         this.trainingFormCompleted = trainingFormCompleted;
     }
 
-
-    // Resto de los getters y setters...
     public String getId() {
         return id != null && !id.isEmpty() ? id : "Sin ID";
     }
 
     public void setId(String id) {
         if (id == null || id.isEmpty()) {
-            throw new IllegalArgumentException("El ID del usuario no puede ser nulo o vacío");
+            // Puedes descomentar esto si quieres validación estricta
+            // throw new IllegalArgumentException("El ID del usuario no puede ser nulo o vacío");
         }
         this.id = id;
     }
 
-    public String getFirstName() {
-        return firstName != null ? firstName : "Sin nombre";
-    }
+    public String getFirstName() { return firstName != null ? firstName : "Sin nombre"; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
 
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
+    public String getLastName() { return lastName != null ? lastName : "Sin apellido"; }
+    public void setLastName(String lastName) { this.lastName = lastName; }
 
-    public String getLastName() {
-        return lastName != null ? lastName : "Sin apellido";
-    }
+    public String getEmail() { return email != null ? email : "Sin correo"; }
+    public void setEmail(String email) { this.email = email; }
 
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
+    public int getAge() { return age; }
+    public void setAge(int age) { this.age = age; }
 
-    public String getEmail() {
-        return email != null ? email : "Sin correo";
-    }
+    public double getWeight() { return weight; }
+    public void setWeight(double weight) { this.weight = weight; }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    public double getHeight() { return height; }
+    public void setHeight(double height) { this.height = height; }
 
-    public String getPassword() {
-        return password;
-    }
+    public String getGender() { return gender != null ? gender : "Sin género"; }
+    public void setGender(String gender) { this.gender = gender; }
 
-    public void setPassword(String password) {
-        this.password = password;
-    }
+    public String getActivityLevel() { return activityLevel != null ? activityLevel : "Sin actividad"; }
+    public void setActivityLevel(String activityLevel) { this.activityLevel = activityLevel; }
 
-    public int getAge() {
-        return age;
-    }
+    public String getGoal() { return goal != null ? goal : "Sin meta"; }
+    public void setGoal(String goal) { this.goal = goal; }
 
-    public void setAge(int age) {
-        this.age = age;
-    }
+    public boolean isFirstTime() { return firstTime; }
+    public void setFirstTime(boolean firstTime) { this.firstTime = firstTime; }
 
-    public double getWeight() {
-        return weight;
-    }
+    public double getCaloriesToday() { return caloriesToday; }
+    public void setCaloriesToday(double caloriesToday) { this.caloriesToday = caloriesToday; }
 
-    public void setWeight(double weight) {
-        this.weight = weight;
-    }
+    public double getProteinToday() { return proteinToday; }
+    public double getFatToday() { return fatToday; }
+    public double getCarbToday() { return carbToday; }
 
-    public double getHeight() {
-        return height;
-    }
-
-    public void setHeight(double height) {
-        this.height = height;
-    }
-
-    public String getGender() {
-        return gender != null ? gender : "Sin género";
-    }
-
-    public void setGender(String gender) {
-        this.gender = gender;
-    }
-
-    public String getActivityLevel() {
-        return activityLevel != null ? activityLevel : "Sin actividad";
-    }
-
-    public void setActivityLevel(String activityLevel) {
-        this.activityLevel = activityLevel;
-    }
-
-    public String getGoal() {
-        return goal != null ? goal : "Sin meta";
-    }
-
-    public void setGoal(String goal) {
-        this.goal = goal;
-    }
-
-    public boolean isAdmin() {
-        return isAdmin;
-    }
-
-    public void setAdmin(boolean admin) {
-        isAdmin = admin;
-    }
-
-    public boolean isFirstTime() {
-        return firstTime;
-    }
-
-    public void setFirstTime(boolean firstTime) {
-        this.firstTime = firstTime;
-    }
-
-    public double getCaloriesToday() {
-        return caloriesToday;
-    }
-
-    public void setCaloriesToday(double caloriesToday) {
-        this.caloriesToday = caloriesToday;
-    }
-
-    public double getProteinToday() {
-        return proteinToday;
-    }
-
-    public double getFatToday() {
-        return fatToday;
-    }
-
-    public double getCarbToday() {
-        return carbToday;
-    }
-
+    // Métodos de suma (Lógica de negocio)
     public void addCaloriesToday(double calories) {
         if (calories < 0) {
             Log.w(TAG, "Intento de añadir calorías negativas ignorado.");
             return;
         }
-        Log.d(TAG, "addCaloriesToday | Valor previo: " + this.caloriesToday + ", Añadiendo: " + calories);
         this.caloriesToday += calories;
-        Log.d(TAG, "addCaloriesToday | Valor actualizado: " + this.caloriesToday);
     }
 
     public void addProteinToday(double protein) {
-        if (protein < 0) {
-            Log.w(TAG, "Intento de añadir proteínas negativas ignorado.");
-            return;
-        }
-        Log.d(TAG, "addProteinToday | Valor previo: " + this.proteinToday + ", Añadiendo: " + protein);
+        if (protein < 0) return;
         this.proteinToday += protein;
-        Log.d(TAG, "addProteinToday | Valor actualizado: " + this.proteinToday);
     }
 
     public void addFatToday(double fat) {
-        if (fat < 0) {
-            Log.w(TAG, "Intento de añadir grasas negativas ignorado.");
-            return;
-        }
-        Log.d(TAG, "addFatToday | Valor previo: " + this.fatToday + ", Añadiendo: " + fat);
+        if (fat < 0) return;
         this.fatToday += fat;
-        Log.d(TAG, "addFatToday | Valor actualizado: " + this.fatToday);
     }
 
     public void addCarbToday(double carbs) {
-        if (carbs < 0) {
-            Log.w(TAG, "Intento de añadir carbohidratos negativos ignorado.");
-            return;
-        }
-        Log.d(TAG, "addCarbToday | Valor previo: " + this.carbToday + ", Añadiendo: " + carbs);
+        if (carbs < 0) return;
         this.carbToday += carbs;
-        Log.d(TAG, "addCarbToday | Valor actualizado: " + this.carbToday);
     }
 
-    public double getLatitude() {
-        return latitude;
-    }
+    public double getLatitude() { return latitude; }
+    public void setLatitude(double latitude) { this.latitude = latitude; }
 
-    public void setLatitude(double latitude) {
-        this.latitude = latitude;
-    }
+    public double getLongitude() { return longitude; }
+    public void setLongitude(double longitude) { this.longitude = longitude; }
 
-    public double getLongitude() {
-        return longitude;
-    }
+    public String getProfilePhotoUrl() { return profilePhotoUrl != null ? profilePhotoUrl : "default"; }
+    public void setProfilePhotoUrl(String profilePhotoUrl) { this.profilePhotoUrl = profilePhotoUrl; }
 
-    public void setLongitude(double longitude) {
-        this.longitude = longitude;
-    }
+    public String getProfilePhoto() { return profilePhoto; }
+    public void setProfilePhoto(String profilePhoto) { this.profilePhoto = profilePhoto; }
 
-    public String getProfilePhotoUrl() {
-        return profilePhotoUrl != null ? profilePhotoUrl : "default";
-    }
-
-    public String getProfilePhoto() {
-        return profilePhoto;
-    }
-
-    public void setProfilePhoto(String profilePhoto) {
-        this.profilePhoto = profilePhoto;
-    }
-
-    public void setProfilePhotoUrl(String profilePhotoUrl) {
-        this.profilePhotoUrl = profilePhotoUrl;
-    }
     // Métodos para restar valores
     public void subtractCaloriesToday(double calories) {
-        if (calories < 0) {
-            Log.w(TAG, "Intento de restar calorías negativas ignorado.");
-            return;
-        }
-        Log.d(TAG, "subtractCaloriesToday | Valor previo: " + this.caloriesToday + ", Restando: " + calories);
+        if (calories < 0) return;
         this.caloriesToday = Math.max(0, this.caloriesToday - calories);
-        Log.d(TAG, "subtractCaloriesToday | Valor actualizado: " + this.caloriesToday);
     }
 
     public void subtractProteinToday(double protein) {
-        if (protein < 0) {
-            Log.w(TAG, "Intento de restar proteínas negativas ignorado.");
-            return;
-        }
-        Log.d(TAG, "subtractProteinToday | Valor previo: " + this.proteinToday + ", Restando: " + protein);
+        if (protein < 0) return;
         this.proteinToday = Math.max(0, this.proteinToday - protein);
-        Log.d(TAG, "subtractProteinToday | Valor actualizado: " + this.proteinToday);
     }
 
     public void subtractFatToday(double fat) {
-        if (fat < 0) {
-            Log.w(TAG, "Intento de restar grasas negativas ignorado.");
-            return;
-        }
-        Log.d(TAG, "subtractFatToday | Valor previo: " + this.fatToday + ", Restando: " + fat);
+        if (fat < 0) return;
         this.fatToday = Math.max(0, this.fatToday - fat);
-        Log.d(TAG, "subtractFatToday | Valor actualizado: " + this.fatToday);
     }
 
     public void subtractCarbToday(double carbs) {
-        if (carbs < 0) {
-            Log.w(TAG, "Intento de restar carbohidratos negativos ignorado.");
-            return;
-        }
-        Log.d(TAG, "subtractCarbToday | Valor previo: " + this.carbToday + ", Restando: " + carbs);
+        if (carbs < 0) return;
         this.carbToday = Math.max(0, this.carbToday - carbs);
-        Log.d(TAG, "subtractCarbToday | Valor actualizado: " + this.carbToday);
     }
 
     public void resetDailyValues() {
-        Log.d(TAG, "resetDailyValues | Reiniciando valores diarios a cero.");
         this.caloriesToday = 0.0;
         this.proteinToday = 0.0;
         this.fatToday = 0.0;
         this.carbToday = 0.0;
     }
 
-    // Métodos de cálculo
+    // Métodos de cálculo (Lógica de negocio)
     public int massIndex(double weight, double height) {
         height = feetToMeters(height);
         return (int) (weight / (height * height));
@@ -370,70 +244,42 @@ public class User {
 
     public double calculateCalories(double weight, double height, int age, String gender, String activityLevel, String goal) {
         double bmr;
-
-        // 🔥 Cálculo mejorado del BMR
         if ("male".equalsIgnoreCase(gender)) {
             bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
         } else {
             bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
         }
 
-        // 📌 Ajuste con peso x 23 y suavizado del impacto
         double adjustedBMR = (bmr + (weight * 23)) / 2;
 
-        // 🔥 Factor de actividad basado en nivel de actividad
         double activityFactor = switch (activityLevel != null ? activityLevel.toLowerCase() : "sedentary") {
-            case "sedentary" -> 1.2;       // Poco o nada de ejercicio
-            case "light" -> 1.375;         // Ejercicio ligero (1-3 días/semana)
-            case "moderate" -> 1.55;       // Ejercicio moderado (3-5 días/semana)
-            case "high" -> 1.725;          // Ejercicio intenso (6-7 días/semana)
-            case "very high" -> 1.9;       // Atletas o entrenamientos extremos
-            default -> 1.2;                // Sedentario por defecto
+            case "sedentary" -> 1.2;
+            case "light" -> 1.375;
+            case "moderate" -> 1.55;
+            case "high" -> 1.725;
+            case "very high" -> 1.9;
+            default -> 1.2;
         };
 
-        // 🔥 Cálculo del Gasto Energético Total (GET)
         double get = adjustedBMR * activityFactor;
 
-        // 🔥 Ajuste según objetivo del usuario
         double finalCalories = switch (goal != null ? goal.toLowerCase() : "maintain weight") {
-            case "lose weight" -> get * 0.75;       // 🔹 Deficit calórico (-25%)
-            case "gain muscle" -> get * 1.15;       // 🔹 Superávit calórico (+15%)
-            case "gain weight" -> get * 1.2;        // 🔹 Subida de peso más agresiva (+20%)
-            default -> get;                         // 🔹 Mantenimiento
+            case "lose weight" -> get * 0.75;
+            case "gain muscle" -> get * 1.15;
+            case "gain weight" -> get * 1.2;
+            default -> get;
         };
 
-        // 📌 Logs para depuración en Logcat
-        Log.d("CalculoCalorias", "📌 Peso: " + weight + " kg, Altura: " + height + " cm, Edad: " + age + " años, Género: " + gender);
-        Log.d("CalculoCalorias", "📌 Nivel de Actividad: " + activityLevel + " (Factor: " + activityFactor + ")");
-        Log.d("CalculoCalorias", "📌 BMR Original: " + bmr + ", BMR Ajustado: " + adjustedBMR);
-        Log.d("CalculoCalorias", "📌 Gasto Energético Total (GET): " + get);
-        Log.d("CalculoCalorias", "📌 Objetivo: " + goal + ", Calorías Finales: " + finalCalories);
-
+        Log.d("CalculoCalorias", "Objetivo: " + goal + ", Calorías Finales: " + finalCalories);
         return finalCalories;
     }
 
+    public double calculateProtein() { return weight * 1.6; }
+    public double calculateFat() { return weight * 0.8; }
+    public double calculateCarbs() { return weight * 4; }
 
-    public double calculateProtein() {
-        // Ejemplo: 1.6 gramos de proteína por kilogramo de peso corporal
-        return weight * 1.6;
-    }
-
-    public double calculateFat() {
-        // Ejemplo: 0.8 gramos de grasa por kilogramo de peso corporal
-        return weight * 0.8;
-    }
-
-    public double calculateCarbs() {
-        // Ejemplo: 4 gramos de carbohidratos por kilogramo de peso corporal
-        return weight * 4;
-    }
-    public boolean isCutting() {
-        return goal != null && goal.toLowerCase().contains("perder");
-    }
-
-    public boolean isBulking() {
-        return goal != null && goal.toLowerCase().contains("ganar");
-    }
+    public boolean isCutting() { return goal != null && goal.toLowerCase().contains("perder"); }
+    public boolean isBulking() { return goal != null && goal.toLowerCase().contains("ganar"); }
 
     public double[] calculateMacros(double weight, String goal, double calories) {
         double proteinGrams = 1.8 * weight;
