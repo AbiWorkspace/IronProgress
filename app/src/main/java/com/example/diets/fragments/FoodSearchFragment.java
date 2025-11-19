@@ -2,6 +2,7 @@ package com.example.diets.fragments;
 
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.text.Html;
 import android.text.TextUtils;
 import android.util.Log;
@@ -19,8 +20,6 @@ import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.Spinner;
 import android.widget.Toast;
-import android.os.SystemClock;
-
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -31,8 +30,8 @@ import com.example.diets.adapters.SearchResultAdapter;
 import com.example.diets.dialogs.BarcodeScannerDialog;
 import com.example.diets.dialogs.GramsInputDialog;
 import com.example.diets.dialogs.RecipeDialog;
-import com.example.diets.model.FoodBlock;
-import com.example.diets.model.FoodItem;
+import com.example.diets.model.FoodBlock;          // ✅ se mantiene para compatibilidad con otras clases
+import com.example.diets.model.FoodItem;          // ✅ se mantiene
 import com.example.diets.network.OkHttpSingleton;
 import com.google.mlkit.common.model.DownloadConditions;
 import com.google.mlkit.nl.translate.TranslateLanguage;
@@ -167,6 +166,7 @@ public class FoodSearchFragment extends Fragment {
         });
         pm.show();
     }
+
     private void toggleQuickFilter(String name, MenuItem mi) {
         if (quickSelectedNames.contains(name)) removeQuickFilter(name);
         else addQuickFilter(name);
@@ -201,6 +201,7 @@ public class FoodSearchFragment extends Fragment {
         quickSelectedNames.add(name);
         quickSelectedPairs.add(pair);
     }
+
     private void removeQuickFilter(String name) {
         int idx = quickSelectedNames.indexOf(name);
         if (idx >= 0) {
@@ -208,6 +209,7 @@ public class FoodSearchFragment extends Fragment {
             quickSelectedPairs.remove(idx);
         }
     }
+
     private void clearQuickFilters() { quickSelectedNames.clear(); quickSelectedPairs.clear(); }
 
     // ====================== BÚSQUEDAS ===========================
@@ -251,10 +253,8 @@ public class FoodSearchFragment extends Fragment {
                                         "Código no encontrado. Mostrando resultados relacionados…",
                                         Toast.LENGTH_SHORT).show());
                     }
-// Fallback: ejecuta una búsqueda normal en el hilo de UI
-                    if (isAdded()) {
-                        requireActivity().runOnUiThread(() -> searchFood(barcode));
-                    }
+                    // Fallback: ejecuta una búsqueda normal con el mismo texto
+                    searchFood(barcode);
                     return;
                 }
 
@@ -315,8 +315,22 @@ public class FoodSearchFragment extends Fragment {
 
                 String brand = p.optString("brands", "Sin marca");
                 String img   = p.optString("image_front_url", "");
+                String servingSizeStr = p.optString("serving_size", "");
 
                 FoodResult food = new FoodResult(name, kcal, 0, brand, img, protein, carbs, fat);
+
+                // Porciones: siempre 100 g + porción OFF si existe
+                food.portions.add(new FoodResult.Portion("100 g", 100));
+                double servingGrams = parseServingSizeToGrams(servingSizeStr);
+                if (servingGrams > 0) {
+                    String label = "1 porción (" + servingSizeStr + ")";
+                    food.portions.add(new FoodResult.Portion(label, servingGrams));
+                    Log.d(TAG, "Porción OFF (barcode): " + label + " = " + servingGrams + " g");
+                } else {
+                    Log.d(TAG, "Sin porción OFF válida (barcode) para " + name +
+                            " – serving_size='" + servingSizeStr + "'");
+                }
+
                 resultObjects.add(food);
 
                 final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición
@@ -343,28 +357,13 @@ public class FoodSearchFragment extends Fragment {
         }).start();
     }
 
-
-
     private void searchFood(String query) {
         Log.d(TAG, "searchFood: " + query);
-
-        productResults.clear();
-        recipeResults.clear();
-
-        // Limpieza + notify en UI para evitar tocar vistas fuera del hilo principal
-        if (isAdded()) {
-            requireActivity().runOnUiThread(() -> {
-                resultObjects.clear();
-                adapter.notifyDataSetChanged();
-            });
-        } else {
-            resultObjects.clear();
-        }
-
+        resultObjects.clear(); adapter.notifyDataSetChanged();
+        productResults.clear(); recipeResults.clear();
         fetchProductsFromOpenFoodFacts(query);
-        fetchRecipesFromSpoonacular(query);
+        fetchRecipesFromSpoonacular(query); // ← SEGURO
     }
-
 
     // Si falta, agrega esto:
     private void fetchRecipesFromSpoonacular(String query) {
@@ -486,18 +485,11 @@ public class FoodSearchFragment extends Fragment {
                     rec.idMeal  = id;
 
                     translateRecipeFields(rec, () -> {
-                        if (isAdded()) {
-                            requireActivity().runOnUiThread(() -> {
-                                recipeResults.add(rec);
-                                resultObjects.add(rec);
-                                adapter.notifyDataSetChanged();
-                            });
-                        } else {
-                            recipeResults.add(rec);
-                            resultObjects.add(rec);
-                        }
+                        recipeResults.add(rec);
+                        resultObjects.add(rec);
+                        if (isAdded())
+                            requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
                     });
-
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Error Spoonacular", e);
@@ -526,7 +518,8 @@ public class FoodSearchFragment extends Fragment {
                         .append("nutriments.energy-kcal_100g,nutriments.proteins_100g,")
                         .append("nutriments.carbohydrates_100g,nutriments.fat_100g,")
                         .append("nutriments.sugars_100g,nutriments.sodium_100g,")
-                        .append("nutriments.fiber_100g");
+                        .append("nutriments.fiber_100g,")
+                        .append("serving_size"); // 👈 añadimos serving_size
 
                 for (int i = 0; i < quickSelectedPairs.size(); i++) {
                     String[] pr = quickSelectedPairs.get(i);
@@ -574,8 +567,22 @@ public class FoodSearchFragment extends Fragment {
 
                     String brand = p.optString("brands", "Sin marca");
                     String img   = p.optString("image_front_url", "");
+                    String servingSizeStr = p.optString("serving_size", "");
 
                     FoodResult food = new FoodResult(name, kcal, 0, brand, img, protein, carbs, fat);
+
+                    // Porciones: siempre 100 g + porción OFF si existe
+                    food.portions.add(new FoodResult.Portion("100 g", 100));
+                    double servingGrams = parseServingSizeToGrams(servingSizeStr);
+                    if (servingGrams > 0) {
+                        String label = "1 porción (" + servingSizeStr + ")";
+                        food.portions.add(new FoodResult.Portion(label, servingGrams));
+                        Log.d(TAG, "Porción OFF (search): " + label + " = " + servingGrams + " g");
+                    } else {
+                        Log.d(TAG, "Sin porción OFF válida (search) para " + name +
+                                " – serving_size='" + servingSizeStr + "'");
+                    }
+
                     foodResultsAddWithRanking(tempProducts, food, query);
                 }
 
@@ -583,8 +590,10 @@ public class FoodSearchFragment extends Fragment {
                 Collections.sort(tempProducts, (a, b) ->
                         Integer.compare(relevanceScore(a.name, query), relevanceScore(b.name, query)));
 
-                // ⏱ fin medición (solo red/cálculo)
-                final long t1 = SystemClock.elapsedRealtime();
+                productResults.addAll(tempProducts);
+                resultObjects.addAll(tempProducts);
+
+                final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición
                 boolean success = !tempProducts.isEmpty();
                 Log.i("OFF_TIMING",
                         "term=" + query +
@@ -593,18 +602,7 @@ public class FoodSearchFragment extends Fragment {
                                 " source=red" +
                                 " count=" + tempProducts.size());
 
-                if (isAdded()) {
-                    requireActivity().runOnUiThread(() -> {
-                        productResults.addAll(tempProducts);
-                        resultObjects.addAll(tempProducts);
-                        adapter.notifyDataSetChanged();
-                    });
-                } else {
-                    // Si el fragment aún no está añadido, actualiza listas sin tocar la UI
-                    productResults.addAll(tempProducts);
-                    resultObjects.addAll(tempProducts);
-                }
-
+                if (isAdded()) requireActivity().runOnUiThread(() -> adapter.notifyDataSetChanged());
 
             } catch (Exception e) {
                 final long t1 = SystemClock.elapsedRealtime(); // ⏱ fin medición con error
@@ -619,12 +617,13 @@ public class FoodSearchFragment extends Fragment {
         }).start();
     }
 
-
     // ================ FILTROS AVANZADOS (SIN romper compatibilidad) ================
     private boolean passesMacroFilters(double kcal, double protein, double carbs, double fat) {
         return passesMacroFilters(kcal, protein, carbs, fat, -1, -1, -1);
     }
-    private boolean passesMacroFilters(double kcal, double protein, double carbs, double fat, double sugar, double sodium, double fiber) {
+
+    private boolean passesMacroFilters(double kcal, double protein, double carbs, double fat,
+                                       double sugar, double sodium, double fiber) {
         for (String name : macroSelectedNames) {
             MacroSpec m = macroFilterMap.get(name);
             if (m == null) continue;
@@ -694,11 +693,13 @@ public class FoodSearchFragment extends Fragment {
             this.maxKcal = maxKcal; this.minProtein = minProt; this.maxCarbs = maxCarbs; this.maxFat = maxFat;
             this.maxSugar = -1; this.maxSodium = -1; this.minFiber = -1;
         }
-        MacroSpec(double maxKcal, double minProt, double maxCarbs, double maxFat, double maxSugar, double maxSodium, double minFiber) {
+        MacroSpec(double maxKcal, double minProt, double maxCarbs, double maxFat,
+                  double maxSugar, double maxSodium, double minFiber) {
             this.maxKcal = maxKcal; this.minProtein = minProt; this.maxCarbs = maxCarbs; this.maxFat = maxFat;
             this.maxSugar = maxSugar; this.maxSodium = maxSodium; this.minFiber = minFiber;
         }
     }
+
     private Map<String, MacroSpec> getMacroFilters() {
         Map<String, MacroSpec> m = new LinkedHashMap<>();
         m.put("Bajo en grasa",         new MacroSpec(-1, -1, -1, 10));
@@ -711,6 +712,7 @@ public class FoodSearchFragment extends Fragment {
         m.put("Alto en fibra",         new MacroSpec(-1, -1, -1, -1, -1, -1, 5));     // >= 5g fibra
         return m;
     }
+
     private String getSpoonacularMacroQuery(String name) {
         switch (name) {
             case "Bajo en grasa":         return "&maxFat=10";
@@ -723,6 +725,36 @@ public class FoodSearchFragment extends Fragment {
             case "Alto en fibra":         return "&minFiber=5";
             default: return "";
         }
+    }
+
+    // ========= PARSEO DE serving_size → gramos (para porciones OFF) =========
+    private double parseServingSizeToGrams(String serving) {
+        if (TextUtils.isEmpty(serving)) return -1;
+        String s = serving.replace(',', '.').toLowerCase(Locale.ROOT);
+
+        // Busca el primer número con unidad g / gramos / ml / l
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(\\d+(?:\\.\\d+)?)\\s*(g|gramos|ml|l)")
+                .matcher(s);
+
+        if (!m.find()) return -1;
+
+        double value;
+        try {
+            value = Double.parseDouble(m.group(1));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+
+        String unit = m.group(2);
+        if ("ml".equals(unit)) {
+            // Aproximación densidad ≈ agua
+            return value;
+        } else if ("l".equals(unit)) {
+            return value * 1000.0;
+        }
+        // g / gramos
+        return value;
     }
 
     // =================== RESTO DEL CÓDIGO IGUAL (sin tocar nada) ==============
@@ -806,6 +838,7 @@ public class FoodSearchFragment extends Fragment {
             this.ingredients = ingredients;
             this.type = "receta";
         }
+
         public FoodResult(String name, double kcalPer100g, double grams,
                           String brand, String imageUrl,
                           double protein, double carbs, double fat) {
@@ -814,7 +847,7 @@ public class FoodSearchFragment extends Fragment {
             this.protein = protein; this.carbs = carbs; this.fat = fat;
             this.type = "producto";
         }
+
         public boolean isRecipe() { return "receta".equalsIgnoreCase(type); }
     }
 }
-
