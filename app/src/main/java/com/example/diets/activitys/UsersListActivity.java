@@ -89,13 +89,13 @@ public class UsersListActivity extends AppCompatActivity {
                     String uid   = u.getKey();
                     Log.v(TAG, "Procesando UID: " + uid);
 
-                    // ⛔ Omitirme a mí mismo (opcional, recomendado)
+                    // Omitirme a mí mismo (opcional, recomendado)
                     if (myUid != null && myUid.equals(uid)) {
                         Log.w(TAG, "-> Omitiendo usuario " + uid + " (Soy yo, el coach/admin).");
                         continue;
                     }
 
-                    // ⛔ Omitir coaches / admins
+                    // Omitir coaches / admins
                     String role = u.child("role").getValue(String.class);
                     Log.v(TAG, "-> UID: " + uid + ", Role: " + (role != null ? role : "null"));
 
