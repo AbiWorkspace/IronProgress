@@ -134,7 +134,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot snapshot) {
                         if (!snapshot.exists()) {
-                            Log.e(TAG, "❌ No se encontraron datos del usuario.");
+                            Log.e(TAG, "No se encontraron datos del usuario.");
                             Toast.makeText(MainActivity.this, "Error al obtener datos del usuario", Toast.LENGTH_SHORT).show();
                             return;
                         }
@@ -160,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
 
                         // --------- Ruteo según tipo ----------
                         if ("coach".equalsIgnoreCase(role)) {
-                            // ✅ Coach aprobado: ir a pantalla de coach (lista de usuarios)
+                            // Coach aprobado: ir a pantalla de coach (lista de usuarios)
                             Intent i = new Intent(MainActivity.this, UsersListActivity.class);
                             startActivity(i);
                             finish();
@@ -168,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
                         }
 
                         if (coachCandidate) {
-                            // 🕒 Solicitó ser coach pero aún no aprobado: pantalla de espera
+                            //  Solicitó ser coach pero aún no aprobado: pantalla de espera
                             Intent i = new Intent(MainActivity.this, CoachPendingActivity.class);
                             startActivity(i);
                             finish();

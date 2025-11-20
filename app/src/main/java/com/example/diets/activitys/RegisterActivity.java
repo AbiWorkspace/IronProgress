@@ -217,13 +217,7 @@ public class RegisterActivity extends AppCompatActivity {
             Map<String, Object> updates = new HashMap<>();
             updates.put("/users/" + userId, user);
 
-            if (enviarSolicitud) {
-                Map<String, Object> req = new HashMap<>();
-                req.put("name", firstName + " " + lastName);
-                req.put("email", email);
-                req.put("createdAt", ServerValue.TIMESTAMP);
-                updates.put("/coachRequests/" + userId, req);
-            }
+
 
             root.updateChildren(updates).addOnCompleteListener(t -> {
                 postRegisterNavigate(enviarSolicitud);

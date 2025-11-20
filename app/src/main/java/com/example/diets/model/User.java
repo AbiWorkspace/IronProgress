@@ -14,7 +14,7 @@ public class User {
     private String lastName;
     private String email;
 
-    // ✅ Nuevo campo Rol
+    // Nuevo campo Rol
     private String role;
 
     private int age;
@@ -85,7 +85,7 @@ public class User {
 
     // --- GETTERS Y SETTERS (Aquí estaban faltando los del Rol) ---
 
-    // ✅ ESTOS SON LOS QUE FALTABAN Y CAUSABAN EL ERROR
+    // ESTOS SON LOS QUE FALTABAN Y CAUSABAN EL ERROR
     public String getRole() {
         return role != null ? role : "user";
     }
