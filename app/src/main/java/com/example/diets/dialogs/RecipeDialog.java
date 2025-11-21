@@ -206,18 +206,10 @@ public class RecipeDialog extends DialogFragment {
                 return;
             }
 
-            double factor = grams / 100.0;
-            recipe.grams       = grams;
-            recipe.kcalPer100g = Math.round(baseKcal * factor);
-            recipe.protein     = Math.round(baseProtein * factor * 10) / 10.0;
-            recipe.carbs       = Math.round(baseCarbs * factor * 10) / 10.0;
-            recipe.fat         = Math.round(baseFat * factor * 10) / 10.0;
+            // Solo esto:
+            recipe.grams = grams;
 
-            Log.d(TAG, "btnSave: valores ajustados → grams=" + grams +
-                    " | kcal=" + recipe.kcalPer100g +
-                    " | P=" + recipe.protein +
-                    " | C=" + recipe.carbs +
-                    " | F=" + recipe.fat);
+            Log.d(TAG, "btnSave: gramos seleccionados → " + grams);
 
             if (gramsListener != null) {
                 gramsListener.onGramsConfirmed(recipe);
@@ -226,6 +218,7 @@ public class RecipeDialog extends DialogFragment {
             }
             dismiss();
         });
+
 
         /* ---------- BOTÓN CERRAR ---------- */
         btnClose.setOnClickListener(vw -> {

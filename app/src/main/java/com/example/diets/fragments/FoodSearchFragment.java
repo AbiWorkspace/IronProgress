@@ -30,9 +30,10 @@ import com.example.diets.adapters.SearchResultAdapter;
 import com.example.diets.dialogs.BarcodeScannerDialog;
 import com.example.diets.dialogs.GramsInputDialog;
 import com.example.diets.dialogs.RecipeDialog;
-import com.example.diets.model.FoodBlock;          // ✅ se mantiene para compatibilidad con otras clases
-import com.example.diets.model.FoodItem;          // ✅ se mantiene
+import com.example.diets.model.FoodBlock;          //  se mantiene para compatibilidad con otras clases
+import com.example.diets.model.FoodItem;          //  se mantiene
 import com.example.diets.network.OkHttpSingleton;
+import com.google.android.gms.common.api.Response;
 import com.google.mlkit.common.model.DownloadConditions;
 import com.google.mlkit.nl.translate.TranslateLanguage;
 import com.google.mlkit.nl.translate.Translator;
@@ -52,11 +53,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
-// ... imports exactamente igual
+
 public class FoodSearchFragment extends Fragment {
 
     // ==================== CONSTANTES ======================
@@ -389,7 +387,10 @@ public class FoodSearchFragment extends Fragment {
                 for (String n : quickSelectedNames)  url.append(getSpoonacularQuickQuery(n));
                 for (String n : macroSelectedNames) url.append(getSpoonacularMacroQuery(n));
 
-                Log.d(TAG, "AUDIT_TRAIL: Spoonacular URL Params (Filtros Server-Side): " + url.toString());
+                Log.d(TAG, "AUDIT_TRAIL: Spoonacular filtros server-side aplicados. query=" + query +
+                        " quickFilters=" + quickSelectedNames +
+                        " macroFilters=" + macroSelectedNames);
+
 
                 OkHttpClient cli = OkHttpSingleton.get();
                 Response rsp = cli.newCall(new Request.Builder().url(url.toString()).build()).execute();
