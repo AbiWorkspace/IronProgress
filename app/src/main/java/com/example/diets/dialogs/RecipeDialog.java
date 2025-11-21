@@ -32,6 +32,7 @@ import com.google.mlkit.nl.translate.Translation;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+
 /** Diálogo que muestra detalles completos de una receta o producto seleccionado (estético). */
 public class RecipeDialog extends DialogFragment {
 
@@ -138,7 +139,7 @@ public class RecipeDialog extends DialogFragment {
         /* ---------- INGREDIENTES ---------- */
         if (recipe.ingredients == null || recipe.ingredients.isEmpty()) {
             Log.w(TAG, "onCreateView: ingredientes vacíos.");
-            ingList.setText("⚠️ Ingredientes no disponibles.");
+            ingList.setText("Ingredientes no disponibles.");
         } else {
             ingList.setText(htmlBulletize(recipe.ingredients));
             Log.d(TAG, "onCreateView: ingredientes mostrados. total=" + recipe.ingredients.size());
