@@ -8,6 +8,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -80,11 +81,16 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
         }
 
         doneButton.setOnClickListener(btn -> {
+            if (selectedExercises.isEmpty()) {
+                Toast.makeText(getContext(), "Debes seleccionar al menos un ejercicio", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             if (listener != null && trainingDay != null) {
                 listener.onExercisesSelected(selectedExercises, trainingDay);
-                Log.d(TAG, "✅ Enviados " + selectedExercises.size() + " ejercicios.");
+                Log.d(TAG, " Enviados " + selectedExercises.size() + " ejercicios.");
             } else {
-                Log.w(TAG, "⚠ Listener o TrainingDay es nulo.");
+                Log.w(TAG, " Listener o TrainingDay es nulo.");
             }
             dismiss();
         });
@@ -101,7 +107,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
     /* ---------- CARGA DE EJERCICIOS ---------- */
 
     private void loadExercises(List<MovementPattern> patterns) {
-        Log.d(TAG, "🔄 Cargando ejercicios…");
+        Log.d(TAG, " Cargando ejercicios…");
 
         /* Musculatura del día normalizada */
         Set<String> patternMuscles = new HashSet<>();
@@ -115,7 +121,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
         exercisesListener = new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snap) {
-                if (!isAdded()) {                         // ⛑️  Fragment todavía vivo?
+                if (!isAdded()) {                         //   Fragment todavía vivo?
                     Log.w(TAG, "Callback recibido tras cerrarse el diálogo → ignorado.");
                     return;
                 }
@@ -143,7 +149,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
             @Override
             public void onCancelled(@NonNull DatabaseError err) {
                 if (isAdded())
-                    Log.e(TAG, "❌ Firebase error: " + err.getMessage());
+                    Log.e(TAG, " Firebase error: " + err.getMessage());
             }
         };
 
@@ -166,7 +172,7 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
 
         recyclerView.setAdapter(adapter);
         adapter.notifyDataSetChanged();
-        Log.d(TAG, "✅ RecyclerView listo (" + exercises.size() + " ítems).");
+        Log.d(TAG, " RecyclerView listo (" + exercises.size() + " ítems).");
     }
 
     /* ---------- OPERACIONES ---------- */
@@ -174,10 +180,10 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
     private void addExerciseToSelection(Exercise ex) {
         if (selectedExercises.contains(ex)) {
             selectedExercises.remove(ex);
-            Log.d(TAG, "➖ Eliminado: " + ex.getName());
+            Log.d(TAG, " Eliminado: " + ex.getName());
         } else {
             selectedExercises.add(ex);
-            Log.d(TAG, "➕ Añadido: " + ex.getName());
+            Log.d(TAG, " Añadido: " + ex.getName());
         }
         if (adapter != null) adapter.notifyDataSetChanged();
     }

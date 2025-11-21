@@ -22,35 +22,38 @@ import com.example.diets.model.TrainingDay;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import java.util.List;
-
 public class MenuPopupFragment extends DialogFragment {
 
+    private static final String TAG = "MenuPopupFragment";
 
     private TrainingDay trainingDay;
-
-
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_menu_popup, container, false);
     }
+
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
         BottomNavigationView navigationView = view.findViewById(R.id.navigation);
 
-        // ✅ Obtener TrainingDay
+        //  Obtener TrainingDay
         Bundle args = getArguments();
         if (args != null && args.containsKey("trainingDay")) {
             trainingDay = (TrainingDay) args.getSerializable("trainingDay");
-            Log.d("MenuPopupFragment", "📌 TrainingDay recibido en MenuPopupFragment: " + trainingDay);
+            Log.d("MenuPopupFragment", " TrainingDay recibido en MenuPopupFragment: " + trainingDay);
         } else {
-            Log.e("MenuPopupFragment", "❌ ERROR: No se recibió TrainingDay.");
+            Log.e("MenuPopupFragment", " ERROR: No se recibió TrainingDay.");
         }
 
         navigationView.setOnItemSelectedListener(item -> {
+            // 🔎 AUDITORÍA: cambio de fuente de datos (Firebase vs Local JSON)
+            Log.i(TAG, "AUDIT_TRAIL: Cambiando fuente de datos -> " +
+                    (item.getItemId() == R.id.navigation_exercises ? "CATÁLOGO (Firebase)" : "LOCAL (JSON)"));
+
             Fragment selectedFragment = null;
 
             if (item.getItemId() == R.id.navigation_exercises) {
@@ -63,14 +66,14 @@ public class MenuPopupFragment extends DialogFragment {
                 Bundle fragmentArgs = new Bundle();
                 if (trainingDay != null) {
                     fragmentArgs.putSerializable("trainingDay", trainingDay);
-                    Log.d("MenuPopupFragment", "✅ Pasando TrainingDay a " + selectedFragment.getClass().getSimpleName());
+                    Log.d("MenuPopupFragment", " Pasando TrainingDay a " + selectedFragment.getClass().getSimpleName());
                 } else {
-                    Log.e("MenuPopupFragment", "⚠ TrainingDay es NULL al pasarlo al fragmento hijo.");
+                    Log.e("MenuPopupFragment", " TrainingDay es NULL al pasarlo al fragmento hijo.");
                 }
 
                 selectedFragment.setArguments(fragmentArgs);
 
-                // ✅ NO SE TOCA EL CÓDIGO EXISTENTE, solo aseguramos el `trainingDay`
+                //  NO SE TOCA EL CÓDIGO EXISTENTE, solo aseguramos el `trainingDay`
                 if (selectedFragment instanceof ExerciseSelectionDialogFragment) {
                     ((ExerciseSelectionDialogFragment) selectedFragment).setOnExercisesSelectedListener(
                             (selectedExercises, day) -> sendExercisesToParentFragment(selectedExercises, day)
@@ -92,7 +95,6 @@ public class MenuPopupFragment extends DialogFragment {
             navigationView.setSelectedItemId(R.id.navigation_exercises);
         }
     }
-
 
     public void sendExercisesToParentFragment(List<Exercise> selectedExercises, TrainingDay trainingDay) {
         FragmentManager fragmentManager = getParentFragmentManager();
@@ -120,7 +122,7 @@ public class MenuPopupFragment extends DialogFragment {
                 if (trainingDay != null) {
                     selectExercisesFragment.addSelectedExercise(exercise, trainingDay);
                 } else {
-                    Log.e("MenuPopupFragment", "❌ trainingDay es nulo, no se pudo agregar el ejercicio.");
+                    Log.e("MenuPopupFragment", " trainingDay es nulo, no se pudo agregar el ejercicio.");
                 }
                 break;
             }
