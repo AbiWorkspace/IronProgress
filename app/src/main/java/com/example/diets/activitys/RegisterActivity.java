@@ -44,6 +44,13 @@ import java.io.ByteArrayOutputStream;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Activity de registro de usuarios.
+ *
+ * <p>Incluye trazas de auditoría (AUDIT_TRAIL) para seguir el flujo completo
+ * de registro y, en particular, la regla de unicidad de Coach tanto en UI
+ * (visibilidad del checkbox) como en backend (bandera coachCandidate).</p>
+ */
 public class RegisterActivity extends AppCompatActivity {
 
     private static final String TAG = "RegisterActivity";
@@ -60,9 +67,18 @@ public class RegisterActivity extends AppCompatActivity {
 
     private Bitmap photoBitmap;
 
-    // --- callback simple para reutilizar consulta de "¿existe coach?"
+    /**
+     * Callback simple para reutilizar la consulta de "¿existe coach?".
+     * Usa un único booleano para devolver el resultado de forma asíncrona.
+     */
     private interface BoolCallback { void onResult(boolean value); }
 
+    /**
+     * Inicializa la pantalla de registro, configura captura de foto, instancia
+     * Firebase y realiza una primera validación de unicidad de Coach contra la nube.
+     *
+     * @param savedInstanceState estado previamente guardado de la Activity.
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -86,6 +102,9 @@ public class RegisterActivity extends AppCompatActivity {
                     && chkCoachRequest.getVisibility() == View.VISIBLE
                     && chkCoachRequest.isChecked();
 
+            // Auditoría: intento de registro y estado de la solicitud de coach en UI
+            Log.d(TAG, "AUDIT_TRAIL: Click en registrar. requestCoachUI=" + requestCoach + " | email=" + email);
+
             if (validateInputs(firstName, lastName, email, password)) {
                 registerButton.setEnabled(false);
                 registerUser(firstName, lastName, email, password, requestCoach);
@@ -93,12 +112,19 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Al volver a primer plano, vuelve a consultar al backend para decidir
+     * si el checkbox de solicitud de coach debe mostrarse u ocultarse.
+     */
     @Override
     protected void onResume() {
         super.onResume();
         checkIfCoachAlreadyExists();
     }
 
+    /**
+     * Asocia las vistas del layout con los campos de la Activity.
+     */
     private void initializeUI() {
         firstNameEditText = findViewById(R.id.firstNameEditText);
         lastNameEditText  = findViewById(R.id.lastNameEditText);
@@ -110,6 +136,10 @@ public class RegisterActivity extends AppCompatActivity {
         chkCoachRequest   = findViewById(R.id.chkCoachRequest);
     }
 
+    /**
+     * Configura el botón de captura de foto para solicitar permisos de cámara
+     * y lanzar el intent de captura cuando estén concedidos.
+     */
     private void setupPhotoCapture() {
         takePhotoButton.setOnClickListener(v -> {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
@@ -122,6 +152,13 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Recibe el resultado de la captura de foto y actualiza la vista de perfil.
+     *
+     * @param requestCode código de la petición.
+     * @param resultCode  resultado de la operación.
+     * @param data        intent con los datos devueltos por la cámara.
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -132,6 +169,15 @@ public class RegisterActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Valida los campos del formulario de registro.
+     *
+     * @param firstName nombre capturado.
+     * @param lastName  apellido capturado.
+     * @param email     correo electrónico capturado.
+     * @param password  contraseña capturada.
+     * @return {@code true} si todos los campos son válidos, {@code false} en caso contrario.
+     */
     private boolean validateInputs(String firstName, String lastName, String email, String password) {
         if (firstName.isEmpty() || !firstName.matches("[a-zA-Z]+")) {
             firstNameEditText.setError("Nombre requerido y sin números/esp.");
@@ -149,9 +195,21 @@ public class RegisterActivity extends AppCompatActivity {
             passwordEditText.setError("Mínimo 6 caracteres");
             return false;
         }
+        // Auditoría ligera de validación exitosa
+        Log.d(TAG, "AUDIT_TRAIL: Validación de campos exitosa para email=" + email);
         return true;
     }
 
+    /**
+     * Orquesta el registro del usuario en Firebase Authentication.
+     * Si la autenticación es exitosa, delega la escritura del perfil en RTDB.
+     *
+     * @param firstName    nombre del usuario.
+     * @param lastName     apellido del usuario.
+     * @param email        correo electrónico del usuario.
+     * @param password     contraseña en texto plano (no se loguea).
+     * @param requestCoach indica si el usuario marcó la solicitud de coach en UI.
+     */
     private void registerUser(String firstName, String lastName, String email, String password,
                               boolean requestCoach) {
         mAuth.createUserWithEmailAndPassword(email, password)
@@ -160,11 +218,13 @@ public class RegisterActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         FirebaseUser user = mAuth.getCurrentUser();
                         if (user != null) {
+                            Log.i(TAG, "AUDIT_TRAIL: Registro FirebaseAuth exitoso -> UID=" + user.getUid() + " | email=" + email + " | requestCoachUI=" + requestCoach);
                             writeNewUser(user.getUid(), firstName, lastName, email, photoBitmap, requestCoach);
                         }
                     } else {
                         Exception ex = task.getException();
                         Log.e(TAG, "Error en el registro", ex);
+                        Log.w(TAG, "AUDIT_TRAIL: Falló registro FirebaseAuth -> email=" + email + " | exception=" + (ex != null ? ex.getClass().getSimpleName() : "desconocida"));
 
                         // --- MODIFICACIÓN ---
                         // Mover el Toast para ser más específico
@@ -192,6 +252,19 @@ public class RegisterActivity extends AppCompatActivity {
                 });
     }
 
+    /**
+     * Construye el mapa de usuario y lo persiste en RTDB.
+     * Aquí se aplica la regla de negocio de unicidad de Coach:
+     * solo se marca {@code coachCandidate=true} si el usuario pidió coach
+     * en la UI y el backend confirma que aún NO existe un coach.
+     *
+     * @param userId         UID del usuario autenticado.
+     * @param firstName      nombre del usuario.
+     * @param lastName       apellido del usuario.
+     * @param email          correo electrónico del usuario.
+     * @param photoBitmap    foto de perfil en bitmap (puede ser null).
+     * @param requestCoachUI estado del checkbox de solicitud de coach en UI.
+     */
     private void writeNewUser(String userId, String firstName, String lastName, String email,
                               @Nullable Bitmap photoBitmap, boolean requestCoachUI) {
 
@@ -213,12 +286,16 @@ public class RegisterActivity extends AppCompatActivity {
         existsCoach(exists -> {
             boolean enviarSolicitud = requestCoachUI && !exists;
 
+            // Auditoría de regla de negocio (unicidad de Coach)
+            Log.i(TAG, "AUDIT_TRAIL: Evaluando regla de unicidad de Coach -> requestCoachUI=" + requestCoachUI + " | existeCoach=" + exists + " | coachCandidate(enviarSolicitud)=" + enviarSolicitud);
+
             user.put("coachCandidate", enviarSolicitud);
 
             Map<String, Object> updates = new HashMap<>();
             updates.put("/users/" + userId, user);
 
-
+            // Auditoría requerida: escritura del perfil en RTDB
+            Log.i(TAG, "AUDIT_TRAIL: Escribiendo perfil en RTDB. UID: " + userId + " | Role: " + user.get("role") + " | CoachCandidate: " + user.get("coachCandidate"));
 
             root.updateChildren(updates).addOnCompleteListener(t -> {
                 postRegisterNavigate(enviarSolicitud);
@@ -230,10 +307,21 @@ public class RegisterActivity extends AppCompatActivity {
     }
 
     // ---------- VISIBILIDAD DEL CHECK (front) CONTROLADA POR BACKEND ----------
+
+    /**
+     * Controla la visibilidad del checkbox de solicitud de coach según lo que
+     * responda el backend. Solo se muestra si NO existe ningún coach registrado.
+     *
+     * La regla de negocio de unicidad de Coach se inicia aquí desde la perspectiva de UI.
+     */
     private void checkIfCoachAlreadyExists() {
         if (chkCoachRequest == null) return;
         chkCoachRequest.setVisibility(View.GONE);
         chkCoachRequest.setChecked(false);
+
+        // AUDIT: inicio de validación de unicidad de Coach (llamada a la nube)
+        Log.d(TAG, "AUDIT_TRAIL: Iniciando validación de unicidad de Coach en la nube...");
+
         existsCoach(exists -> {
             // Si existe coach -> oculto; si no, muestro desmarcado
             chkCoachRequest.setVisibility(exists ? View.GONE : View.VISIBLE);
@@ -241,6 +329,16 @@ public class RegisterActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * Consulta en RTDB si existe al menos un usuario con {@code role == "coach"}.
+     * El resultado se devuelve a través de un callback booleano.
+     *
+     * <p>En caso de error (onCancelled), se aplica un fail-safe conservador:
+     * se asume que SÍ existe un coach para evitar violar la unicidad.</p>
+     *
+     * @param cb callback que recibe {@code true} si existe coach o si hay error (fail-safe),
+     *           {@code false} si no existe coach.
+     */
     private void existsCoach(@NonNull final BoolCallback cb) {
         // Esta es la consulta que tú esperas:
         // Busca en /users, ordena por "role" y mira si existe alguno igual a "coach"
@@ -251,12 +349,14 @@ public class RegisterActivity extends AppCompatActivity {
                         // dataSnapshot.exists() será 'true' si encuentra al menos 1 coach
                         boolean has = dataSnapshot.exists();
                         Log.d(TAG, "Consulta de 'role' == 'coach' existe = " + has);
+                        Log.i(TAG, "AUDIT_TRAIL: ¿Existe Coach registrado?: " + has + ". Ajustando visibilidad del checkbox.");
                         cb.onResult(has);
                     }
 
                     @Override
                     public void onCancelled(@NonNull DatabaseError databaseError) {
                         Log.e(TAG, "Error al consultar 'role' de coach: ", databaseError.toException());
+                        Log.i(TAG, "AUDIT_TRAIL: Error al consultar unicidad de Coach. Se aplica fail-safe asumiendo que ya existe un Coach y se oculta el checkbox.");
                         // Fail-safe: Si hay un error de reglas, OCULTAMOS el check
                         // Es más seguro asumir que SÍ existe un coach si no podemos verificar
                         cb.onResult(true);
@@ -264,15 +364,22 @@ public class RegisterActivity extends AppCompatActivity {
                 });
     }
 
-
-
+    /**
+     * Navega a la pantalla correspondiente después del registro según se haya
+     * enviado o no una solicitud de coach.
+     *
+     * @param envioSolicitudCoach {@code true} si el usuario quedó como candidato a coach,
+     *                            {@code false} si es un usuario estándar.
+     */
     private void postRegisterNavigate(boolean envioSolicitudCoach) {
         if (envioSolicitudCoach) {
+            Log.i(TAG, "AUDIT_TRAIL: Navegación post-registro -> CoachPendingActivity (solicitud de coach enviada).");
             Toast.makeText(this, "Registro completo. Solicitud de coach enviada.", Toast.LENGTH_LONG).show();
             Intent intent = new Intent(this, CoachPendingActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(intent);
         } else {
+            Log.i(TAG, "AUDIT_TRAIL: Navegación post-registro -> MainActivity (sin solicitud de coach).");
             Toast.makeText(this, "Registro completo.", Toast.LENGTH_LONG).show();
             Intent intent = new Intent(this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -281,6 +388,12 @@ public class RegisterActivity extends AppCompatActivity {
         finish();
     }
 
+    /**
+     * Traductor de excepciones de Firebase Auth a mensajes entendibles en español.
+     *
+     * @param e excepción original de Firebase.
+     * @return mensaje de error localizado.
+     */
     private String getAuthErrorEs(@Nullable Exception e) {
         if (e == null) return "Error desconocido.";
         if (e instanceof FirebaseAuthWeakPasswordException) return "La contraseña es demasiado débil. Usa al menos 6 caracteres.";
@@ -298,6 +411,12 @@ public class RegisterActivity extends AppCompatActivity {
         return (fb != null && !fb.isEmpty()) ? fb : "Error inesperado. Intenta de nuevo.";
     }
 
+    /**
+     * Codifica un {@link Bitmap} en Base64 para persistirlo como texto en RTDB.
+     *
+     * @param bitmap imagen a codificar (puede ser {@code null}).
+     * @return cadena Base64 o {@code null} si no se pudo codificar.
+     */
     private String encodeBitmapToBase64(Bitmap bitmap) {
         if (bitmap == null) return null;
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
