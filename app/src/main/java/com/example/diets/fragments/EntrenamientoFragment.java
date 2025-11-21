@@ -109,6 +109,9 @@ public class EntrenamientoFragment extends Fragment {
             int days = Integer.parseInt(daysText.replaceAll("\\D+", ""));
             int time = Integer.parseInt(timeText.replaceAll("\\D+", ""));
 
+            // 🔎 AUDITORÍA: demostrar que los parámetros fantasma sí se capturan
+            Log.i(TAG, "AUDIT_TRAIL: Parametros capturados -> Días: " + days + " | Exp: " + experience + " | Tiempo: " + time + ". Reteniendo en memoria para siguiente paso.");
+
             // Crear un Bundle con los datos
             Bundle data = new Bundle();
             data.putString("goal", goal);
@@ -119,6 +122,7 @@ public class EntrenamientoFragment extends Fragment {
 
             // Llamar al método para cambiar al nuevo fragmento
             if (getActivity() instanceof ViewPagerActivity) {
+                Log.d(TAG, "AUDIT_TRAIL: Navegando a Selección de Distribución. Datos transferidos en Bundle.");
                 ((ViewPagerActivity) getActivity()).switchToExerciseDistributionFragment(data);
             }
         });
