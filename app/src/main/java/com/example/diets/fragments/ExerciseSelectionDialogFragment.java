@@ -138,6 +138,9 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
                     }
                 }
 
+                // 🔎 AUDITORÍA: resultado del filtrado inteligente por patrón del día
+                Log.d(TAG, "AUDIT_TRAIL: Filtrado de catálogo aplicado. Ejercicios coincidentes con el patrón del día: " + filtered.size());
+
                 /* Refrescar UI */
                 requireActivity().runOnUiThread(() -> {
                     exercises.clear();
