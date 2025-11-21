@@ -39,7 +39,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-
 public class CreatedExercisesFragment extends Fragment implements
         AddExerciseDialogFragment.AddExerciseListener,
         ExercisesAdapter.OnExerciseClickListener,
@@ -139,7 +138,8 @@ public class CreatedExercisesFragment extends Fragment implements
         deleteExerciseButton.setOnClickListener(v -> showDeleteConfirmationDialog());
     }
 
-    public void setOnExerciseSelectedListener(OnExerciseSelectedListener listener) {        this.listener = listener;
+    public void setOnExerciseSelectedListener(OnExerciseSelectedListener listener) {
+        this.listener = listener;
     }
 
     private void showDeleteConfirmationDialog() {
@@ -166,15 +166,21 @@ public class CreatedExercisesFragment extends Fragment implements
         if (!ready()) return;
         String u = uid();
         if (u == null) { Log.w(TAG, "save: uid null"); return; }
+
+        // 🔎 AUDITORÍA: persistencia local de ejercicios personalizados
+        Log.i(TAG, "AUDIT_TRAIL: Persistiendo ejercicio nuevo en almacenamiento interno (Privado).");
+
         try (FileWriter writer = new FileWriter(file())) {
             new Gson().toJson(exercises, writer);
         } catch (IOException e) {
             Log.e(TAG, "Error al guardar ejercicios", e);
         }
     }
+
     private File file() {
         return new File(requireContext().getFilesDir(), uid() + "_exercises.json");
     }
+
     // Cargar ejercicios (si no hay archivo, el adapter YA está listo → no hay NPE)
     private void loadExercisesFromInternalStorage(@Nullable List<MovementPattern> movementPatterns) {
         Log.d(TAG, "loadExercisesFromInternalStorage: Iniciando carga desde almacenamiento interno.");
@@ -196,6 +202,9 @@ public class CreatedExercisesFragment extends Fragment implements
 
             exercises.clear();
             if (loadedExercises != null) {
+                // 🔎 AUDITORÍA: archivo existe y se cargan ejercicios desde JSON local
+                Log.i(TAG, "AUDIT_TRAIL: Cargando ejercicios personalizados desde JSON local. Total: " + loadedExercises.size());
+
                 exercises.addAll(loadedExercises); // por ahora sin filtro
                 Log.d(TAG, "loadExercisesFromInternalStorage: Cargados " + exercises.size() + " ejercicios.");
             } else {
