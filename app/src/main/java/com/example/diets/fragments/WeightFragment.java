@@ -66,11 +66,13 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+
 public class WeightFragment extends Fragment {
 
     /* -------------------------------------------------- */
     /* ------------------- CONSTANTES ------------------- */
     /* -------------------------------------------------- */
+    private static final String TAG = "WeightFragment";   //  para AUDIT_TRAIL
     private static final String KEY_WAITING_PROGRESS = "waiting_progress";
     private static final String KEY_WAITING_DATE     = "waiting_date"; // epochDay del último ajuste
     private static final int WAIT_DAYS_AFTER_ADJUST  = 7;
@@ -383,7 +385,11 @@ public class WeightFragment extends Fragment {
         }
 
         double weight = Double.parseDouble(wStr);
-        if(weight <= 20 || weight > 300) {
+
+        // 🧾 AUDIT TRAIL
+        Log.i(TAG, "AUDIT_TRAIL: Guardando peso: " + weight + "kg para fecha: " + selectedDate + ". Validando unicidad y rango.");
+
+        if(weight <= 40 || weight > 150) {
             Toast.makeText(getContext(), "Peso fuera de rango", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -414,6 +420,7 @@ public class WeightFragment extends Fragment {
 
         Log.d(LOG_PREFIX, "Calorías obtenidas para " + selectedDate + ": " + kcal);
     }
+
 
     /**
      * Busca en SharedPreferences (FoodPrefs) las kcal del día (clave compatible con DashboardFragment):
@@ -569,9 +576,9 @@ public class WeightFragment extends Fragment {
             long daysSince = today - lastAdjustDay;
             daysLeft = (int) (WAIT_DAYS_AFTER_ADJUST - daysSince);
             if (daysLeft > 0) {
-                Log.d(LOG_PREFIX, "⏳ esperando " + daysLeft + " d tras ajuste");
+                Log.d(LOG_PREFIX, " esperando " + daysLeft + " d tras ajuste");
             } else {
-                Log.d(LOG_PREFIX, "🟢 Fin del periodo de espera. Se reanuda el análisis.");
+                Log.d(LOG_PREFIX, " Fin del periodo de espera. Se reanuda el análisis.");
                 waiting = false;
                 p.edit().putBoolean(prefKey(KEY_WAITING_PROGRESS), false).apply();
             }
@@ -714,6 +721,9 @@ public class WeightFragment extends Fragment {
             }
 
             if (upd != curr) {
+                //  AUDIT TRAIL
+                Log.w(TAG, "AUDIT_TRAIL: Ajuste Inteligente activado. Modificando Kcal diarias para cumplir meta.");
+
                 kcalRef.setValue(upd);
                 Log.d(LOG_PREFIX, String.format(Locale.getDefault(),
                         "[ajustarCalorias] kcal %,.0f → %,.0f", curr, upd));
@@ -732,6 +742,7 @@ public class WeightFragment extends Fragment {
             Log.e(LOG_PREFIX, "Error leyendo caloriesToday", e);
         });
     }
+
 
     /** Calcula kcal promedio en los 7 días terminando en offset (-7,-14,-21). */
     private double kcalAverageForRange(int offsetFromToday){

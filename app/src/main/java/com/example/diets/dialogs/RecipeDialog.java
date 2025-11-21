@@ -32,7 +32,6 @@ import com.google.mlkit.nl.translate.Translation;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
-
 /** Diálogo que muestra detalles completos de una receta o producto seleccionado (estético). */
 public class RecipeDialog extends DialogFragment {
 
@@ -82,6 +81,12 @@ public class RecipeDialog extends DialogFragment {
             dismiss();
             return v;
         }
+
+        // === AUDIT_TRAIL: apertura de detalle de receta ===
+        boolean tieneInstrucciones = recipe.instructions != null && !recipe.instructions.isEmpty();
+        Log.i(TAG, "AUDIT_TRAIL: Abriendo detalle de receta. ID: " + recipe.idMeal
+                + " | Tiene instrucciones: " + tieneInstrucciones);
+
         Log.d(TAG, "onCreateView: receta recibida – idMeal=" + recipe.idMeal +
                 " | name=" + recipe.name +
                 " | instrLen=" + (recipe.instructions == null ? "null" : recipe.instructions.length()));
@@ -206,6 +211,10 @@ public class RecipeDialog extends DialogFragment {
                 return;
             }
 
+            // AUDIT_TRAIL al confirmar receta y recalcular macros
+            Log.d(TAG, "AUDIT_TRAIL: Confirmando receta. Gramos: " + grams +
+                    ". Recalculando macros (Kcal: " + recipe.kcalPer100g + ").");
+
             // Solo esto:
             recipe.grams = grams;
 
@@ -218,7 +227,6 @@ public class RecipeDialog extends DialogFragment {
             }
             dismiss();
         });
-
 
         /* ---------- BOTÓN CERRAR ---------- */
         btnClose.setOnClickListener(vw -> {

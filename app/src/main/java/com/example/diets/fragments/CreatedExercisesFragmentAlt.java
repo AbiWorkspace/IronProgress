@@ -221,6 +221,7 @@ public class CreatedExercisesFragmentAlt extends Fragment implements
 
     private void setupRecyclerView() {
         if (recyclerView == null) return;
+
         if (adapter == null) {
             adapter = new ExercisesAdapter(
                     exercises,
@@ -233,10 +234,13 @@ public class CreatedExercisesFragmentAlt extends Fragment implements
                     },
                     this
             );
-            recyclerView.setAdapter(adapter);
         }
+
+        recyclerView.setAdapter(adapter);
+
         adapter.notifyDataSetChanged();
     }
+
 
     public void addExerciseToSelection(Exercise exercise) {
         if (exercise == null) return;

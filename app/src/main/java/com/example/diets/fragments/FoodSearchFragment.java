@@ -20,7 +20,7 @@ import android.widget.ListView;
 import android.widget.PopupMenu;
 import android.widget.Spinner;
 import android.widget.Toast;
-
+import com.example.diets.network.OkHttpSingleton;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -33,7 +33,9 @@ import com.example.diets.dialogs.RecipeDialog;
 import com.example.diets.model.FoodBlock;          //  se mantiene para compatibilidad con otras clases
 import com.example.diets.model.FoodItem;          //  se mantiene
 import com.example.diets.network.OkHttpSingleton;
-import com.google.android.gms.common.api.Response;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import com.google.mlkit.common.model.DownloadConditions;
 import com.google.mlkit.nl.translate.TranslateLanguage;
 import com.google.mlkit.nl.translate.Translator;

@@ -52,6 +52,7 @@ import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 public class DashboardFragment extends Fragment {
 
     private static final String TAG = "DashboardFragment";
@@ -1193,6 +1194,10 @@ public class DashboardFragment extends Fragment {
                     foodBlockAdapter.notifyItemChanged(0);
                 }
 
+                //  AUDIT TRAIL requerido
+                Log.i(TAG, "AUDIT_TRAIL: Receta añadida al bloque de comida. " +
+                        "Guardando en historial local (SharedPreferences).");
+
                 guardarComidasDelDia(currentDate);
                 recalculateDayTotals();
 
@@ -1203,4 +1208,5 @@ public class DashboardFragment extends Fragment {
 
         dialog.show(getParentFragmentManager(), "RecipeDialogTag");
     }
+
 }

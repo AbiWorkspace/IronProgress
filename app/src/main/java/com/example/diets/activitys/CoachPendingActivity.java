@@ -18,7 +18,6 @@ import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
-
 public class CoachPendingActivity extends AppCompatActivity {
 
     private static final String TAG = "CoachPendingActivity";
@@ -67,10 +66,19 @@ public class CoachPendingActivity extends AppCompatActivity {
                 .child(uid).child("role");
 
         roleListener = new ValueEventListener() {
-            @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
                 String role = snapshot.getValue(String.class);
+
+                // AUDIT TRAIL: monitoreo en tiempo real del rol
+                Log.i(TAG, "AUDIT_TRAIL: Monitoreando estado de rol. Valor actual en DB: " + role);
+
                 Log.d(TAG, "role actual: " + role);
                 if ("coach".equalsIgnoreCase(role)) {
+
+                    // AUDIT TRAIL: transición a rol coach detectada
+                    Log.w(TAG, "AUDIT_TRAIL: Rol 'Coach' detectado. Aprobación concedida. Navegando a Panel.");
+
                     // Ya eres coach → ir a la lista de usuarios (pantallas del coach)
                     Intent i = new Intent(CoachPendingActivity.this, UsersListActivity.class);
                     i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
@@ -79,7 +87,9 @@ public class CoachPendingActivity extends AppCompatActivity {
                 }
                 // Si sigue como "user" o null, se queda esta pantalla con el spinner y el texto
             }
-            @Override public void onCancelled(@NonNull DatabaseError error) {
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
                 Log.e(TAG, "Error leyendo role: " + error.getMessage());
             }
         };

@@ -94,7 +94,17 @@ public class ExerciseDetailsFragment extends Fragment {
             }
         }
 
-        backButton.setOnClickListener(v -> getParentFragmentManager().popBackStack());
+        backButton.setOnClickListener(v -> {
+            Fragment parent = getParentFragment();
+            if (parent != null) {
+                // 🔙 Volver en el MISMO FragmentManager donde se hizo el replace
+                parent.getChildFragmentManager().popBackStack();
+            } else {
+                // Fallback por si algún día lo usas como fragmento "normal"
+                requireActivity().getSupportFragmentManager().popBackStack();
+            }
+        });
+
     }
 
     private boolean cargarImagenesDesdeListaYVerificar(List<String> base64Images) {

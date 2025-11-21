@@ -32,6 +32,8 @@ import com.example.diets.model.Exercise;
 import com.example.diets.model.MovementPattern;
 import com.example.diets.model.Muscle;
 import com.google.common.reflect.TypeToken;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -146,6 +148,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
         saveButton.setOnClickListener(v -> saveExercise());
     }
 
+
     /* ------------------------------------------------------------------ */
     private void saveExercise() {
         String exerciseName = nameEditText.getText().toString().trim();
@@ -238,35 +241,60 @@ public class AddExerciseDialogFragment extends DialogFragment {
             Log.e("AddExerciseDialogFragment", "Error al seleccionar la imagen", e);
         }
     }
+    // Helpers de seguridad / archivo por usuario
+    private @Nullable String uid() {
+        FirebaseUser u = FirebaseAuth.getInstance().getCurrentUser();
+        return (u != null) ? u.getUid() : null;
+    }
+
+    private boolean ready() {
+        return isAdded() && getContext() != null;
+    }
+
+    /** Archivo JSON local privado por usuario: <UID>_exercises.json */
+    private File file() {
+        return new File(requireContext().getFilesDir(), uid() + "_exercises.json");
+    }
 
     private void saveExerciseToInternalStorage(Exercise exercise) {
-        Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: Guardando ejercicio en almacenamiento interno");
+        Log.d(TAG, "saveExerciseToInternalStorage: Guardando ejercicio en almacenamiento interno");
+
+        if (!ready()) {
+            Log.w(TAG, "saveExerciseToInternalStorage: Fragment no está listo.");
+            return;
+        }
+
+        String u = uid();
+        if (u == null) {
+            Log.w(TAG, "saveExerciseToInternalStorage: uid null (usuario no autenticado). No se guarda.");
+            return;
+        }
 
         try {
-            // Cargar ejercicios existentes desde JSON
+            // Cargar ejercicios existentes desde JSON (<UID>_exercises.json)
             List<Exercise> exercises = loadExercisesFromInternalStorage();
 
             // Añadir el nuevo ejercicio a la lista
             exercises.add(exercise);
 
             // Guardar lista en formato JSON
-            File file = new File(getContext().getFilesDir(), FILE_NAME);
+            File f = file();
 
-            // AUDITORÍA: archivo aislado por UID (nombre de archivo)
-            Log.d(TAG, "AUDIT_TRAIL: Persistiendo en archivo aislado por UID: " + file.getName());
+            Log.d(TAG, "AUDIT_TRAIL: Persistiendo " + exercises.size()
+                    + " ejercicios en archivo aislado por UID: " + f.getName());
 
-            FileWriter writer = new FileWriter(file);
-            Gson gson = new Gson();
-            String json = gson.toJson(exercises);
+            try (FileWriter writer = new FileWriter(f)) {
+                Gson gson = new Gson();
+                String json = gson.toJson(exercises);
+                writer.write(json);
+            }
 
-            writer.write(json);
-            writer.close();
-
-            Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage:  Ejercicio guardado correctamente.");
+            Log.d(TAG, "saveExerciseToInternalStorage: Ejercicio guardado correctamente en " + f.getName());
         } catch (IOException e) {
-            Log.e("AddExerciseDialogFragment", " Error al guardar ejercicio", e);
+            Log.e(TAG, "saveExerciseToInternalStorage: Error al guardar ejercicio", e);
         }
     }
+
 
 
     private void loadMusclesFromDatabase() {
@@ -366,31 +394,40 @@ public class AddExerciseDialogFragment extends DialogFragment {
     private List<Exercise> loadExercisesFromInternalStorage() {
         List<Exercise> exercises = new ArrayList<>();
 
-        try {
-            File file = new File(getContext().getFilesDir(), FILE_NAME);
-            if (!file.exists()) {
-                Log.e("AddExerciseDialogFragment", "❌ Archivo de ejercicios no encontrado.");
-                return exercises;
-            }
+        if (!ready()) {
+            Log.w(TAG, "loadExercisesFromInternalStorage: Fragment no está listo.");
+            return exercises;
+        }
 
-            BufferedReader reader = new BufferedReader(new FileReader(file));
+        String u = uid();
+        if (u == null) {
+            Log.w(TAG, "loadExercisesFromInternalStorage: uid null (usuario no autenticado).");
+            return exercises;
+        }
+
+        File f = file();
+        if (!f.exists()) {
+            Log.i(TAG, "loadExercisesFromInternalStorage: Archivo no encontrado para uid="
+                    + u + " -> " + f.getName() + ". Lista vacía.");
+            return exercises;
+        }
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(f))) {
             Gson gson = new Gson();
             Type listType = new TypeToken<List<Exercise>>() {}.getType();
 
             exercises = gson.fromJson(reader, listType);
-            reader.close();
+            if (exercises == null) exercises = new ArrayList<>();
 
-            if (exercises == null) {
-                exercises = new ArrayList<>();
-            }
-
-            Log.d("AddExerciseDialogFragment", " Ejercicios cargados correctamente: " + exercises.size());
+            Log.d(TAG, "loadExercisesFromInternalStorage: Ejercicios cargados ("
+                    + exercises.size() + ") desde " + f.getName());
         } catch (Exception e) {
-            Log.e("AddExerciseDialogFragment", " Error al cargar ejercicios desde almacenamiento interno", e);
+            Log.e(TAG, "loadExercisesFromInternalStorage: Error al cargar ejercicios", e);
         }
 
         return exercises;
     }
+
 
     private String encodeImageToBase64(Bitmap bitmap) {
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
