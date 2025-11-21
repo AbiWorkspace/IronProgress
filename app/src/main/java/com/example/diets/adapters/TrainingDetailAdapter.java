@@ -65,6 +65,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 // imports necesarios
 import android.content.Context;
 import androidx.appcompat.app.AlertDialog;
+
 public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAdapter.ExerciseViewHolder> {
 
     private static final String TAG = "TrainingDetailAdapter";

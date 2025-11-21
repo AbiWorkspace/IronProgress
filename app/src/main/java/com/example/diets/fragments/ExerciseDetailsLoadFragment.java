@@ -142,59 +142,61 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
     }
 
     private void saveExerciseDetails() {
-        Log.d(TAG, "saveExerciseDetails: 🚀 Iniciando guardado de datos del ejercicio");
+        Log.d(TAG, "saveExerciseDetails: Iniciando guardado de datos del ejercicio");
 
         TextInputEditText loadEditText = getView().findViewById(R.id.loadEditText);
         Spinner repsSpinner = getView().findViewById(R.id.repsSpinner);
         Spinner familiaritySpinner = getView().findViewById(R.id.familiaritySpinner);
 
         if (!isExerciseDataValid(loadEditText, repsSpinner, familiaritySpinner)) {
-            Log.w(TAG, "saveExerciseDetails: ❌ Validación fallida - campos incompletos");
-            showToast("⚠️ Completa todos los campos antes de guardar.");
+            Log.w(TAG, "saveExerciseDetails: Validación fallida - campos incompletos");
+
+
+            showToast("️ Completa o introduce todos los campos validos.");
             return;
         }
 
         int currentLoad = Integer.parseInt(loadEditText.getText().toString());
-        int maxReps = repsSpinner.getSelectedItemPosition() + 1;
+        int maxReps = repsSpinner.getSelectedItemPosition() ;
         boolean isCompleted = familiaritySpinner.getSelectedItemPosition() == 3;
         String familiarity = familiaritySpinner.getSelectedItem().toString();
 
-        Log.d(TAG, "saveExerciseDetails: 📥 Valores del formulario:");
-        Log.d(TAG, "    ➤ currentLoad: " + currentLoad);
-        Log.d(TAG, "    ➤ maxReps: " + maxReps);
-        Log.d(TAG, "    ➤ isCompleted: " + isCompleted);
-        Log.d(TAG, "    ➤ familiarity: " + familiarity);
+        Log.d(TAG, "saveExerciseDetails:  Valores del formulario:");
+        Log.d(TAG, "     currentLoad: " + currentLoad);
+        Log.d(TAG, "    maxReps: " + maxReps);
+        Log.d(TAG, "    isCompleted: " + isCompleted);
+        Log.d(TAG, "     familiarity: " + familiarity);
 
         userExercise.setCurrentLoad(currentLoad);
         userExercise.setMaxReps(maxReps);
         userExercise.setCompleted(isCompleted);
         userExercise.setFamiliarity(familiarity);
 
-        Log.d(TAG, "saveExerciseDetails: ✅ Datos asignados a userExercise: " + userExercise.getName());
+        Log.d(TAG, "saveExerciseDetails:  Datos asignados a userExercise: " + userExercise.getName());
 
-        // 🔎 AUDITORÍA: antes de enviar a Firebase, dejamos huella de la carga inicial
+        //  AUDITORÍA: antes de enviar a Firebase, dejamos huella de la carga inicial
         Log.i(TAG, "AUDIT_TRAIL: Guardando carga inicial para ejercicio: " + userExercise.getName()
                 + " | Carga: " + currentLoad + " | Reps: " + maxReps);
 
         if (userId == null || mDatabase == null) {
-            Log.e(TAG, "saveExerciseDetails: ❌ UID o referencia Firebase no disponible");
+            Log.e(TAG, "saveExerciseDetails:  UID o referencia Firebase no disponible");
             return;
         }
 
         DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
-        Log.d(TAG, "saveExerciseDetails: 🔍 Consultando ejercicio por nombre en Firebase (name=" + userExercise.getName() + ")");
+        Log.d(TAG, "saveExerciseDetails:  Consultando ejercicio por nombre en Firebase (name=" + userExercise.getName() + ")");
 
         userExercisesRef.orderByChild("name").equalTo(userExercise.getName())
                 .addListenerForSingleValueEvent(new ValueEventListener() {
                     @Override
                     public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        Log.d(TAG, "saveExerciseDetails - onDataChange: 📦 Datos recibidos desde Firebase");
+                        Log.d(TAG, "saveExerciseDetails - onDataChange:  Datos recibidos desde Firebase");
 
                         if (snapshot.exists()) {
-                            Log.d(TAG, "saveExerciseDetails - onDataChange: ✅ Ejercicio encontrado en Firebase");
+                            Log.d(TAG, "saveExerciseDetails - onDataChange:  Ejercicio encontrado en Firebase");
                             for (DataSnapshot childSnapshot : snapshot.getChildren()) {
                                 String exerciseKey = childSnapshot.getKey();
-                                Log.d(TAG, "saveExerciseDetails - onDataChange: ➤ Firebase Key del ejercicio: " + exerciseKey);
+                                Log.d(TAG, "saveExerciseDetails - onDataChange:  Firebase Key del ejercicio: " + exerciseKey);
 
                                 if (exerciseKey != null) {
                                     Map<String, Object> updates = new HashMap<>();
@@ -203,31 +205,31 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
                                     updates.put("isCompleted", isCompleted);
                                     updates.put("familiarity", familiarity);
 
-                                    Log.d(TAG, "saveExerciseDetails - onDataChange: 🔧 Datos a guardar: " + updates.toString());
+                                    Log.d(TAG, "saveExerciseDetails - onDataChange:  Datos a guardar: " + updates.toString());
 
                                     userExercisesRef.child(exerciseKey).updateChildren(updates)
                                             .addOnSuccessListener(aVoid -> {
-                                                Log.d(TAG, "saveExerciseDetails - onSuccess: ✅ Datos guardados exitosamente para " + userExercise.getName());
+                                                Log.d(TAG, "saveExerciseDetails - onSuccess:  Datos guardados exitosamente para " + userExercise.getName());
                                                 sharedViewModel.selectExercise(userExercise);
-                                                showToast("✅ Datos guardados correctamente");
+                                                showToast(" Datos guardados correctamente");
                                             })
                                             .addOnFailureListener(e -> {
-                                                Log.e(TAG, "saveExerciseDetails - onFailure: ❌ Error al guardar en Firebase", e);
-                                                showToast("❌ Error al guardar los datos.");
+                                                Log.e(TAG, "saveExerciseDetails - onFailure:  Error al guardar en Firebase", e);
+                                                showToast(" Error al guardar los datos.");
                                             });
                                 } else {
-                                    Log.e(TAG, "saveExerciseDetails - onDataChange: ❌ Firebase Key nula para el ejercicio");
+                                    Log.e(TAG, "saveExerciseDetails - onDataChange:  Firebase Key nula para el ejercicio");
                                 }
                             }
                         } else {
-                            Log.w(TAG, "saveExerciseDetails - onDataChange: ⚠️ No se encontró el ejercicio con nombre: " + userExercise.getName());
-                            showToast("❌ No se encontró el ejercicio en la base de datos.");
+                            Log.w(TAG, "saveExerciseDetails - onDataChange: No se encontró el ejercicio con nombre: " + userExercise.getName());
+                            showToast(" No se encontró el ejercicio en la base de datos.");
                         }
                     }
 
                     @Override
                     public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e(TAG, "saveExerciseDetails - onCancelled: ❌ Error de Firebase - " + error.getMessage());
+                        Log.e(TAG, "saveExerciseDetails - onCancelled:  Error de Firebase - " + error.getMessage());
                     }
                 });
     }
@@ -237,32 +239,35 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         Log.d(TAG, "isExerciseDataValid: Validando campos del formulario");
 
         if (loadEditText == null || repsSpinner == null || familiaritySpinner == null) {
-            Log.e(TAG, "isExerciseDataValid: ❌ Un campo es nulo");
+            Log.e(TAG, "isExerciseDataValid:  Un campo es nulo");
             return false;
         }
 
         if (TextUtils.isEmpty(loadEditText.getText())) {
-            Log.e(TAG, "isExerciseDataValid: ❌ El campo de carga está vacío");
+            Log.e(TAG, "isExerciseDataValid:  El campo de carga está vacío");
             return false;
         }
 
         try {
             int load = Integer.parseInt(loadEditText.getText().toString());
             if (load <= 0) {
-                Log.e(TAG, "isExerciseDataValid: ❌ El peso debe ser mayor que 0");
+                Log.e(TAG, "isExerciseDataValid:  El peso debe ser mayor que 0");
+                return false;
+            }else if(load > 1000){
+                Log.e(TAG, "isExerciseDataValid:  El peso debe ser menor que 1000");
                 return false;
             }
         } catch (NumberFormatException e) {
-            Log.e(TAG, "isExerciseDataValid: ❌ Error al convertir la carga", e);
+            Log.e(TAG, "isExerciseDataValid: Error al convertir la carga", e);
             return false;
         }
 
         if (repsSpinner.getSelectedItemPosition() == 0) {
-            Log.e(TAG, "isExerciseDataValid: ❌ Repeticiones no seleccionadas");
+            Log.e(TAG, "isExerciseDataValid:  Repeticiones no seleccionadas");
             return false;
         }
 
-        Log.d(TAG, "isExerciseDataValid: ✅ Validación completada correctamente");
+        Log.d(TAG, "isExerciseDataValid:  Validación completada correctamente");
         return true;
     }
 
@@ -270,7 +275,7 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
         if (getActivity() != null) {
             Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
         } else {
-            Log.e(TAG, "showToast: ❌ No se puede mostrar el toast, fragmento no adjunto");
+            Log.e(TAG, "showToast:  No se puede mostrar el toast, fragmento no adjunto");
         }
     }
 

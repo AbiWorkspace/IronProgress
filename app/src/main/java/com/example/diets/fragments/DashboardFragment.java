@@ -52,7 +52,6 @@ import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 public class DashboardFragment extends Fragment {
 
     private static final String TAG = "DashboardFragment";
@@ -264,7 +263,7 @@ public class DashboardFragment extends Fragment {
 
 
     private void saveGoalsToPrefs() {
-        if (effectiveUid == null || !isAdded() || getContext() == null) return;
+        if (effectiveUid == null || !isAdded() || getContext() != null) return;
 
         SharedPreferences.Editor ed;
         try {
@@ -461,6 +460,7 @@ public class DashboardFragment extends Fragment {
                             // Este 'if' SÓLO se ejecuta si NO hay metas guardadas,
                             // poblando los valores desde Firebase por primera vez.
                             if (!prefsExistentes || goalsKcal <= 0) {
+                                Log.i(TAG, "AUDIT_TRAIL: Primer inicio detectado. Calculando TDEE y Macros iniciales basados en perfil Firebase.");
                                 goalsKcal = kcalTodayValue;
                                 // Métodos SIN argumentos (evita error de signatura)
                                 goalsP    = user.calculateProtein();
@@ -703,7 +703,10 @@ public class DashboardFragment extends Fragment {
             }
         }
 
-        if (removedAny) editor.apply();
+        if (removedAny) {
+            Log.w(TAG, "AUDIT_TRAIL: Mantenimiento automático: Eliminados registros locales antiguos (>365 días).");
+            editor.apply();
+        }
     }
 
     /** MIGRACIÓN: Marca como receta items antiguos que tengan ingredientes. */
@@ -941,6 +944,9 @@ public class DashboardFragment extends Fragment {
                 goalsF = Math.round(goalsF * scaleFactor);
             }
 
+            // 🔎 AUDITORÍA: rebalanceo automático de macros (solo Kcal cambiadas)
+            Log.d(TAG, "AUDIT_TRAIL: Rebalanceo inteligente de macros ejecutado. Nueva meta Kcal: " + goalsKcal);
+
             saveGoalsToPrefs();
             updateMacrosUI();
             recalculateDayTotals();
@@ -1029,6 +1035,9 @@ public class DashboardFragment extends Fragment {
         goalsP = Math.round(finalP);
         goalsC = Math.round(finalC);
         goalsF = Math.round(finalF);
+
+        // 🔎 AUDITORÍA: rebalanceo inteligente con macros fijos/parciales
+        Log.d(TAG, "AUDIT_TRAIL: Rebalanceo inteligente de macros ejecutado. Nueva meta Kcal: " + goalsKcal);
 
         saveGoalsToPrefs();
         updateMacrosUI();

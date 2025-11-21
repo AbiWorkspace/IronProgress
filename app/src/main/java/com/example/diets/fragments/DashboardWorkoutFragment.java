@@ -31,7 +31,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
 public class DashboardWorkoutFragment extends Fragment {
 
     private static final String TAG = "DashboardWorkoutFragment";
@@ -80,16 +79,38 @@ public class DashboardWorkoutFragment extends Fragment {
         if (coachModeFromArgs && targetFromArgs != null && !targetFromArgs.trim().isEmpty()) {
             effectiveUid = targetFromArgs;
             Log.i(TAG, "resolveEffectiveUid: coachMode (args) ON -> effectiveUid=" + effectiveUid);
+
+            // AUDIT_TRAIL: contexto efectivo (coach vs usuario)
+            FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
+            String authUid = current != null ? current.getUid() : null;
+            boolean isCoach = authUid != null && !effectiveUid.equals(authUid);
+            Log.i(TAG, "AUDIT_TRAIL: Resolviendo contexto de usuario. Effective UID: "
+                    + effectiveUid + " (¿Es Coach?: " + isCoach + ")");
+
             return;
         }
         if (coachModeFromIntent && targetFromIntent != null && !targetFromIntent.trim().isEmpty()) {
             effectiveUid = targetFromIntent;
             Log.i(TAG, "resolveEffectiveUid: coachMode (intent) ON -> effectiveUid=" + effectiveUid);
+
+            // AUDIT_TRAIL: contexto efectivo (coach vs usuario)
+            FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
+            String authUid = current != null ? current.getUid() : null;
+            boolean isCoach = authUid != null && !effectiveUid.equals(authUid);
+            Log.i(TAG, "AUDIT_TRAIL: Resolviendo contexto de usuario. Effective UID: "
+                    + effectiveUid + " (¿Es Coach?: " + isCoach + ")");
+
             return;
         }
         FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
         effectiveUid = (current != null) ? current.getUid() : null;
         Log.i(TAG, "resolveEffectiveUid: coachMode OFF -> effectiveUid=" + effectiveUid);
+
+        // AUDIT_TRAIL: contexto efectivo (modo usuario normal)
+        String authUid = current != null ? current.getUid() : null;
+        boolean isCoach = authUid != null && !effectiveUid.equals(authUid);
+        Log.i(TAG, "AUDIT_TRAIL: Resolviendo contexto de usuario. Effective UID: "
+                + effectiveUid + " (¿Es Coach?: " + isCoach + ")");
     }
 
     // ===========================
@@ -162,7 +183,10 @@ public class DashboardWorkoutFragment extends Fragment {
                 trainingDays.addAll(tempDays.values());
                 actualizarRecyclerView();
 
-                // Log final
+                // AUDIT_TRAIL: plan de entrenamiento cargado completamente
+                Log.d(TAG, "AUDIT_TRAIL: Plan cargado exitosamente. Días encontrados: " + trainingDays.size());
+
+                // Log final de detalle por día
                 for (TrainingDay d : trainingDays) {
                     Log.d(TAG, "RV Día: " + d.getDayTitle() + " | ejercicios=" + d.getExercises().size());
                 }
@@ -237,6 +261,10 @@ public class DashboardWorkoutFragment extends Fragment {
     }
 
     private void switchToTrainingDetailFragment(@NonNull TrainingDay trainingDay) {
+        // AUDIT_TRAIL: inicio de sesión / jornada de entrenamiento
+        Log.i(TAG, "AUDIT_TRAIL: Iniciando sesión de entrenamiento para: "
+                + trainingDay.getDayTitle() + ". Pasando contexto de seguridad.");
+
         Log.d(TAG, "switchToTrainingDetailFragment: Abriendo detalle del día " + trainingDay.getDayTitle());
         ViewPagerActivity activity = (ViewPagerActivity) getActivity();
         if (activity == null) {

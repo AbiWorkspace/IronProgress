@@ -30,7 +30,6 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
 import java.util.Map;
-
 public class UserFormFragment extends Fragment {
 
     private Spinner genderSpinner, activityLevelSpinner, goalSpinner, weightSpinner, heightSpinner, ageSpinner;
@@ -118,17 +117,17 @@ public class UserFormFragment extends Fragment {
     }
 
     private void handleSubmit() {
-        Log.d(TAG, "🚀 handleSubmit() iniciado.");
+        Log.d(TAG, " handleSubmit() iniciado.");
 
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser == null) {
-            Log.e(TAG, "❌ Usuario no autenticado.");
+            Log.e(TAG, " Usuario no autenticado.");
             showErrorDialog("Usuario no autenticado.");
             return;
         }
 
         String userId = currentUser.getUid();
-        Log.d(TAG, "📌 ID del usuario: " + userId);
+        Log.d(TAG, " ID del usuario: " + userId);
 
         String gender = genderSpinner.getSelectedItem().toString();
         String activityLevel = activityLevelSpinner.getSelectedItem().toString();
@@ -137,20 +136,24 @@ public class UserFormFragment extends Fragment {
         String height = heightSpinner.getSelectedItem().toString();
         String age = ageSpinner.getSelectedItem().toString();
 
-        Log.d(TAG, "📌 Datos capturados:");
-        Log.d(TAG, "   ➡️ Género: " + gender);
-        Log.d(TAG, "   ➡️ Nivel de actividad: " + activityLevel);
-        Log.d(TAG, "   ➡️ Meta: " + goal);
-        Log.d(TAG, "   ➡️ Peso: " + weight);
-        Log.d(TAG, "   ➡️ Altura: " + height);
-        Log.d(TAG, "   ➡️ Edad: " + age);
+        Log.d(TAG, " Datos capturados:");
+        Log.d(TAG, "    Género: " + gender);
+        Log.d(TAG, "    Nivel de actividad: " + activityLevel);
+        Log.d(TAG, "    Meta: " + goal);
+        Log.d(TAG, "    Peso: " + weight);
+        Log.d(TAG, "   Altura: " + height);
+        Log.d(TAG, "    Edad: " + age);
 
         if (gender.isEmpty() || activityLevel.isEmpty() || goal.isEmpty()
                 || weight.isEmpty() || height.isEmpty() || age.isEmpty()) {
-            Log.e(TAG, "❌ Campos vacíos detectados.");
+            Log.e(TAG, " Campos vacíos detectados.");
             showErrorDialog("Por favor, completa todos los campos antes de enviar.");
             return;
         }
+
+        // 🔎 AUDITORÍA: persistencia de perfil biométrico (sin cálculos de macros aquí)
+        Log.i(TAG, "AUDIT_TRAIL: Guardando perfil biométrico. Peso: " + weight
+                + " | Meta: " + goal + ". (Cálculo de macros delegado al Dashboard).");
 
         Map<String, Object> userData = new HashMap<>();
         userData.put("weight", Double.parseDouble(weight));
@@ -159,23 +162,23 @@ public class UserFormFragment extends Fragment {
         userData.put("gender", gender);
         userData.put("activityLevel", activityLevel);
         userData.put("goal", goal);
-        userData.put("isFirstTime", false);  // 🔥 Esto se actualiza junto con los demás datos
+        userData.put("isFirstTime", false);  //  Esto se actualiza junto con los demás datos
 
-        Log.d(TAG, "📌 Datos preparados para guardar en Firebase.");
+        Log.d(TAG, " Datos preparados para guardar en Firebase.");
 
-        // 🔥 Guardar en Realtime Database
+        //  Guardar en Realtime Database
         mDatabase.child("users").child(userId).updateChildren(userData)
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful()) {
-                        Log.d(TAG, "✅ Datos guardados correctamente (incluido firstTime = false).");
+                        Log.d(TAG, " Datos guardados correctamente (incluido firstTime = false).");
                         showSuccessDialog("¡Formulario enviado exitosamente!");
                     } else {
-                        Log.e(TAG, "❌ Error al guardar en Realtime Database", task.getException());
+                        Log.e(TAG, " Error al guardar en Realtime Database", task.getException());
                         showErrorDialog("Error al actualizar la información.");
                     }
                 });
 
-        Log.d(TAG, "🏁 handleSubmit() finalizado.");
+        Log.d(TAG, " handleSubmit() finalizado.");
     }
 
 

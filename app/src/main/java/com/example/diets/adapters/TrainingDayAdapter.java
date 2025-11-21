@@ -1,9 +1,3 @@
-/******************************************************************************
- *  TrainingDayAdapter.java                                                   *
- *  Botón siempre habilitado + subList segura                                  *
- *  © 2025 – Listo para copiar y pegar                                        *
- ******************************************************************************/
-
 package com.example.diets.adapters;
 
 import android.util.Log;
