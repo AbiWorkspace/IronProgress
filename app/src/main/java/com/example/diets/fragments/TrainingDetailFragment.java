@@ -130,7 +130,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         if (realDayKey == null) realDayKey = dayKey;
 
         if (effectiveUid == null) {
-            Log.e(TAG, "❌ effectiveUid NULL: no se pueden cargar datos.");
+            Log.e(TAG, "effectiveUid NULL: no se pueden cargar datos.");
             return view;
         }
 
@@ -145,7 +145,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                 Log.d(TAG, "Patrón: " + movementPatternDelDia.getName() + " | sinergias=" + musculosSinergicosDelDia);
                 btnAddExercise.setEnabled(true);
             } else {
-                Log.w(TAG, "⚠ No se encontró patrón de movimiento para: " + dayKey);
+                Log.w(TAG, "No se encontró patrón de movimiento para: " + dayKey);
             }
         });
 
@@ -218,11 +218,11 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
         dayExercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (snapshot.exists()) {
-                    Log.d(TAG, "✅ Encontrado nodo exacto (key): " + dayKey);
+                    Log.d(TAG, "Encontrado nodo exacto (key): " + dayKey);
                     realDayKey = dayKey;
                     cargarEjerciciosDesdeNodo(uid, realDayKey, snapshot, onDone);
                 } else {
-                    Log.w(TAG, "⚠ No existe el nodo exacto. Buscando hijo con field name == " + dayKey);
+                    Log.w(TAG, "No existe el nodo exacto. Buscando hijo con field name == " + dayKey);
                     mpRef.addListenerForSingleValueEvent(new ValueEventListener() {
                         @Override public void onDataChange(@NonNull DataSnapshot parentSnap) {
                             String tmpKey = null;
@@ -234,7 +234,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                                 }
                             }
                             if (tmpKey == null) {
-                                Log.e(TAG, "❌ No se encontró ningún día con name=" + dayKey);
+                                Log.e(TAG, "No se encontró ningún día con name=" + dayKey);
                                 exercises = new ArrayList<>();
                                 initOrNotifyAdapter();
                                 onDone.run();
@@ -257,20 +257,20 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                                             cargarEjerciciosDesdeNodo(uidFinal, realKeyFinal, fixedSnap, onDoneFinal);
                                         }
                                         @Override public void onCancelled(@NonNull DatabaseError e) {
-                                            Log.e(TAG, "❌ Error fallback userExercises: " + e.getMessage());
+                                            Log.e(TAG, "Error fallback userExercises: " + e.getMessage());
                                             onDoneFinal.run();
                                         }
                                     });
                         }
                         @Override public void onCancelled(@NonNull DatabaseError e) {
-                            Log.e(TAG, "❌ Error leyendo userMovementPatterns: " + e.getMessage());
+                            Log.e(TAG, "Error leyendo userMovementPatterns: " + e.getMessage());
                             onDone.run();
                         }
                     });
                 }
             }
             @Override public void onCancelled(@NonNull DatabaseError e) {
-                Log.e(TAG, "❌ Error dayExercisesRef: " + e.getMessage());
+                Log.e(TAG, "Error dayExercisesRef: " + e.getMessage());
                 onDone.run();
             }
         });
@@ -378,7 +378,7 @@ public class TrainingDetailFragment extends Fragment implements OnExercisesSelec
                 onDone.run();
             }
             @Override public void onCancelled(@NonNull DatabaseError e) {
-                Log.e(TAG, "❌ Error al leer userExercises globales: " + e.getMessage());
+                Log.e(TAG, "Error al leer userExercises globales: " + e.getMessage());
                 onDone.run();
             }
         });

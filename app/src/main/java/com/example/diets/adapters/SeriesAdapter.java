@@ -96,7 +96,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         this.exerciseName  = exerciseName;
         this.parentAdapter = parentAdapter;
 
-        /* 🆕  snapshot de la tabla ‘real’  */
+        /*   snapshot de la tabla ‘real’  */
         baseSeries.addAll(seriesList);
     }
 
@@ -243,9 +243,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     }
 
 
-    /* =========================================================
-     *  Firebase fetch
-     * ========================================================= */
+
     public void cargarUltimasSeriesDesdeFirebase(String exerciseId,
                                                  Context ctx,
                                                  @Nullable Runnable onFinished) {
@@ -357,62 +355,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
     }
 
 
-    /* Guarda ‘list’ en Firebase y ejecuta onFinished cuando termine */
-    public void saveToFirebase(List<ExerciseSeries> list, Runnable onFinished) {
 
-        // Guardia: RPE debe estar entre 5 y 10 en todas las series
-        if (!validateAllRpe()) {
-            Log.e(TAG, "RPE fuera de rango (5–10). No se guarda.");
-            if (onFinished != null) onFinished.run();
-            return;
-        }
-
-        String uid = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference ref = FirebaseDatabase.getInstance()
-                .getReference("users").child(uid)
-                .child("userExercises").child(exerciseName)   // si usas ID cambia aquí
-                .child("seriesData");
-
-        ref.setValue(list, (error, _ref) -> {
-            if (error != null) Log.e(TAG,"No se pudo subir", error.toException());
-            else               Log.d(TAG,"Sesión subida ("+list.size()+")");
-            if (onFinished != null) onFinished.run();
-        });
-    }
-
-
-
-
-    /** Deja la última serie como referencia y elimina solo las antiguas duplicadas. */
-    private void dedupHistory() {
-        if (historialSeries.isEmpty()) return;
-
-        ExerciseSeries ultima = historialSeries.get(historialSeries.size()-1);
-        historialSeries.clear();
-        historialSeries.add(ultima);      // <-- mantiene punto de partida del próximo cálculo
-        lastHistorySerie = ultima;
-        bestHistorySerie = ultima;        // opcional: fuerza enfoque en el último rendimiento
-    }
-    // ya existe:
-    public void commitAllEdits() { commitAllEdits(null); }
-
-    public void commitAllEdits(@Nullable Runnable onFinished) {
-
-        if (seriesAdapters.isEmpty()) {        // nada que guardar
-            if (onFinished != null) onFinished.run();
-            return;
-        }
-
-        AtomicInteger restantes = new AtomicInteger(seriesAdapters.size());
-
-        for (SeriesAdapter sa : seriesAdapters.values()) {
-            sa.commitAllEdits(() -> {
-                if (restantes.decrementAndGet() == 0 && onFinished != null) {
-                    onFinished.run();
-                }
-            });
-        }
-    }
 
 
 
@@ -545,6 +488,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
                 }
             }
         };
+
 
 
 
@@ -783,5 +727,20 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.SeriesView
         // Si en el futuro vuelves a usar ValueEventListener persistente,
         // elimina aquí el listener de Firebase.
     }
+    // NUEVO: commitAllEdits SIN static, en SeriesAdapter
+    public void commitAllEdits() {
+        commitAllEdits(null);
+    }
 
+    public void commitAllEdits(@Nullable Runnable onFinished) {
+        // Validar RPE de todas las series (opcional, pero ya lo tienes hecho)
+        boolean ok = validateAllRpe();
+        Log.d(TAG, "commitAllEdits: validación RPE global = " + ok);
+
+        // Aquí podrías guardar en Firebase si quieres en el futuro
+
+        if (onFinished != null) {
+            onFinished.run();
+        }
+    }
 }

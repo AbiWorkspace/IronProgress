@@ -47,42 +47,65 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        Log.d(TAG, "onCreate() llamado - iniciando configuración de MainActivity");
+
+        // --- Referencias a la UI ---
         emailEditText = findViewById(R.id.emailEditText);
         passwordEditText = findViewById(R.id.passwordEditText);
         loginButton = findViewById(R.id.loginButton);
         registerButton = findViewById(R.id.registerButton);
 
+        Log.d(TAG, "Componentes de UI inicializados: emailEditText, passwordEditText, loginButton, registerButton");
+
+        // --- Inicialización de Firebase Auth y Realtime Database ---
         mAuth = FirebaseAuth.getInstance();
         mDatabase = FirebaseDatabase.getInstance().getReference();
 
+        Log.d(TAG, "FirebaseAuth y DatabaseReference inicializados correctamente");
 
-        // Verifica si el usuario ya está autenticado
+        // --- Verificación de sesión activa ---
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
-            Log.d(TAG, "Usuario ya autenticado: " + currentUser.getUid());
+            // El usuario ya tiene sesión activa, se intenta saltar el login
+            Log.d(TAG, "Usuario ya autenticado al abrir la app. uid=" + currentUser.getUid());
             checkFirstTimeLogin(currentUser.getUid());
+        } else {
+            Log.d(TAG, "No hay usuario autenticado. Se muestra pantalla de login.");
         }
 
+        // --- Listener del botón de inicio de sesión ---
         loginButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                Log.d(TAG, "click en loginButton");
+
                 String email = emailEditText.getText().toString().trim();
                 String password = passwordEditText.getText().toString().trim();
 
+                Log.d(TAG, "Datos capturados desde UI. email=" + email + " (password no se imprime por seguridad)");
+
+                // Validación local de los datos antes de ir a Firebase Auth
                 if (validateInputs(email, password)) {
-                    Log.d(TAG, "Intentando iniciar sesión con: " + email);
+                    Log.d(TAG, "Validación de inputs exitosa. Intentando iniciar sesión con FirebaseAuth.");
                     loginUser(email, password);
+                } else {
+                    Log.d(TAG, "Validación de inputs fallida. No se llama a loginUser().");
                 }
             }
         });
 
+        // --- Listener del botón de registro ---
         registerButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                Log.d(TAG, "click en registerButton - navegando a RegisterActivity");
                 startActivity(new Intent(MainActivity.this, RegisterActivity.class));
             }
         });
+
+        Log.d(TAG, "onCreate() finalizado - MainActivity lista para interacción del usuario");
     }
+
 
     private boolean validateInputs(String email, String password) {
         if (email.isEmpty() || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
@@ -125,6 +148,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+//Metodo que nos ayud a validar si es su primer inicio de sesion
 
     private void checkFirstTimeLogin(String userId) {
         Log.d(TAG, "Verificando primer inicio de sesión para el usuario: " + userId);
@@ -188,7 +212,7 @@ public class MainActivity extends AppCompatActivity {
 
                     @Override
                     public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e(TAG, "❌ Error de base de datos: " + error.getMessage());
+                        Log.e(TAG, "Error de base de datos: " + error.getMessage());
                         Toast.makeText(MainActivity.this, "Error de base de datos", Toast.LENGTH_SHORT).show();
                     }
                 });

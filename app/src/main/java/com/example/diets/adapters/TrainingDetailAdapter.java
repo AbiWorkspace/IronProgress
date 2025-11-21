@@ -570,7 +570,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
             FragmentManager fm = ((FragmentActivity) itemView.getContext()).getSupportFragmentManager();
 
             if (ex.isFromInternal()) {
-                Log.d(TAG, "📦 Es interno → enviando objeto completo a diálogo.");
+                Log.d(TAG, " Es interno → enviando objeto completo a diálogo.");
                 ExerciseDetailsDialogFragment dlg =
                         ExerciseDetailsDialogFragment.newInstance(null, dayKey, true, TrainingDetailAdapter.this.effectiveUid);
                 dlg.setInternalExercise(ex);
@@ -624,7 +624,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                         if (!sug.isEmpty()) seriesAdapter.setFromSuggest(sug);
                     }
 
-                    // 🔓 Abrir el diálogo ya con la key resuelta y el UID correcto
+                    //  Abrir el diálogo ya con la key resuelta y el UID correcto
                     ExerciseDetailsDialogFragment
                             .newInstance(key, dayKey, false, TrainingDetailAdapter.this.effectiveUid)
                             .show(fm, "ExerciseDetailsDialog");
@@ -668,28 +668,28 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                 boolean ok = decodeIntoView(ex.getImages().get(0), target);
                 Log.d(TAG, "resultado decode = " + ok);
 
-                if (ok) return;          // ✅ salimos SOLO si mostramos la imagen
+                if (ok) return;          // salimos SOLO si mostramos la imagen
                 // si no, continuamos a la caché y al fallback Firebase
             }
 
             /* ② Ejercicio interno sin imágenes ----------------------------------- */
             if (ex.isFromInternal()) {
-                Log.d(TAG, "  ② interno SIN imágenes → continuamos a caché / Firebase");
+                Log.d(TAG, "  interno SIN imágenes → continuamos a caché / Firebase");
                 // NO hacemos return: dejamos que pruebe caché y, si es necesario, Firebase
             }
 
             /* ③ ¿Está en la caché de la sesión? ---------------------------------- */
             List<String> cached = exerciseImagesCache.get(ex.getName());
             if (cached != null && !cached.isEmpty()) {
-                Log.d(TAG, "  ③ caché HIT → " + cached.size() + " img(s)");
+                Log.d(TAG, "   caché HIT → " + cached.size() + " img(s)");
                 decodeIntoView(cached.get(0), target);
                 ex.setImages(cached);
                 return;
             }
-            Log.d(TAG, "  ③ caché MISS");
+            Log.d(TAG, "   caché MISS");
 
             /* ④ Fallback → /exerciseImages  (lista completa) ---------------------- */
-            Log.d(TAG, "  ④ consultando /exerciseImages en Firebase …");
+            Log.d(TAG, "   consultando /exerciseImages en Firebase …");
             DatabaseReference ref = FirebaseDatabase.getInstance()
                     .getReference("exerciseImages");
 
@@ -861,7 +861,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
         }
     }
 
-    //  ⛔  AHORA MISMO ESTÁ AQUÍ  ⛔
+    //    AHORA MISMO ESTÁ AQUÍ
     public void commitAllEdits(@Nullable Runnable onFinished) {
         if (seriesAdapters.isEmpty()) {
             if (onFinished != null) onFinished.run();
@@ -911,13 +911,13 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                     ProgresionDinamica.sugerirSeries(
                             context,            // ← AGREGA EL CONTEXT AQUÍ
                             ejercicio,          // datos del ejercicio
-                            feedback,           // ✅ solo completadas
+                            feedback,           //  solo completadas
                             hist,               // historial
                             ProgresionDinamica.NivelUsuario.INTERMEDIO,
                             SALTO_MIN);
 
             /* ---------- 4) volcar la sugerencia en la UI ---------- */
-            if (!sugeridas.isEmpty()) {          // ✅ solo si hay algo que mostrar
+            if (!sugeridas.isEmpty()) {          //  solo si hay algo que mostrar
                 sa.setFromSuggest(sugeridas);    // ya hace notify*
             }   // si está vacía, mantenemos las series actuales
 
