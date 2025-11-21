@@ -25,7 +25,6 @@ import com.google.firebase.database.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
-
 public class ExerciseSelectionDialogFragment extends DialogFragment
         implements ExercisesAdapter.OnExerciseSelectionChangedListener {
 
@@ -168,8 +167,8 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
         adapter = new ExercisesAdapter(
                 exercises,
                 preselected,
-                // Click rápido → detalles + toggle
-                ex -> { addExerciseToSelection(ex); showExerciseDetails(ex); },
+                // Click rápido → solo detalles (NO toggle de selección)
+                ex -> showExerciseDetails(ex),
                 this         // listener de selección para checkboxes
         );
 
@@ -192,6 +191,9 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
     }
 
     private void showExerciseDetails(Exercise ex) {
+        // AUDITORÍA: navegación a detalle preservando selección actual en memoria
+        Log.i(TAG, "AUDIT_TRAIL: Navegando a Detalle de Ejercicio. Preservando estado de selección actual.");
+
         ExerciseDetailsFragment d = ExerciseDetailsFragment.newInstance(ex);
         getParentFragmentManager().beginTransaction()
                 .replace(R.id.fragment_container, d)
@@ -221,6 +223,11 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
         ex.setMusclesWorked(worked instanceof String ? (String) worked : "");
 
         ex.setSynergistMuscles(extractSynergistNames(m.get("synergistMuscles")));
+
+        // AUDITORÍA: mapeo desde Firebase + presencia de imagen
+        Log.v(TAG, "AUDIT_TRAIL: Mapeando ejercicio desde Firebase -> " + ex.getName()
+                + " | Imagen presente: " + (!ex.getImage().isEmpty()));
+
         return ex;
     }
 
