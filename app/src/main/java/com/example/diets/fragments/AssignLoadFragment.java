@@ -85,9 +85,6 @@ public class AssignLoadFragment extends Fragment {
             }
         });
 
-
-
-
         // Obtener el userId del usuario autenticado
         FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
         if (currentUser != null) {
@@ -110,14 +107,18 @@ public class AssignLoadFragment extends Fragment {
         Button saveButton = view.findViewById(R.id.saveButton);
         saveButton.setOnClickListener(v -> {
             Log.d(TAG, "AssignLoadFragment - onViewCreated: Botón de guardar clicado");
+
+            //  AUDITORÍA: intento global de cierre del formulario de cargas
+            Log.i(TAG, "AUDIT_TRAIL: Intento de finalizar asignación de cargas. Validando " + userExercises.size() + " ejercicios.");
+
             saveAssignedLoads();
             // Mostrar mensaje al usuario
 
             if (!areAllExercisesValid()) {
-                Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ No se pueden guardar los datos. Hay ejercicios con información incompleta.");
+                Log.e(TAG, "AssignLoadFragment - saveAssignedLoads:  No se pueden guardar los datos. Hay ejercicios con información incompleta.");
                 Toast.makeText(getContext(), "Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
                 return;
-            }else{
+            } else {
                 Toast.makeText(getContext(), "Formulario de entrenamiento completado", Toast.LENGTH_SHORT).show();
                 // Navegar al nuevo fragmento
                 if (getActivity() instanceof ViewPagerActivity) {
@@ -127,9 +128,9 @@ public class AssignLoadFragment extends Fragment {
                     ((ViewPagerActivity) getActivity()).switchToDashboardWorkoutFragment(bundle);
                 }
             }
-
         });
     }
+
 
     private void loadUserExercises() {
         if (userId == null) {
@@ -202,13 +203,13 @@ public class AssignLoadFragment extends Fragment {
         userExercise.setCompleted(map.get("isCompleted") != null ? (Boolean) map.get("isCompleted") : false);
         userExercise.setMaxReps(map.get("maxReps") != null ? ((Long) map.get("maxReps")).intValue() : 0);
 
-        // ✅ SOLO currentLoad - sin fallback
+        //  SOLO currentLoad - sin fallback
         if (map.get("currentLoad") instanceof Long) {
             int value = ((Long) map.get("currentLoad")).intValue();
-            Log.d(TAG, "convertMapToUserExercise: ➤ currentLoad válido para " + userExercise.getName() + ": " + value);
+            Log.d(TAG, "convertMapToUserExercise:  currentLoad válido para " + userExercise.getName() + ": " + value);
             userExercise.setCurrentLoad(value);
         } else {
-            Log.e(TAG, "convertMapToUserExercise: ❌ currentLoad inválido o nulo para " + userExercise.getName());
+            Log.e(TAG, "convertMapToUserExercise:  currentLoad inválido o nulo para " + userExercise.getName());
             userExercise.setCurrentLoad(0);
         }
 
@@ -376,12 +377,12 @@ public class AssignLoadFragment extends Fragment {
         Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: Iniciando validación de datos de todos los ejercicios...");
 
         if (!areAllExercisesValid()) {
-            Log.e(TAG, "AssignLoadFragment - saveAssignedLoads: ❌ No se pueden guardar los datos. Hay ejercicios con información incompleta.");
+            Log.e(TAG, "AssignLoadFragment - saveAssignedLoads:  No se pueden guardar los datos. Hay ejercicios con información incompleta.");
             Toast.makeText(getContext(), "Completa todos los datos de los ejercicios antes de guardar.", Toast.LENGTH_LONG).show();
             return;
         }
 
-        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Todos los ejercicios están completos. Procediendo a guardar...");
+        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads:  Todos los ejercicios están completos. Procediendo a guardar...");
 
         DatabaseReference userExercisesRef = mDatabase.child("users").child(userId).child("userExercises");
 
@@ -397,13 +398,13 @@ public class AssignLoadFragment extends Fragment {
                             if (exerciseKey != null) {
                                 Map<String, Object> exerciseUpdates = new HashMap<>();
 
-                                // 🔥 Agregar solo los nuevos datos sin eliminar los existentes
+                                //  Agregar solo los nuevos datos sin eliminar los existentes
                                 exerciseUpdates.put("currentLoad", exercise.getCurrentLoad());
                                 exerciseUpdates.put("maxReps", exercise.getMaxReps());
                                 exerciseUpdates.put("familiarity", exercise.getFamiliarity());
                                 exerciseUpdates.put("completed", exercise.isCompleted());
 
-                                // 🔥 Agregar o actualizar series de ejercicios sin eliminar el ejercicio completo
+                                //  Agregar o actualizar series de ejercicios sin eliminar el ejercicio completo
                                 List<Map<String, Object>> seriesList = new ArrayList<>();
                                 for (ExerciseSeries series : exercise.getExerciseSeriesList()) {
                                     Map<String, Object> seriesData = new HashMap<>();
@@ -415,34 +416,34 @@ public class AssignLoadFragment extends Fragment {
                                 }
                                 exerciseUpdates.put("exerciseSeriesList", seriesList);
 
-                                // 🔥 Usamos updateChildren para NO sobrescribir el ejercicio existente
+                                //  Usamos updateChildren para NO sobrescribir el ejercicio existente
                                 userExercisesRef.child(exerciseKey).updateChildren(exerciseUpdates)
-                                        .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Datos actualizados para el ejercicio: " + exercise.getName()))
-                                        .addOnFailureListener(e -> Log.e(TAG, "❌ Error al actualizar el ejercicio: " + exercise.getName(), e));
+                                        .addOnSuccessListener(aVoid -> Log.d(TAG, " Datos actualizados para el ejercicio: " + exercise.getName()))
+                                        .addOnFailureListener(e -> Log.e(TAG, " Error al actualizar el ejercicio: " + exercise.getName(), e));
                             }
                         }
                     } else {
-                        Log.e(TAG, "❌ No se encontró el ejercicio en Firebase: " + exercise.getName());
+                        Log.e(TAG, " No se encontró el ejercicio en Firebase: " + exercise.getName());
                     }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
-                    Log.e(TAG, "❌ Error al buscar el ejercicio en Firebase: " + error.getMessage());
+                    Log.e(TAG, " Error al buscar el ejercicio en Firebase: " + error.getMessage());
                 }
             });
         }
 
-        // 🔥 Actualizar el estado del formulario de entrenamiento
+        //  Actualizar el estado del formulario de entrenamiento
         DatabaseReference userRef = mDatabase.child("users").child(userId);
         userRef.child("trainingFormCompleted").setValue(true)
-                .addOnSuccessListener(aVoid -> Log.d(TAG, "✅ Estado del formulario actualizado"))
-                .addOnFailureListener(e -> Log.e(TAG, "❌ Error al actualizar el estado del formulario.", e));
+                .addOnSuccessListener(aVoid -> Log.d(TAG, " Estado del formulario actualizado"))
+                .addOnFailureListener(e -> Log.e(TAG, " Error al actualizar el estado del formulario.", e));
 
-        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads: ✅ Todos los ejercicios han sido guardados correctamente.");
+        Log.d(TAG, "AssignLoadFragment - saveAssignedLoads:  Todos los ejercicios han sido guardados correctamente.");
         Toast.makeText(getContext(), "Cargas asignadas guardadas exitosamente", Toast.LENGTH_SHORT).show();
 
-        // 🔥 Actualizar los iconos de estado
+        //  Actualizar los iconos de estado
         updateAllStatusButtonIcons();
     }
 

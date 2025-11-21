@@ -60,6 +60,8 @@ public class CreatedExercisesFragmentAlt extends Fragment implements
         var u = FirebaseAuth.getInstance().getCurrentUser();
         return (u != null) ? u.getUid() : null;
     }
+
+    //
     private File file() {
         return new File(requireContext().getFilesDir(), uid() + "_exercises.json");
     }
