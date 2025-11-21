@@ -61,6 +61,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
 
     private static final int PICK_IMAGE_REQUEST = 1;
     private static final String FILE_NAME       = "exercises.json";
+    private static final String TAG             = "AddExerciseDialogFragment";
 
     /* ------------ UI ------------ */
     private EditText nameEditText, descriptionEditText;
@@ -134,7 +135,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
         selectImageButton.setOnClickListener(v -> {
             Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
             intent.setType("image/*");
-            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);        // ⭐ permite varias
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);        //  permite varias
             intent.addCategory(Intent.CATEGORY_OPENABLE);
             startActivityForResult(Intent.createChooser(intent, "Selecciona imagen(es)"),
                     PICK_IMAGE_REQUEST);
@@ -153,6 +154,9 @@ public class AddExerciseDialogFragment extends DialogFragment {
             return;
         }
 
+        // AUDITORÍA: intento de creación con conteo de imágenes
+        Log.i(TAG, "AUDIT_TRAIL: Intentando crear ejercicio: " + exerciseName + " | Imágenes: " + imagesBase64.size());
+
         Exercise newExercise = new Exercise();
 
         // 🔍 Establecer como ejercicio de almacenamiento interno
@@ -160,7 +164,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
 
         newExercise.setName(exerciseName);
         newExercise.setFromInternal(true);
-        Log.d("AddExerciseDialogFragment", "📌 Creando ejercicio - isFromInternal(): " + newExercise.isFromInternal());
+        Log.d("AddExerciseDialogFragment", "Creando ejercicio - isFromInternal(): " + newExercise.isFromInternal());
         newExercise.setEquipmentType(equipmentTypeSpinner.getSelectedItem().toString());
         newExercise.setExerciseType(exerciseTypeSpinner.getSelectedItem().toString());
 
@@ -226,7 +230,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
                     requireActivity().getContentResolver(), uri);
 
             String b64 = encodeImageToBase64(bitmap);
-            imagesBase64.add(b64);          // ⭐ se añade a la lista
+            imagesBase64.add(b64);          //  se añade a la lista
             imageBase64 = b64;              // compatibilidad con antiguo campo
 
             if (showPreview) imagePreview.setImageBitmap(bitmap);
@@ -234,6 +238,7 @@ public class AddExerciseDialogFragment extends DialogFragment {
             Log.e("AddExerciseDialogFragment", "Error al seleccionar la imagen", e);
         }
     }
+
     private void saveExerciseToInternalStorage(Exercise exercise) {
         Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: Guardando ejercicio en almacenamiento interno");
 
@@ -246,6 +251,10 @@ public class AddExerciseDialogFragment extends DialogFragment {
 
             // Guardar lista en formato JSON
             File file = new File(getContext().getFilesDir(), FILE_NAME);
+
+            // AUDITORÍA: archivo aislado por UID (nombre de archivo)
+            Log.d(TAG, "AUDIT_TRAIL: Persistiendo en archivo aislado por UID: " + file.getName());
+
             FileWriter writer = new FileWriter(file);
             Gson gson = new Gson();
             String json = gson.toJson(exercises);
@@ -253,15 +262,18 @@ public class AddExerciseDialogFragment extends DialogFragment {
             writer.write(json);
             writer.close();
 
-            Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage: ✅ Ejercicio guardado correctamente.");
+            Log.d("AddExerciseDialogFragment", "saveExerciseToInternalStorage:  Ejercicio guardado correctamente.");
         } catch (IOException e) {
-            Log.e("AddExerciseDialogFragment", "❌ Error al guardar ejercicio", e);
+            Log.e("AddExerciseDialogFragment", " Error al guardar ejercicio", e);
         }
     }
 
 
     private void loadMusclesFromDatabase() {
         Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Cargando músculos desde la base de datos");
+        // AUDITORÍA: sincronización de catálogos para validar formularios
+        Log.d(TAG, "AUDIT_TRAIL: Sincronizando catálogos desde Firebase para validación de formularios.");
+
         DatabaseReference exercisesRef = FirebaseDatabase.getInstance().getReference().child("exercises");
         exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
@@ -372,9 +384,9 @@ public class AddExerciseDialogFragment extends DialogFragment {
                 exercises = new ArrayList<>();
             }
 
-            Log.d("AddExerciseDialogFragment", "📥 Ejercicios cargados correctamente: " + exercises.size());
+            Log.d("AddExerciseDialogFragment", " Ejercicios cargados correctamente: " + exercises.size());
         } catch (Exception e) {
-            Log.e("AddExerciseDialogFragment", "❌ Error al cargar ejercicios desde almacenamiento interno", e);
+            Log.e("AddExerciseDialogFragment", " Error al cargar ejercicios desde almacenamiento interno", e);
         }
 
         return exercises;
