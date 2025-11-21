@@ -89,7 +89,6 @@ public class EntrenamientoFragment extends Fragment {
 
         Log.d(TAG, "showWelcomeForm: Configurando ArrayAdapter personalizado para los Spinners con texto blanco");
 
-
         daysSpinner.setAdapter(daysAdapter);
         jobTypeSpinner.setAdapter(jobTypeAdapter);
         goalSpinner2.setAdapter(goalAdapter);
@@ -110,8 +109,8 @@ public class EntrenamientoFragment extends Fragment {
             int days = Integer.parseInt(daysText.replaceAll("\\D+", ""));
             int time = Integer.parseInt(timeText.replaceAll("\\D+", ""));
 
-            //  AUDITORÍA: demostrar que los parámetros fantasma sí se capturan
-            Log.i(TAG, "AUDIT_TRAIL: Parametros capturados -> Días: " + days + " | Exp: " + experience + " | Tiempo: " + time + ". Reteniendo en memoria para siguiente paso.");
+            // 🔎 AUDITORÍA: datos efímeros capturados antes de crear el Bundle
+            Log.i(TAG, "AUDIT_TRAIL: Capturando parámetros de filtrado (Efímeros) -> Días: " + days + ", Exp: " + experience + ". Pasando a siguiente vista sin persistir en BD.");
 
             // Crear un Bundle con los datos
             Bundle data = new Bundle();
@@ -123,9 +122,9 @@ public class EntrenamientoFragment extends Fragment {
 
             // Llamar al método para cambiar al nuevo fragmento
             if (getActivity() instanceof ViewPagerActivity) {
-                Log.d(TAG, "AUDIT_TRAIL: Navegando a Selección de Distribución. Datos transferidos en Bundle.");
                 ((ViewPagerActivity) getActivity()).switchToExerciseDistributionFragment(data);
             }
         });
     }
+
 }
