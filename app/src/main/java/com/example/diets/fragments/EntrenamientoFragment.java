@@ -23,6 +23,7 @@ public class EntrenamientoFragment extends Fragment {
 
     private static final String PREFS_NAME = "MyPrefsFile";
     private static final String FIRST_TIME_KEY = "firstTime";
+    private static final String TAG = "EntrenamientoFragment";
 
     @Nullable
     @Override
