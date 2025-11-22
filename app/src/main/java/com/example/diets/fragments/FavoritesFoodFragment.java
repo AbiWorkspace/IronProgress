@@ -1,5 +1,7 @@
 package com.example.diets.fragments;
 
+import static android.content.ContentValues.TAG;
+
 import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
@@ -29,7 +31,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 public class FavoritesFoodFragment extends Fragment {
-
+    private final String TAG = "FavoritesFoodFragment";
     private ListView favoritesListView;
     private EditText searchFavoritesEditText;
     private ImageButton searchFavoritesButton;
@@ -138,26 +140,40 @@ public class FavoritesFoodFragment extends Fragment {
 
 
     private void loadFavorites() {
+        // 1. Obtener el Set de Strings (JSON) de los favoritos persistidos.
+        Log.d(TAG, "Iniciando carga de favoritos desde FavoritesManager.");
         Set<String> jsonSet = GramsInputDialog.FavoritesManager.getAllFavorites(requireContext());
+        Log.d(TAG, "Obtenidos " + jsonSet.size() + " JSONs de favoritos.");
+
         List<FoodSearchFragment.FoodResult> allFoods = new ArrayList<>();
 
+        // 2. Iterar sobre cada JSON para deserializarlo a un objeto FoodResult.
         for (String json : jsonSet) {
             try {
+                // Verificación básica de formato antes de intentar la deserialización
                 if (json != null && json.trim().startsWith("{")) {
                     FoodSearchFragment.FoodResult food = gson.fromJson(json, FoodSearchFragment.FoodResult.class);
                     allFoods.add(food);
+                    Log.d(TAG, "Deserializado y agregado: " + food.name);
+                } else {
+                    Log.w(TAG, "JSON de favorito es nulo o inválido, omitiendo.");
                 }
             } catch (Exception e) {
-                Log.e("FavoritesFoodFragment", "Error al deserializar favorito: " + e.getMessage());
+                // Manejo de errores de deserialización (ej. JSON malformado o cambio de estructura de la clase)
+                Log.e(TAG, "Error al deserializar favorito (JSON: " + json + "): " + e.getMessage());
             }
         }
 
+        // 3. Actualizar la lista local de favoritos del fragmento.
         favoritesList.clear();
         favoritesList.addAll(allFoods);
+        Log.d(TAG, "Lista local 'favoritesList' actualizada con " + allFoods.size() + " alimentos.");
 
+        // 4. Actualizar el adaptador de la interfaz de usuario.
         adapter.clear();
         adapter.addAll(allFoods);
         adapter.notifyDataSetChanged();
+        Log.d(TAG, "Adaptador de la UI notificado del cambio de datos. Carga completada.");
     }
 
 
