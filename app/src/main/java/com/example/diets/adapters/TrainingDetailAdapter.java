@@ -419,13 +419,8 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
 
             pm.inflate(R.menu.menu_exercise_actions);
 
-            MenuItem dynItem = pm.getMenu().findItem(R.id.action_toggle_dynamic);
-            if (dynItem != null) {
-                boolean estadoGuardado = Prefs.isDynamicEnabledForExercise(itemView.getContext(), ex.getName());
-                dynItem.setChecked(estadoGuardado);
 
-                Log.d(TAG, "showPopupDelete: Check 'Progresión dinámica' cargado para " + ex.getName() + " = " + estadoGuardado);
-            }
+
 
 
             pm.setOnMenuItemClickListener(menuItem -> {
@@ -451,48 +446,7 @@ public class TrainingDetailAdapter extends RecyclerView.Adapter<TrainingDetailAd
                     return true;
                 }
 
-                if (menuItem.getItemId() == R.id.action_toggle_dynamic) {
-                    boolean newVal = !menuItem.isChecked();
-                    menuItem.setChecked(newVal);
 
-                    Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
-                            "El usuario ha " + (newVal ? "activado" : "desactivado") +
-                            " la Progresión Dinámica para el ejercicio '" + ex.getName() + "'.");
-
-                    // Guarda preferencia del usuario para este ejercicio
-                    Prefs.setDynamicEnabledForExercise(itemView.getContext(), ex.getName(), newVal);
-                    Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
-                            "Se ha guardado la preferencia Progresión Dinámica = " + newVal +
-                            " para el ejercicio '" + ex.getName() + "'.");
-
-                    if (newVal) {
-                        // El usuario quiere sugerencias automáticas
-                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
-                                "Solicitando sugerencia dinámica de series para '" + ex.getName() + "'.");
-                        List<ProgresionDinamica.Serie> sugeridas = ProgresionDinamica.sugerirSeries(
-                                context,
-                                ex,
-                                seriesAdapter.getUpdatedSeriesList(),
-                                seriesAdapter.getHistorialSeries(),
-                                ProgresionDinamica.NivelUsuario.INTERMEDIO,
-                                2.5f
-                        );
-                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
-                                "Sugerencias recibidas: " + sugeridas.size() + " series.");
-                        seriesAdapter.setFromSuggest(sugeridas);
-                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
-                                "La tabla de series ha sido reemplazada por la sugerencia dinámica.");
-                    } else {
-                        // El usuario desactivó la sugerencia, restaurar lista original
-                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
-                                "Restaurando la lista original de series para '" + ex.getName() + "'.");
-                        seriesAdapter.clearSuggestions();
-                        Log.d(TAG, "ExerciseViewHolder - showPopupDelete: " +
-                                "La tabla de series ha sido restaurada a los valores de Firebase.");
-                    }
-
-                    return true;
-                }
 
 
 

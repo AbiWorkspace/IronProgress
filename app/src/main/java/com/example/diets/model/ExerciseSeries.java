@@ -6,15 +6,15 @@ public class ExerciseSeries {
     private static final String TAG = "ExerciseSeries"; // 🔥 Nombre de la clase para logs
     private int seriesNumber;
     private int reps;
-    private double weight; // ✅ Debe ser double
-    private double rpe;    // ✅ Debe ser double (no int)
-    private boolean isCompleted; // ✅ Nuevo atributo para indicar si la serie está completada
+    private double weight; //  Debe ser double
+    private double rpe;    //  Debe ser double (no int)
+    private boolean isCompleted; //  Nuevo atributo para indicar si la serie está completada
     private Double previousLoad;
     private long date;          // Epoch millis
     public long  getDate()  { return date; }
     public void  setDate(long d){ this.date = d; }
 
-    // 🔥 Constructor vacío requerido por Firebase
+    //  Constructor vacío requerido por Firebase
     public ExerciseSeries() {
         this.seriesNumber = 0;
         this.reps = 0;

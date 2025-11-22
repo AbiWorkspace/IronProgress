@@ -200,7 +200,7 @@ public class AssignLoadFragment extends Fragment {
 
         userExercise.setGoals(convertList(map.get("goals"), String.class));
         userExercise.setMovementPatterns(convertList(map.get("movementPatterns"), MovementPattern.class));
-        userExercise.setCompleted(map.get("isCompleted") != null ? (Boolean) map.get("isCompleted") : false);
+        userExercise.setCompleted(map.get("completed") != null ? (Boolean) map.get("completed") : false);
         userExercise.setMaxReps(map.get("maxReps") != null ? ((Long) map.get("maxReps")).intValue() : 0);
 
         //  SOLO currentLoad - sin fallback

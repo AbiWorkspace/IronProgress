@@ -202,7 +202,7 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
                                     Map<String, Object> updates = new HashMap<>();
                                     updates.put("currentLoad", currentLoad);
                                     updates.put("maxReps", maxReps);
-                                    updates.put("isCompleted", isCompleted);
+                                    updates.put("completed", isCompleted);
                                     updates.put("familiarity", familiarity);
 
                                     Log.d(TAG, "saveExerciseDetails - onDataChange:  Datos a guardar: " + updates.toString());

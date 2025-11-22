@@ -49,7 +49,7 @@ import java.util.Map;
  *
  * <p>Incluye trazas de auditoría (AUDIT_TRAIL) para seguir el flujo completo
  * de registro y, en particular, la regla de unicidad de Coach tanto en UI
- * (visibilidad del checkbox) como en backend (bandera coachCandidate).</p>
+ * (visibilidad del checkbox) como en backend .</p>
  */
 public class RegisterActivity extends AppCompatActivity {
 
@@ -255,7 +255,7 @@ public class RegisterActivity extends AppCompatActivity {
     /**
      * Construye el mapa de usuario y lo persiste en RTDB.
      * Aquí se aplica la regla de negocio de unicidad de Coach:
-     * solo se marca {@code coachCandidate=true} si el usuario pidió coach
+
      * en la UI y el backend confirma que aún NO existe un coach.
      *
      * @param userId         UID del usuario autenticado.
@@ -280,22 +280,22 @@ public class RegisterActivity extends AppCompatActivity {
         user.put("profilePhoto", encodedImage);
         user.put("isFirstTime", true);
         user.put("role", "user");
-        user.put("coachCandidate", false); // se setea luego según verificación
+
 
         // El backend decide con certeza:
         existsCoach(exists -> {
             boolean enviarSolicitud = requestCoachUI && !exists;
 
             // Auditoría de regla de negocio (unicidad de Coach)
-            Log.i(TAG, "AUDIT_TRAIL: Evaluando regla de unicidad de Coach -> requestCoachUI=" + requestCoachUI + " | existeCoach=" + exists + " | coachCandidate(enviarSolicitud)=" + enviarSolicitud);
+            Log.i(TAG, "AUDIT_TRAIL: Evaluando regla de unicidad de Coach -> requestCoachUI=" + requestCoachUI + " | existeCoach=" + enviarSolicitud);
 
-            user.put("coachCandidate", enviarSolicitud);
+
 
             Map<String, Object> updates = new HashMap<>();
             updates.put("/users/" + userId, user);
 
             // Auditoría requerida: escritura del perfil en RTDB
-            Log.i(TAG, "AUDIT_TRAIL: Escribiendo perfil en RTDB. UID: " + userId + " | Role: " + user.get("role") + " | CoachCandidate: " + user.get("coachCandidate"));
+            Log.i(TAG, "AUDIT_TRAIL: Escribiendo perfil en RTDB. UID: " + userId + " | Role: " + user.get("role"));
 
             root.updateChildren(updates).addOnCompleteListener(t -> {
                 postRegisterNavigate(enviarSolicitud);
