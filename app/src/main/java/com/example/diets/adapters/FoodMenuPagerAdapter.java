@@ -11,7 +11,7 @@ import com.example.diets.fragments.FoodSearchFragment;
 import com.example.diets.fragments.FavoritesFoodFragment;
 
 import java.util.function.Consumer;
-
+//MENU ENCARGADO DE UNIR  FoodSearchFragment y FavoritesFragment
 public class FoodMenuPagerAdapter extends FragmentStateAdapter {
 
     private final Consumer<FoodSearchFragment.FoodResult> onFoodSelected;
