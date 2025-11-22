@@ -63,12 +63,12 @@ public class FoodSearchFragment extends Fragment {
 
     // ==================== CONSTANTES ======================
     private static final String TAG = "FoodSearchFragment";
-
-    // ==================== UI WIDGETS ======================
+    private String effectiveUid;
     private EditText searchFoodEditText;
+    // ==================== UI WIDGETS ======================
+
     private ListView foodResultsListView;
     private SearchResultAdapter adapter;
-
     // ==================== CALLBACK ========================
     private Consumer<FoodResult> onFoodSelected;
 
@@ -150,7 +150,25 @@ public class FoodSearchFragment extends Fragment {
 
         return view;
     }
-
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Bundle args = getArguments();
+        if (args != null) {
+            // Recuperar el UID pasado en newInstance
+            effectiveUid = args.getString("uid");
+            Log.d(TAG, "FoodSearchFragment iniciado con UID: " + effectiveUid);
+        } else {
+            Log.e(TAG, "ADVERTENCIA: FoodSearchFragment iniciado sin UID.");
+        }
+    }
+    public static FoodSearchFragment newInstance(String uid) {
+        FoodSearchFragment fragment = new FoodSearchFragment();
+        Bundle args = new Bundle();
+        args.putString("uid", uid); // Clave para el UID
+        fragment.setArguments(args);
+        return fragment;
+    }
     // ===================== POPUP QUICK FILTER =====================
     private void showQuickFilterPopup(View anchor) {
         ContextThemeWrapper cw = new ContextThemeWrapper(requireContext(), R.style.PopupMenu_Dark);
@@ -826,20 +844,23 @@ public class FoodSearchFragment extends Fragment {
 
     private void handleResultClick(FoodResult sel) {
         if (sel.isRecipe()) {
-            RecipeDialog dlg = RecipeDialog.newInstance(sel);
+            RecipeDialog dlg = RecipeDialog.newInstance(sel, effectiveUid); // ✅ Pasar effectiveUid
             dlg.setOnGramsConfirmedListener(r -> { if (onFoodSelected != null) onFoodSelected.accept(r); });
             dlg.show(getParentFragmentManager(), "RecipeDialog");
             return;
         }
         GramsInputDialog.newInstance(sel, r -> {
-            if (r.ingredients != null && !r.ingredients.isEmpty()) {
-                RecipeDialog dlg = RecipeDialog.newInstance(r);
-                dlg.setOnGramsConfirmedListener(rr -> { if (onFoodSelected != null) onFoodSelected.accept(rr); });
-                dlg.show(getParentFragmentManager(), "RecipeDialog");
-                return;
-            }
-            if (onFoodSelected != null) onFoodSelected.accept(r);
-        }).show(getParentFragmentManager(), "GramsInputDialog");
+                    if (r.ingredients != null && !r.ingredients.isEmpty()) {
+                        RecipeDialog dlg = RecipeDialog.newInstance(r, effectiveUid); // ✅ Pasar effectiveUid
+                        // Nota: Si RecipeDialog también maneja favoritos,
+                        // su newInstance también necesitaría el UID. Por ahora lo dejamos igual.
+                        dlg.setOnGramsConfirmedListener(rr -> { if (onFoodSelected != null) onFoodSelected.accept(rr); });
+                        dlg.show(getParentFragmentManager(), "RecipeDialog");
+                        return;
+                    }
+                    if (onFoodSelected != null) onFoodSelected.accept(r);
+                }, this.effectiveUid) // ✅ CORRECCIÓN FINAL: Pasar el UID aquí
+                .show(getParentFragmentManager(), "GramsInputDialog");
     }
 
     public static class FoodResult implements java.io.Serializable {

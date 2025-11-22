@@ -37,11 +37,38 @@ public class FavoritesFoodFragment extends Fragment {
     private ImageButton searchFavoritesButton;
     private SearchResultAdapter adapter;
 
+    // ✅ ATRIBUTO PARA EL UID
+    private String effectiveUid;
 
     private final List<FoodSearchFragment.FoodResult> favoritesList = new ArrayList<>();
 
     private Consumer<FoodSearchFragment.FoodResult> onFoodSelected;
     private final com.google.gson.Gson gson = new com.google.gson.Gson();
+
+    // ==================== NEW INSTANCE / CICLO DE VIDA ======================
+
+    // ✅ NEW INSTANCE MODIFICADO PARA RECIBIR UID
+    public static FavoritesFoodFragment newInstance(String uid) {
+        FavoritesFoodFragment fragment = new FavoritesFoodFragment();
+        Bundle args = new Bundle();
+        args.putString("uid", uid);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Bundle args = getArguments();
+        if (args != null) {
+            // ✅ RECUPERAR EL UID
+            effectiveUid = args.getString("uid");
+            Log.d(TAG, "Fragment iniciado con effectiveUid: " + effectiveUid);
+        } else {
+            Log.e(TAG, "ADVERTENCIA: FavoritesFoodFragment iniciado sin UID.");
+        }
+    }
+
     public void setOnFoodSelected(Consumer<FoodSearchFragment.FoodResult> listener) {
         this.onFoodSelected = listener;
     }
@@ -57,19 +84,32 @@ public class FavoritesFoodFragment extends Fragment {
         searchFavoritesEditText = view.findViewById(R.id.searchFavoritesEditText);
         searchFavoritesButton = view.findViewById(R.id.searchFavoritesButton);
 
-        adapter = new SearchResultAdapter(requireContext(), favoritesList);
+        // 🛑 ANTES (EL ERROR):
+        // adapter = new SearchResultAdapter(requireContext(), favoritesList);
+        // Esto vinculaba el adaptador directamente a tu lista maestra. Al limpiar uno, se borraba el otro.
+
+        // ✅ AHORA (LA SOLUCIÓN):
+        // Inicializamos con una ArrayList NUEVA y VACÍA.
+        adapter = new SearchResultAdapter(requireContext(), new ArrayList<>());
         favoritesListView.setAdapter(adapter);
 
 
         favoritesListView.setOnItemClickListener((parent, v, position, id) -> {
             if (position < adapter.getCount()) {
                 FoodSearchFragment.FoodResult selectedFood = favoritesList.get(position);
+
+                if (effectiveUid == null) {
+                    Log.e(TAG, "UID nulo. No se puede abrir diálogo.");
+                    return;
+                }
+
                 if (selectedFood.isRecipe()) {
-                    RecipeDialog dialog = RecipeDialog.newInstance(selectedFood);
+                    // 🛑 CORRECCIÓN AQUÍ: Pasar effectiveUid
+                    RecipeDialog dialog = RecipeDialog.newInstance(selectedFood, effectiveUid);
+
                     dialog.setOnGramsConfirmedListener(result -> {
                         if (onFoodSelected != null) {
                             onFoodSelected.accept(result);
-                            // Si quieres cerrar el fragmento padre:
                             if (getParentFragment() instanceof DialogFragment) {
                                 ((DialogFragment) getParentFragment()).dismiss();
                             }
@@ -77,14 +117,19 @@ public class FavoritesFoodFragment extends Fragment {
                     });
                     dialog.show(getParentFragmentManager(), "RecipeDialog");
                 } else {
-                    GramsInputDialog dialog = GramsInputDialog.newInstance(selectedFood, gramsResult -> {
-                        if (onFoodSelected != null) {
-                            onFoodSelected.accept(gramsResult);
-                            if (getParentFragment() instanceof DialogFragment) {
-                                ((DialogFragment) getParentFragment()).dismiss();
-                            }
-                        }
-                    });
+                    // ✅ Ya estaba correcto, pasa effectiveUid
+                    GramsInputDialog dialog = GramsInputDialog.newInstance(
+                            selectedFood,
+                            gramsResult -> {
+                                if (onFoodSelected != null) {
+                                    onFoodSelected.accept(gramsResult);
+                                    if (getParentFragment() instanceof DialogFragment) {
+                                        ((DialogFragment) getParentFragment()).dismiss();
+                                    }
+                                }
+                            },
+                            effectiveUid
+                    );
                     dialog.setOnFavoriteStatusChangedListener(() -> loadFavorites());
                     dialog.show(getParentFragmentManager(), "GramsInputDialog");
                 }
@@ -99,6 +144,7 @@ public class FavoritesFoodFragment extends Fragment {
 
         return view;
     }
+
     public interface OnFavoriteStatusChangedListener {
         void onFavoriteStatusChanged();
     }
@@ -126,61 +172,84 @@ public class FavoritesFoodFragment extends Fragment {
 
     private void filterFavorites(String query) {
         List<FoodSearchFragment.FoodResult> filteredFoods = new ArrayList<>();
+        String queryLower = query.toLowerCase();
 
+        // Filtra SIEMPRE la lista maestra (favoritesList)
         for (FoodSearchFragment.FoodResult food : favoritesList) {
-            if (food.name.toLowerCase().contains(query.toLowerCase())) {
+            if (food.name.toLowerCase().contains(queryLower)) {
                 filteredFoods.add(food);
             }
         }
 
+        // Actualiza el adaptador con los resultados filtrados.
         adapter.clear();
         adapter.addAll(filteredFoods);
         adapter.notifyDataSetChanged();
+        Log.d(TAG, "Filtro aplicado para '" + query + "'. Mostrando " + filteredFoods.size() + " resultados.");
     }
 
 
     private void loadFavorites() {
+        // Validación de seguridad
+        if (effectiveUid == null) {
+            Log.e(TAG, "No se puede cargar favoritos: effectiveUid es nulo.");
+            favoritesList.clear();
+            if (adapter != null) {
+                adapter.clear();
+                adapter.notifyDataSetChanged();
+            }
+            return;
+        }
+
+        Log.d(TAG, "Iniciando carga de favoritos desde FavoritesManager para UID: " + effectiveUid);
+
         // 1. Obtener el Set de Strings (JSON) de los favoritos persistidos.
-        Log.d(TAG, "Iniciando carga de favoritos desde FavoritesManager.");
-        Set<String> jsonSet = GramsInputDialog.FavoritesManager.getAllFavorites(requireContext());
-        Log.d(TAG, "Obtenidos " + jsonSet.size() + " JSONs de favoritos.");
+        Set<String> jsonSet = GramsInputDialog.FavoritesManager.getAllFavorites(requireContext(), effectiveUid);
 
         List<FoodSearchFragment.FoodResult> allFoods = new ArrayList<>();
 
-        // 2. Iterar sobre cada JSON para deserializarlo a un objeto FoodResult.
+        // 2. Iterar sobre cada JSON para deserializarlo.
         for (String json : jsonSet) {
             try {
-                // Verificación básica de formato antes de intentar la deserialización
                 if (json != null && json.trim().startsWith("{")) {
                     FoodSearchFragment.FoodResult food = gson.fromJson(json, FoodSearchFragment.FoodResult.class);
                     allFoods.add(food);
-                    Log.d(TAG, "Deserializado y agregado: " + food.name);
-                } else {
-                    Log.w(TAG, "JSON de favorito es nulo o inválido, omitiendo.");
                 }
             } catch (Exception e) {
-                // Manejo de errores de deserialización (ej. JSON malformado o cambio de estructura de la clase)
-                Log.e(TAG, "Error al deserializar favorito (JSON: " + json + "): " + e.getMessage());
+                Log.e(TAG, "Error al deserializar favorito: " + e.getMessage());
             }
         }
 
-        // 3. Actualizar la lista local de favoritos del fragmento.
+        // 3. Actualizar la lista local de favoritos (favoritesList).
         favoritesList.clear();
         favoritesList.addAll(allFoods);
+
         Log.d(TAG, "Lista local 'favoritesList' actualizada con " + allFoods.size() + " alimentos.");
 
-        // 4. Actualizar el adaptador de la interfaz de usuario.
-        adapter.clear();
-        adapter.addAll(allFoods);
-        adapter.notifyDataSetChanged();
-        Log.d(TAG, "Adaptador de la UI notificado del cambio de datos. Carga completada.");
+        // 4. 🔥 Llamar al refresco de la UI para aplicar el filtro actual.
+        refreshFavoritesUI();
+        Log.d(TAG, "Carga de favoritos completada.");
     }
 
+    private void refreshFavoritesUI() {
+        String query = searchFavoritesEditText.getText().toString().trim();
+        Log.d(TAG, "Refrescando UI. Query: '" + query + "'");
+
+        if (query.isEmpty()) {
+            // Si no hay búsqueda, mostramos la lista completa (favoritesList).
+            adapter.clear();
+            adapter.addAll(favoritesList);
+            adapter.notifyDataSetChanged();
+            Log.d(TAG, "UI refrescada: Mostrando " + favoritesList.size() + " elementos sin filtrar.");
+        } else {
+            // Si hay búsqueda, delegamos la tarea a filterFavorites.
+            filterFavorites(query);
+        }
+    }
 
     @Override
     public void onResume() {
         super.onResume();
-        loadFavorites(); // 🔥 Cada vez que se vea el fragmento, actualizamos favoritos
+        loadFavorites();
     }
-
 }

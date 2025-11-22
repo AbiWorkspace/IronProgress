@@ -12,40 +12,46 @@ import com.example.diets.fragments.FavoritesFoodFragment;
 
 import java.util.function.Consumer;
 //MENU ENCARGADO DE UNIR  FoodSearchFragment y FavoritesFragment
+
 public class FoodMenuPagerAdapter extends FragmentStateAdapter {
 
     private final Consumer<FoodSearchFragment.FoodResult> onFoodSelected;
     private final FoodMenuDialogFragment parentDialog;
-
+    private final String effectiveUid; // ✅ 1. Atributo para almacenar el UID
 
     public FoodMenuPagerAdapter(@NonNull FoodMenuDialogFragment parentDialog,
-                                Consumer<FoodSearchFragment.FoodResult> onFoodSelected) {
+                                Consumer<FoodSearchFragment.FoodResult> onFoodSelected,
+                                String effectiveUid) { // ✅ 2. Aceptar el UID en el constructor
         super(parentDialog);
         this.parentDialog = parentDialog;
         this.onFoodSelected = onFoodSelected;
+        this.effectiveUid = effectiveUid; // ✅ 3. Guardar el UID
     }
 
     @NonNull
     @Override
     public Fragment createFragment(int position) {
         if (position == 0) {
-            FoodSearchFragment searchFoodFragment = new FoodSearchFragment();
+            // 🛑 CORRECCIÓN DE LA LÍNEA 32: Usar newInstance y el atributo guardado
+            FoodSearchFragment searchFoodFragment = FoodSearchFragment.newInstance(this.effectiveUid);
+
             searchFoodFragment.setOnFoodSelected(result -> {
                 onFoodSelected.accept(result);
-                Toast.makeText(parentDialog.requireContext(), " Alimento agregado", Toast.LENGTH_SHORT).show(); // 🔥 Confirmación
-                parentDialog.dismissMenu(); // 🔥 cerrar menú
+                Toast.makeText(parentDialog.requireContext(), " Alimento agregado", Toast.LENGTH_SHORT).show();
+                parentDialog.dismissMenu();
             });
             return searchFoodFragment;
         } else {
-            FavoritesFoodFragment favoritesFragment = new FavoritesFoodFragment();
+            // NOTA: Si FavoritesFoodFragment también necesita el UID (y probablemente lo necesite para la gestión segura de favoritos),
+            // también deberías actualizar su constructor y usar FavoritesFoodFragment.newInstance(this.effectiveUid);
+            FavoritesFoodFragment favoritesFragment = FavoritesFoodFragment.newInstance(this.effectiveUid);
             favoritesFragment.setOnFoodSelected(result -> {
                 onFoodSelected.accept(result);
-                Toast.makeText(parentDialog.requireContext(), "Alimento agregado", Toast.LENGTH_SHORT).show(); // 🔥 Confirmación
-                parentDialog.dismissMenu(); // 🔥 cerrar menú
+                Toast.makeText(parentDialog.requireContext(), "Alimento agregado", Toast.LENGTH_SHORT).show();
+                parentDialog.dismissMenu();
             });
             return favoritesFragment;
         }
-
     }
     @Override
     public int getItemCount() {

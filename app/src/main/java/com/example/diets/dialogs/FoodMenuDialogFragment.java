@@ -22,11 +22,19 @@ public class FoodMenuDialogFragment extends DialogFragment {
 
     private ViewPager2 viewPager;
     private TextView tabSearch, tabFavorites;
-
+    private String userUid; // ✅ CORRECCIÓN 1: DECLARAR el atributo aquí
     private Consumer<FoodSearchFragment.FoodResult> onFoodSelected;
 
-    public static FoodMenuDialogFragment newInstance() {
-        return new FoodMenuDialogFragment();
+    // Dentro de FoodMenuDialogFragment.java
+
+    public static FoodMenuDialogFragment newInstance(
+            Consumer<FoodSearchFragment.FoodResult> onFoodSelected,
+            String uid) { // ✅ ACEPTAR UID
+
+        FoodMenuDialogFragment dialog = new FoodMenuDialogFragment();
+        dialog.onFoodSelected = onFoodSelected;
+        dialog.userUid = uid; // 👈 GUARDAR UID en una nueva variable de instancia
+        return dialog;
     }
 
     public void setOnFoodSelected(Consumer<FoodSearchFragment.FoodResult> listener) {
@@ -54,8 +62,7 @@ public class FoodMenuDialogFragment extends DialogFragment {
         tabSearch = view.findViewById(R.id.tabSearch);
         tabFavorites = view.findViewById(R.id.tabFavorites);
 
-        viewPager.setAdapter(new FoodMenuPagerAdapter(this, onFoodSelected));
-
+        viewPager.setAdapter(new FoodMenuPagerAdapter(this, onFoodSelected, userUid));
         // Cambiar tab activo según página
         viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
             @Override

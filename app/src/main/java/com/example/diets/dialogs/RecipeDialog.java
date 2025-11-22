@@ -39,9 +39,11 @@ public class RecipeDialog extends DialogFragment {
     /* ---------- CONSTANTES ---------- */
     private static final String TAG        = "RecipeDialog";
     private static final String ARG_RECIPE = "arg_recipe";
+    private static final String ARG_UID    = "arg_uid"; // ✅ NUEVA CONSTANTE
 
     /* ---------- MODELO ---------- */
     private FoodSearchFragment.FoodResult recipe;
+    private String userUid; // ✅ VARIABLE PARA EL UID
 
     /* ---------- FLAGS ---------- */
     private boolean isFav;
@@ -54,10 +56,12 @@ public class RecipeDialog extends DialogFragment {
         this.gramsListener = listener;
     }
 
-    public static RecipeDialog newInstance(FoodSearchFragment.FoodResult r) {
-        Log.d(TAG, "newInstance: creando instancia con receta " + r.name);
+    // ✅ MODIFICADO: Acepta el UID
+    public static RecipeDialog newInstance(FoodSearchFragment.FoodResult r, String uid) {
+        Log.d(TAG, "newInstance: creando instancia con receta " + r.name + " y UID: " + uid);
         Bundle b = new Bundle();
         b.putSerializable(ARG_RECIPE, r);
+        b.putString(ARG_UID, uid); // ✅ GUARDAR UID
         RecipeDialog d = new RecipeDialog();
         d.setArguments(b);
         return d;
@@ -76,11 +80,21 @@ public class RecipeDialog extends DialogFragment {
         if (getDialog() != null && getDialog().getWindow() != null)
             getDialog().getWindow().setBackgroundDrawable(new ColorDrawable(0x00000000)); // fondo transparente
 
-        recipe = (FoodSearchFragment.FoodResult) getArguments().getSerializable(ARG_RECIPE);
+        // ✅ RECUPERAR DATOS Y UID
+        if (getArguments() != null) {
+            recipe = (FoodSearchFragment.FoodResult) getArguments().getSerializable(ARG_RECIPE);
+            userUid = getArguments().getString(ARG_UID); // ✅ RECUPERAR UID
+        }
+
         if (recipe == null) {
             Log.e(TAG, "onCreateView: receta nula – cerrando diálogo.");
             dismiss();
             return v;
+        }
+
+        // Validación de seguridad para el UID
+        if (userUid == null) {
+            Log.e(TAG, "ERROR CRÍTICO: RecipeDialog iniciado sin UID.");
         }
 
         // === AUDIT_TRAIL: apertura de detalle de receta ===
@@ -162,18 +176,32 @@ public class RecipeDialog extends DialogFragment {
             });
         }
 
-        /* ---------- FAVORITOS ---------- */
-        isFav = GramsInputDialog.FavoritesManager.isFavorite(requireContext(), recipe.name);
-        Log.d(TAG, "onCreateView: receta esFavorita = " + isFav);
+        /* ---------- FAVORITOS (MODIFICADO PARA UID) ---------- */
+
+        // ✅ 1. Comprobar estado inicial pasando el UID
+        isFav = GramsInputDialog.FavoritesManager.isFavorite(requireContext(), userUid, recipe.name);
+
+        Log.d(TAG, "onCreateView: receta esFavorita = " + isFav + " (UID=" + userUid + ")");
         toggleFavIcon(favBtn, isFav);
+
         favBtn.setOnClickListener(btn -> {
+            // Seguridad
+            if (userUid == null) {
+                Toast.makeText(getContext(), "Error: Usuario no identificado.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             isFav = !isFav;
             if (isFav) {
-                GramsInputDialog.FavoritesManager.add(requireContext(), recipe);
+                // ✅ 2. Añadir pasando el UID
+                GramsInputDialog.FavoritesManager.add(requireContext(), userUid, recipe);
                 Log.d(TAG, "favBtn: añadido a favoritos.");
+                Toast.makeText(getContext(), "Añadido a favoritos", Toast.LENGTH_SHORT).show();
             } else {
-                GramsInputDialog.FavoritesManager.remove(requireContext(), recipe.name);
+                // ✅ 3. Remover pasando el UID
+                GramsInputDialog.FavoritesManager.remove(requireContext(), userUid, recipe.name);
                 Log.d(TAG, "favBtn: eliminado de favoritos.");
+                Toast.makeText(getContext(), "Eliminado de favoritos", Toast.LENGTH_SHORT).show();
             }
             toggleFavIcon(favBtn, isFav);
         });

@@ -37,7 +37,7 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
     private static final int MAX_TITLE_CHARS = 20;
     private static final RecyclerView.RecycledViewPool POOL_PRODUCTS = new RecyclerView.RecycledViewPool();
     private static final RecyclerView.RecycledViewPool POOL_RECIPES  = new RecyclerView.RecycledViewPool();
-
+    private final String userUid; // ✅ CORRECCIÓN 1: DECLARAR EL ATRIBUTO
     // ───────────────────────────────── Atributos
     private final List<FoodBlock> foodBlocks;
     private final DashboardFragment parentFragment;
@@ -49,15 +49,18 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
     public FoodBlockAdapter(List<FoodBlock> blocks,
                             Context context,
                             DashboardFragment parentFragment,
+                            String userUid, // ✅ NUEVO PARÁMETRO
                             OnFoodBlockDeleteRequestedListener deleteListener) {
+
         this.foodBlocks     = (blocks != null) ? blocks : new ArrayList<>();
         this.parentFragment = parentFragment;
         this.inflater       = LayoutInflater.from(context);
         this.deleteListener = deleteListener;
         this.ctx            = context;
+        this.userUid        = userUid; // 👈 ASUME QUE AÑADISTE ESTA VARIABLE A LA CLASE
 
         setHasStableIds(true);
-        Log.d(TAG, "🟢 Constructor – bloques: " + this.foodBlocks.size());
+        Log.d(TAG, "🟢 Constructor – bloques: " + this.foodBlocks.size() + ", UID: " + userUid);
     }
 
     // ───────────────────────────────── Interfaces públicas
@@ -150,12 +153,20 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
         if (h.currentBlock != block) {
 
             /* -------- Productos -------- */
-            h.productsAdapter = new FoodItemAdapter(productos, ctx, parentFragment,
+            // Código Corregido en FoodBlockAdapter.java (Línea 156)
+            h.productsAdapter = new FoodItemAdapter(
+                    productos,
+                    ctx,
+                    parentFragment,
+                    // 🛑 CAMBIAR A updateNutritionSummary y agregar recalculateDayTotals()
                     () -> {
-                        updateNutritionSummary(h, block);
-                        parentFragment.recalculateDayTotals();
+                        updateNutritionSummary(h, block); // Actualiza la UI del bloque
+                        parentFragment.recalculateDayTotals(); // Notifica al fragmento padre (Dashboard)
                     },
-                    block);
+                    block,
+                    userUid
+            );
+
 
             h.rvProducts.setLayoutManager(new LinearLayoutManager(ctx));
             h.rvProducts.setAdapter(h.productsAdapter);
@@ -167,12 +178,18 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
             h.productsHelper.attachToRecyclerView(h.rvProducts);
 
             /* -------- Recetas -------- */
-            h.recipesAdapter = new RecipeItemAdapter(recetas, ctx, parentFragment,
+            /* -------- Recetas -------- */
+            h.recipesAdapter = new RecipeItemAdapter(
+                    recetas,
+                    ctx,
+                    parentFragment,
                     () -> {
                         updateNutritionSummary(h, block);
                         parentFragment.recalculateDayTotals();
                     },
-                    block);
+                    block,
+                    userUid // ✅ AÑADIR userUid AQUÍ
+            );
 
             h.rvRecipes.setLayoutManager(new LinearLayoutManager(ctx));
             h.rvRecipes.setAdapter(h.recipesAdapter);
@@ -199,32 +216,32 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
 
         /*────────────────────  BOTÓN “+” AÑADIR ALIMENTO  ──────────────────*/
         h.addFoodItemButton.setOnClickListener(v -> {
-            FoodMenuDialogFragment dialog = FoodMenuDialogFragment.newInstance();
-            dialog.setOnFoodSelected(result -> {
-                FoodItem newItem = new FoodItem(
-                        result.name,  result.grams,
-                        result.kcalPer100g,
-                        result.protein, result.carbs, result.fat,
-                        result.imageUrl,  /*isRecipe*/ false);
+            // 🛑 CORRECCIÓN DE LA LÍNEA 213: Pasar el listener y el userUid
+            FoodMenuDialogFragment dialog = FoodMenuDialogFragment.newInstance(
+                    // Este es el listener que el fragmento llamará cuando se seleccione comida:
+                    result -> {
+                        FoodItem newItem = new FoodItem(
+                                result.name,  result.grams,
+                                result.kcalPer100g,
+                                result.protein, result.carbs, result.fat,
+                                result.imageUrl,  /*isRecipe*/ false);
+                        // ... (resto de lógica para newItem) ...
+                        if (result.ingredients != null && !result.ingredients.isEmpty()) {
+                            newItem.setIngredients(result.ingredients);
+                            newItem.setInstructions(result.instructions);
+                            newItem.setRecipe(true);
+                        }
+                        newItem.setChecked(true);
+                        block.addItem(newItem);
 
-                if (result.ingredients != null && !result.ingredients.isEmpty()) {
-                    newItem.setIngredients(result.ingredients);
-                    newItem.setInstructions(result.instructions);
-                    newItem.setRecipe(true);
-                }
-                newItem.setChecked(true);
+                        notifyItemChanged(h.getBindingAdapterPosition());
+                        parentFragment.recalculateDayTotals();
+                    },
+                    userUid // ✅ Pasar el UID
+            );
 
-                block.addItem(newItem);
-
-            /* NOTAS:
-               • notifyItemChanged() fuerza redraw de ESTE ViewHolder
-               • los totales del día se recalculan en el callback */
-                notifyItemChanged(h.getBindingAdapterPosition());
-                parentFragment.recalculateDayTotals();
-            });
             dialog.show(parentFragment.getParentFragmentManager(), "FoodMenuDialogFragment");
         });
-
         /*────────────────────  MENÚ CONTEXTUAL (delete/duplicate) ──────────*/
         h.menuButton.setOnClickListener(v -> {
             PopupMenu popup = new PopupMenu(v.getContext(), h.menuButton);
@@ -244,6 +261,9 @@ public class FoodBlockAdapter extends RecyclerView.Adapter<FoodBlockAdapter.Bloc
 
         /*────────────────────  RESUMEN NUTRICIONAL  ────────────────────────*/
         updateNutritionSummary(h, block);
+    }
+
+    private void updateBlockSummary(BlockViewHolder h, FoodBlock block) {
     }
 
 

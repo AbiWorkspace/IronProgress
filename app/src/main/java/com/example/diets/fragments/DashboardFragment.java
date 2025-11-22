@@ -247,9 +247,29 @@ public class DashboardFragment extends Fragment {
 
     /* ==================== Helpers de UID y claves ==================== */
 
+
     @Nullable
     private String uid() { return effectiveUid; }
 
+    // NUEVOS MÉTODOS: Obtienen el nombre del archivo de SharedPreferences con el UID
+    private String getFoodPrefsFileName() {
+        String u = uid();
+        if (u == null) {
+            Log.e(TAG, "¡UID nulo al generar nombre de archivo de FoodPrefs!");
+            // Nombre de fallback para evitar fallos si el UID es null (aunque es un error)
+            return PREFS_NAME + "_error";
+        }
+        return PREFS_NAME + "_" + u;
+    }
+
+    private String getGoalsPrefsFileName() {
+        String u = uid();
+        if (u == null) {
+            Log.e(TAG, "¡UID nulo al generar nombre de archivo de GoalsPrefs!");
+            return PREF_GOALS + "_error";
+        }
+        return PREF_GOALS + "_" + u;
+    }
     private String keyFood(LocalDate d) {
         String u = uid();
         if (u == null) {
@@ -266,15 +286,17 @@ public class DashboardFragment extends Fragment {
     /* ==================== Metas (load/save/UI) ==================== */
 
     private void saveGoalsToPrefs() {
-        if (effectiveUid == null || !isAdded() || getContext() != null) return;
+        if (effectiveUid == null || !isAdded() || getContext() == null) return;
 
-        Log.d(TAG, "Guardando metas en SharedPreferences. Kcal: " + goalsKcal + " P: " + goalsP + " F: " + goalsF + " C: " + goalsC); // LOG AÑADIDO
+        Log.d(TAG, "Guardando metas en SharedPreferences (UID=" + effectiveUid + "). Kcal: " + goalsKcal);
 
         SharedPreferences.Editor ed;
         try {
-            ed = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE).edit();
+            // 🛑 CORRECCIÓN: Usar getGoalsPrefsFileName()
+            // NO usar PREF_GOALS aquí, o se guardará en el archivo equivocado.
+            ed = requireContext().getSharedPreferences(getGoalsPrefsFileName(), Context.MODE_PRIVATE).edit();
         } catch (IllegalStateException e) {
-            Log.e(TAG, "Error getting SharedPreferences editor in saveGoalsToPrefs", e);
+            Log.e(TAG, "Error getting SharedPreferences editor", e);
             return;
         }
 
@@ -284,6 +306,8 @@ public class DashboardFragment extends Fragment {
         ed.putFloat(prefix + K_FAT , (float) goalsF);
         ed.putFloat(prefix + K_CARB, (float) goalsC);
         ed.apply();
+
+        Log.d(TAG, "Metas guardadas exitosamente en: " + getGoalsPrefsFileName());
     }
 
     private void updateMacrosUI() {
@@ -343,6 +367,7 @@ public class DashboardFragment extends Fragment {
                 foodBlockList,
                 getContext(),
                 this,
+                effectiveUid, // ✅ NUEVO PARÁMETRO: Pasamos el UID del usuario
                 (block, position) -> showDeleteBlockDialog(block, position)
         );
         recyclerViewFoodBlocks.setAdapter(foodBlockAdapter);
@@ -432,7 +457,7 @@ public class DashboardFragment extends Fragment {
 
     private void loadUserData(String uidToLoad) {
         if (!isAdded()) return;
-        Log.d(TAG, "loadUserData: Solicitando datos a Firebase para UID: " + uidToLoad); // LOG AÑADIDO
+        Log.d(TAG, "loadUserData: Solicitando datos a Firebase para UID: " + uidToLoad);
 
         mDatabase.child("users").child(uidToLoad)
                 .addListenerForSingleValueEvent(new ValueEventListener() {
@@ -440,24 +465,25 @@ public class DashboardFragment extends Fragment {
                         if (!isAdded() || getContext() == null) return;
 
                         if (!userSnapshot.exists()) {
-                            Log.e(TAG, "loadUserData: Snapshot no existe para el usuario."); // LOG AÑADIDO
+                            Log.e(TAG, "loadUserData: Snapshot no existe para el usuario.");
                             Toast.makeText(getContext(), "Error: No se encontraron los datos del usuario.", Toast.LENGTH_LONG).show();
                             return;
                         }
 
                         user = userSnapshot.getValue(User.class);
                         if (user == null) {
-                            Log.e(TAG, "loadUserData: El objeto User es null tras parsear."); // LOG AÑADIDO
+                            Log.e(TAG, "loadUserData: El objeto User es null tras parsear.");
                             Toast.makeText(getContext(), "Error al procesar datos del usuario.", Toast.LENGTH_SHORT).show();
                             return;
                         }
 
-                        Log.i(TAG, "Datos de usuario cargados. Peso: " + user.getWeight() + " Meta: " + user.getGoal()); // LOG AÑADIDO
+                        Log.i(TAG, "Datos de usuario cargados. Peso: " + user.getWeight() + " Meta: " + user.getGoal());
 
                         DatabaseReference kcalRef = mDatabase.child("users").child(uidToLoad).child("caloriesToday");
                         kcalRef.get().addOnSuccessListener(kcalSnapshot -> {
                             if (!isAdded() || getContext() == null) return;
 
+                            // 1. Cálculo de respaldo (por si no hay nada en Firebase)
                             double calculatedKcalToday;
                             if (user.getWeight() <= 0 || user.getHeight() <= 0 || user.getAge() <= 0) {
                                 calculatedKcalToday = 0;
@@ -468,57 +494,72 @@ public class DashboardFragment extends Fragment {
                                 );
                             }
 
+                            // 2. Obtener valor de Firebase
                             double kcalTodayValue = kcalSnapshot.exists()
                                     ? kcalSnapshot.getValue(Double.class)
                                     : calculatedKcalToday;
 
-                            Log.d(TAG, "CaloriesToday de Firebase: " + (kcalSnapshot.exists() ? kcalTodayValue : "No existe (usando calc: " + calculatedKcalToday + ")")); // LOG AÑADIDO
+                            Log.d(TAG, "CaloriesToday de Firebase: " + (kcalSnapshot.exists() ? kcalTodayValue : "No existe (usando calc: " + calculatedKcalToday + ")"));
 
+                            // Si no existía en Firebase, lo creamos
                             if (!kcalSnapshot.exists() && calculatedKcalToday > 0) {
-                                Log.d(TAG, "Estableciendo caloriesToday inicial en Firebase."); // LOG AÑADIDO
+                                Log.d(TAG, "Estableciendo caloriesToday inicial en Firebase.");
                                 kcalRef.setValue(kcalTodayValue);
                             }
 
-                            // Esta línea carga tus metas (incluyendo cambios manuales)
-                            boolean prefsExistentes = loadGoalsFromPrefs();
-                            Log.d(TAG, "Prefs locales existentes: " + prefsExistentes + " MetasKcal actuales: " + goalsKcal); // LOG AÑADIDO
+                            // ---------------------------------------------------------
+                            // 3. LÓGICA DE PERSISTENCIA LOCAL vs FIREBASE (AUDITORÍA)
+                            // ---------------------------------------------------------
 
-                            // Este 'if' SÓLO se ejecuta si NO hay metas guardadas,
-                            // poblando los valores desde Firebase por primera vez.
+                            // Intentamos cargar lo que hay guardado localmente
+                            boolean prefsExistentes = loadGoalsFromPrefs();
+                            Log.d(TAG, "Prefs locales existentes: " + prefsExistentes + " | Meta actual en RAM: " + goalsKcal);
+
+                            // REGLA: Solo sobrescribimos con datos de Firebase si NO hay datos locales
+                            // o si los datos locales están vacíos/corruptos (goalsKcal <= 0).
                             if (!prefsExistentes || goalsKcal <= 0) {
-                                Log.i(TAG, "AUDIT_TRAIL: Primer inicio detectado. Calculando TDEE y Macros iniciales basados en perfil Firebase.");
+                                Log.i(TAG, "AUDIT_TRAIL: Primer inicio o datos locales vacíos. Inicializando con datos de Firebase.");
+
                                 goalsKcal = kcalTodayValue;
-                                // Métodos SIN argumentos (evita error de signatura)
                                 goalsP    = user.calculateProtein();
                                 goalsF    = user.calculateFat();
                                 goalsC    = user.calculateCarbs();
-                                // Escalar si el total macro kcal no cuadra
+
+                                // Ajuste de escala si los macros no suman las kcal totales
                                 double mk = goalsP*4 + goalsC*4 + goalsF*9;
                                 if (kcalTodayValue > 0 && mk > 0 && Math.abs(mk - kcalTodayValue) > 10) {
                                     double f = kcalTodayValue / mk;
-                                    Log.d(TAG, "Escalando macros iniciales por factor: " + f); // LOG AÑADIDO
+                                    Log.d(TAG, "Escalando macros iniciales por factor: " + f);
                                     goalsP = Math.round(goalsP * f);
                                     goalsC = Math.round(goalsC * f);
                                     goalsF = Math.round(goalsF * f);
                                 }
+
+                                // Guardamos inmediatamente para que la próxima vez 'prefsExistentes' sea true
                                 saveGoalsToPrefs();
+                            } else {
+                                // Si ya existen preferencias, NO hacemos nada. Respetamos la edición manual del usuario.
+                                Log.i(TAG, "AUDIT_TRAIL: Se respetan las metas manuales locales (" + goalsKcal + " kcal). Ignorando recalculo automático.");
                             }
 
-                            // Muestra los valores cargados (ya sean de Firebase o tus cambios)
+                            // 4. Actualizar UI final
                             updateMacrosUI();
                             recalculateDayTotals();
 
                         }).addOnFailureListener(e -> {
                             Log.e(TAG, "[loadUserData] Error al obtener caloriesToday de Firebase", e);
+                            // En caso de error de red, intentamos mostrar lo local si existe
+                            loadGoalsFromPrefs();
                             updateMacrosUI();
                             recalculateDayTotals();
                         });
                     }
                     @Override public void onCancelled(@NonNull DatabaseError databaseError) {
                         if (!isAdded()) return;
-                        Log.e(TAG, "loadUserData Cancelled: " + databaseError.getMessage()); // LOG AÑADIDO
+                        Log.e(TAG, "loadUserData Cancelled: " + databaseError.getMessage());
                         Toast.makeText(getContext(), "Error al cargar perfil: " + databaseError.getMessage(), Toast.LENGTH_LONG).show();
-                        goalsKcal=0; goalsP=0; goalsC=0; goalsF=0;
+                        // Fallback seguro
+                        loadGoalsFromPrefs();
                         updateMacrosUI();
                         recalculateDayTotals();
                     }
@@ -558,7 +599,7 @@ public class DashboardFragment extends Fragment {
 
         SharedPreferences.Editor ed;
         try {
-            ed = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit();
+            ed = requireContext().getSharedPreferences(getFoodPrefsFileName(), Context.MODE_PRIVATE).edit();
         } catch (IllegalStateException e) {
             Log.e(TAG, "Error getting SharedPreferences editor in guardarComidasDelDia", e);
             return;
@@ -587,7 +628,9 @@ public class DashboardFragment extends Fragment {
 
         SharedPreferences p;
         try {
-            p = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
+            // 🛑 ¡CORRECCIÓN AQUÍ!
+            // Usa el método que genera el nombre de archivo ÚNICO por UID
+            p = requireContext().getSharedPreferences(getGoalsPrefsFileName(), Context.MODE_PRIVATE);
         } catch (IllegalStateException e) {
             Log.e(TAG, "Error getting SharedPreferences in loadGoalsFromPrefs", e);
             return false;
@@ -617,7 +660,7 @@ public class DashboardFragment extends Fragment {
 
         SharedPreferences prefs;
         try {
-            prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs = requireContext().getSharedPreferences(getFoodPrefsFileName(), Context.MODE_PRIVATE);
         } catch (IllegalStateException e) {
             Log.e(TAG, "Error getting SharedPreferences in loadFoodBlocksForDate", e);
             foodBlockList.clear();
@@ -709,7 +752,7 @@ public class DashboardFragment extends Fragment {
 
         SharedPreferences prefs;
         try {
-            prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            prefs = requireContext().getSharedPreferences(getFoodPrefsFileName(), Context.MODE_PRIVATE);
         } catch (IllegalStateException e) {
             Log.e(TAG, "Error getting SharedPreferences in cleanupOldEntries", e);
             return;
@@ -765,7 +808,7 @@ public class DashboardFragment extends Fragment {
 
         SharedPreferences p;
         try {
-            p = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+            p = requireContext().getSharedPreferences(getFoodPrefsFileName(), Context.MODE_PRIVATE);
         } catch (IllegalStateException e) {
             Log.e(TAG, "Error getting SharedPreferences in migrateAllSavedDays", e);
             return;
@@ -1233,7 +1276,7 @@ public class DashboardFragment extends Fragment {
         if (!isAdded() || getParentFragmentManager() == null) return;
         Log.d(TAG, "Mostrando RecipeDialog para: " + recipeResult.name); // LOG AÑADIDO
 
-        RecipeDialog dialog = RecipeDialog.newInstance(recipeResult);
+        RecipeDialog dialog = RecipeDialog.newInstance(recipeResult, effectiveUid); // ✅ Pasar effectiveUid
 
         dialog.setOnGramsConfirmedListener(confirmedResult -> {
             FoodItem newItem = new FoodItem(
@@ -1278,4 +1321,5 @@ public class DashboardFragment extends Fragment {
 
         dialog.show(getParentFragmentManager(), "RecipeDialogTag");
     }
+
 }

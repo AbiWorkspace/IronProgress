@@ -46,19 +46,21 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
     private final DashboardFragment parent;
     private final OnFoodItemChangedListener listener;
     private final FoodBlock foodBlock;
-
+    private final String userUid; // ✅ NUEVO ATRIBUTO PARA EL UID
     // ───────────────────────────────── Constructor
     public FoodItemAdapter(List<FoodItem> items,
                            Context ctx,
                            DashboardFragment parent,
                            OnFoodItemChangedListener l,
-                           FoodBlock foodBlock) {
+                           FoodBlock foodBlock,
+                           String userUid) { // ✅ ACEPTAR UID) {
         Log.d(TAG, "Constructor: Inicializando adaptador con " + items.size() + " items");
         this.items     = items;  // mantenemos la referencia viva
         this.ctx       = ctx;
         this.parent    = parent;
         this.listener  = l;
         this.foodBlock = foodBlock;
+        this.userUid   = userUid; // ✅ GUARDAR UID
     }
 
     // ───────────────────────────────── ViewHolder
@@ -156,7 +158,7 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
         h.itemView.setOnClickListener(v -> {
             FoodSearchFragment.FoodResult fr = map(it);
             if (fr.ingredients != null && !fr.ingredients.isEmpty()) {
-                RecipeDialog d = RecipeDialog.newInstance(fr);
+                RecipeDialog d = RecipeDialog.newInstance(fr, userUid); // ✅ Pasar userUid
                 d.setOnGramsConfirmedListener(u -> {
                     it.setGrams(u.grams);
                     notifyItemChanged(h.getBindingAdapterPosition());
@@ -165,10 +167,11 @@ public class FoodItemAdapter extends RecyclerView.Adapter<FoodItemAdapter.FoodIt
                 d.show(parent.getParentFragmentManager(), "RecipeDialog");
             } else {
                 GramsInputDialog.newInstance(fr, u -> {
-                    it.setGrams(u.grams);
-                    notifyItemChanged(h.getBindingAdapterPosition());
-                    notifyParent();
-                }).show(parent.getParentFragmentManager(), "GramsInputDialog");
+                            it.setGrams(u.grams);
+                            notifyItemChanged(h.getBindingAdapterPosition());
+                            notifyParent();
+                        }, userUid) // ✅ Pasar el UID aquí
+                        .show(parent.getParentFragmentManager(), "GramsInputDialog");
             }
         });
     }

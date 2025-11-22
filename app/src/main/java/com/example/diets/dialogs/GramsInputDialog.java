@@ -38,10 +38,10 @@ public class GramsInputDialog extends DialogFragment {
     private static final String TAG      = "GramsInputDialog";
     private static final String ARG_FOOD = "arg_food";
     private static final Gson   gson     = new Gson();
-
+    private static final String ARG_UID  = "arg_uid"; // ✅ Añadido para el UID
     private double  selectedPortionGrams = 0;
     private boolean isFavoriteNow;
-
+    private String  userUid; // ✅ Variable de instancia para guardar el UID
     /**
      * Interfaz de callback para notificar cuando se confirma la cantidad de gramos.
      */
@@ -59,13 +59,15 @@ public class GramsInputDialog extends DialogFragment {
      * @return Una nueva instancia de GramsInputDialog.
      */
     public static GramsInputDialog newInstance(FoodSearchFragment.FoodResult food,
-                                               OnGramsConfirmedListener listener) {
+                                               OnGramsConfirmedListener listener,
+                                               String uid) { // ✅ Modificado
         Bundle args = new Bundle();
         args.putSerializable(ARG_FOOD, food);
+        args.putString(ARG_UID, uid); // ✅ Guardar UID
         GramsInputDialog d = new GramsInputDialog();
         d.setArguments(args);
         d.listener = listener;
-        Log.d(TAG, "Nueva instancia creada para: " + food.name);
+        Log.d(TAG, "Nueva instancia creada para: " + food.name + " con UID: " + uid);
         return d;
     }
 
@@ -113,10 +115,15 @@ public class GramsInputDialog extends DialogFragment {
         // ----- Alimento recibido -----
         FoodSearchFragment.FoodResult food =
                 (FoodSearchFragment.FoodResult) getArguments().getSerializable(ARG_FOOD);
+        userUid = getArguments() != null ? getArguments().getString(ARG_UID) : null;
         if (food == null) {
             Log.e(TAG,"FoodResult null en onCreateView. Cerrando diálogo.");
             dismiss();
             return v;
+        }
+        if (userUid == null) {
+            Log.e(TAG, "¡ERROR! UID es nulo. La gestión de favoritos no funcionará correctamente.");
+            // No cerramos el diálogo, pero la funcionalidad de favoritos debe manejar userUid == null
         }
         Log.d(TAG, "Alimento recibido: " + food.name + " (" + food.brand + ")");
 
@@ -240,7 +247,9 @@ public class GramsInputDialog extends DialogFragment {
          * ya está guardado en SharedPreferences a través de FavoritesManager.
          * -> FavoritesManager.isFavorite(Context, String name)
          */
-        isFavoriteNow = FavoritesManager.isFavorite(requireContext(), food.name);
+        // ✅ CORRECCIÓN LINEA 243: Pasar el UID
+        isFavoriteNow = FavoritesManager.isFavorite(requireContext(), userUid, food.name);
+
         Log.d(TAG, "Estado inicial de favorito para " + food.name + ": " + isFavoriteNow);
         updateFavIcon(btnFav, isFavoriteNow);
 
@@ -252,13 +261,19 @@ public class GramsInputDialog extends DialogFragment {
          */
         btnFav.setOnClickListener(vw -> {
             isFavoriteNow = !isFavoriteNow;
+            // ✅ Comprobación de seguridad
+            if (userUid == null) {
+                Toast.makeText(getContext(), "Error: No se pudo verificar el usuario para guardar favoritos.", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
             if (isFavoriteNow) {
-                // Alimento se convierte en favorito
-                FavoritesManager.add(requireContext(), food);
+                //  CORRECCIÓN LINEA 257: Pasar el UID
+                FavoritesManager.add(requireContext(), userUid, food);
                 Log.d(TAG, "Alimento agregado a favoritos: " + food.name);
             } else {
-                // Alimento deja de ser favorito
-                FavoritesManager.remove(requireContext(), food.name);
+                //  CORRECCIÓN LINEA 261: Pasar el UID
+                FavoritesManager.remove(requireContext(), userUid, food.name);
                 Log.d(TAG, "Alimento removido de favoritos: " + food.name);
                 // Notifica al fragmento de favoritos para posible recarga
                 if (favoriteStatusListener != null) {
@@ -339,103 +354,145 @@ public class GramsInputDialog extends DialogFragment {
     }
 
     // --- FAVORITES MANAGER ---
-
-    /**
-     * Clase estática para la gestión de alimentos favoritos utilizando SharedPreferences.
-     * Los alimentos se guardan como un Set<String> de objetos FoodResult serializados en JSON.
-     */
     public static final class FavoritesManager {
-        private static final String PREF = "favorites_pref";
+        // Base: se usará para construir nombres como "favorites_pref_<uid>"
+        public static final String PREF_BASE = "favorites_pref";
         private static final String KEY  = "fav_set";
 
-        /**
-         * Obtiene el Set de Strings (JSONs de FoodResult) de las preferencias.
-         * @param c Contexto de la aplicación.
-         * @return Set de favoritos.
-         */
-        private static Set<String> getSet(Context c) {
-            SharedPreferences p = c.getApplicationContext()
-                    .getSharedPreferences(PREF, Context.MODE_PRIVATE);
-            Set<String> favorites = new HashSet<>(p.getStringSet(KEY, new HashSet<>()));
-            Log.d(TAG, "FavoritesManager - Cargados " + favorites.size() + " favoritos.");
-            return favorites;
-        }
-        /**
-         * Guarda el Set de Strings (JSONs de FoodResult) en las preferencias.
-         * @param c Contexto de la aplicación.
-         * @param s Set de favoritos a guardar.
-         */
-        private static void saveSet(Context c, Set<String> s) {
-            c.getApplicationContext()
-                    .getSharedPreferences(PREF, Context.MODE_PRIVATE)
-                    .edit().putStringSet(KEY, s).apply();
-            Log.d(TAG, "FavoritesManager - Guardados " + s.size() + " favoritos.");
+        // Helper: nombre del archivo SharedPreferences para un UID dado
+        private static String getFavoritesPrefsFileName(String uid) {
+            if (uid == null || uid.isEmpty()) {
+                // Fallback explícito para evitar NPEs y colisiones
+                return PREF_BASE + "_ANON";
+            }
+            return PREF_BASE + "_" + uid;
         }
 
-        /**
-         * Verifica si un alimento es favorito basándose en su nombre.
-         * @param c Contexto de la aplicación.
-         * @param name Nombre del alimento a verificar.
-         * @return true si es favorito, false en caso contrario.
-         */
-        public static boolean isFavorite(Context c, String name) {
-            for (String json : getSet(c)) {
-                FoodSearchFragment.FoodResult f =
-                        gson.fromJson(json, FoodSearchFragment.FoodResult.class);
-                if (f.name.equals(name)) return true;
+        // --- INTERNAL HELPERS (trabajan con UID explícito) ---
+        private static Set<String> getSetForUid(Context c, String uid) {
+            SharedPreferences p = c.getApplicationContext()
+                    .getSharedPreferences(getFavoritesPrefsFileName(uid), Context.MODE_PRIVATE);
+            Set<String> favorites = new HashSet<>(p.getStringSet(KEY, new HashSet<>()));
+            Log.d(TAG, "FavoritesManager - Cargados " + favorites.size() + " favoritos (uid=" + uid + ").");
+            return favorites;
+        }
+
+        private static void saveSetForUid(Context c, String uid, Set<String> s) {
+            c.getApplicationContext()
+                    .getSharedPreferences(getFavoritesPrefsFileName(uid), Context.MODE_PRIVATE)
+                    .edit().putStringSet(KEY, s).apply();
+            Log.d(TAG, "FavoritesManager - Guardados " + s.size() + " favoritos (uid=" + uid + ").");
+        }
+
+        // --- PUBLIC API (con UID explícito) ---
+        public static boolean isFavorite(Context c, String uid, String name) {
+            if (name == null) return false;
+            for (String json : getSetForUid(c, uid)) {
+                try {
+                    FoodSearchFragment.FoodResult f =
+                            gson.fromJson(json, FoodSearchFragment.FoodResult.class);
+                    if (f != null && name.equals(f.name)) return true;
+                } catch (Exception ex) {
+                    Log.w(TAG, "FavoritesManager - JSON parse fail while checking favorite", ex);
+                }
             }
             return false;
         }
-        /**
-         * Agrega un FoodResult a la lista de favoritos.
-         * @param c Contexto de la aplicación.
-         * @param f El FoodResult a agregar.
-         */
-        public static void add(Context c, FoodSearchFragment.FoodResult f) {
-            Set<String> s = getSet(c);
-            s.add(gson.toJson(f)); saveSet(c, s);
-            Log.d(TAG, "FavoritesManager - Agregado " + f.name + " como favorito.");
+
+        public static void add(Context c, String uid, FoodSearchFragment.FoodResult f) {
+            if (f == null) return;
+            Set<String> s = getSetForUid(c, uid);
+            s.add(gson.toJson(f));
+            saveSetForUid(c, uid, s);
+            Log.d(TAG, "FavoritesManager - Agregado " + f.name + " como favorito (uid=" + uid + ").");
         }
-        /**
-         * Elimina un alimento de la lista de favoritos basándose en su nombre.
-         * @param c Contexto de la aplicación.
-         * @param name Nombre del alimento a eliminar.
-         */
-        public static void remove(Context c, String name) {
-            Set<String> s = getSet(c);
-            boolean removed = s.removeIf(j -> gson.fromJson(j, FoodSearchFragment.FoodResult.class)
-                    .name.equals(name));
-            if (removed) {
-                saveSet(c, s);
-                Log.d(TAG, "FavoritesManager - Removido " + name + " de favoritos.");
+
+        public static void remove(Context c, String uid, String name) {
+            // 🛑 CORRECCIÓN: Usar getSetForUid en lugar de getSet
+            Set<String> s = getSetForUid(c, uid);
+
+            // Usamos iteración y remove para evitar la complejidad del removeIf
+            String jsonToRemove = null;
+            for (String json : s) {
+                FoodSearchFragment.FoodResult f = gson.fromJson(json, FoodSearchFragment.FoodResult.class);
+                if (f.name.equals(name)) {
+                    jsonToRemove = json;
+                    break;
+                }
+            }
+
+            if (jsonToRemove != null) {
+                s.remove(jsonToRemove); // Remueve la cadena JSON exacta
+
+                // 🛑 CORRECCIÓN: Usar saveSetForUid en lugar de saveSet
+                saveSetForUid(c, uid, s);
+
+                Log.d(TAG, "FavoritesManager - Removido " + name + " de favoritos (UID: " + uid + ").");
             } else {
                 Log.w(TAG, "FavoritesManager - Intento de remover favorito no encontrado: " + name);
             }
         }
+
+        public static Set<String> getAllFavorites(Context c, String uid) {
+            return getSetForUid(c, uid);
+        }
+
         /**
-         * Elimina TODOS los favoritos persistidos (borrar la clave KEY).
-         * @param c Contexto de la aplicación.
+         * Elimina TODOS los favoritos persistidos para el UID dado.
          */
-        public static void clearAll(Context c) {
+        public static void clearAll(Context c, String uid) {
             try {
                 SharedPreferences prefs = c.getApplicationContext()
-                        .getSharedPreferences(PREF, Context.MODE_PRIVATE);
-                // Removemos solo la clave usada para favoritos (no limpiamos otras claves del mismo archivo por seguridad)
+                        .getSharedPreferences(getFavoritesPrefsFileName(uid), Context.MODE_PRIVATE);
                 prefs.edit().remove(KEY).apply();
-                Log.i(TAG, "FavoritesManager - Todos los favoritos eliminados.");
+                Log.i(TAG, "FavoritesManager - Todos los favoritos eliminados (uid=" + uid + ").");
             } catch (Exception e) {
-                Log.e(TAG, "FavoritesManager - Error al eliminar favoritos.", e);
+                Log.e(TAG, "FavoritesManager - Error al eliminar favoritos (uid=" + uid + ").", e);
             }
         }
-        /**
-         * Obtiene todos los favoritos guardados.
-         * @param c Contexto de la aplicación.
-         * @return Set de Strings (JSONs) de todos los favoritos.
-         */
-        public static Set<String> getAllFavorites(Context c) {
-            Log.d(TAG, "FavoritesManager - Solicitando todos los favoritos.");
-            return getSet(c);
+
+        // --- CONVENIENCIA: SOBRECARGAS (compatibilidad con llamadas anteriores)
+        // Estas versiones obtienen el UID actual de FirebaseAuth si no se proporciona.
+
+        private static String currentUidOrAnon() {
+            try {
+                if (com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser() != null) {
+                    String u = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser().getUid();
+                    if (u != null && !u.isEmpty()) return u;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "FavoritesManager - no se pudo obtener currentUid desde FirebaseAuth", e);
+            }
+            return null; // hará que getFavoritesPrefsFileName devuelva PREF_BASE + "_ANON"
         }
+
+        // isFavorite sin uid (antigua firma)
+        public static boolean isFavorite(Context c, String name) {
+            return isFavorite(c, currentUidOrAnon(), name);
+        }
+
+        // add sin uid (antigua firma)
+        public static void add(Context c, FoodSearchFragment.FoodResult f) {
+            add(c, currentUidOrAnon(), f);
+        }
+
+        // remove sin uid (antigua firma)
+        public static void remove(Context c, String name) {
+            remove(c, currentUidOrAnon(), name);
+        }
+
+        // getAllFavorites sin uid (antigua firma)
+        public static Set<String> getAllFavorites(Context c) {
+            return getAllFavorites(c, currentUidOrAnon());
+        }
+
+        // clearAll sin uid (antigua firma)
+        public static void clearAll(Context c) {
+            clearAll(c, currentUidOrAnon());
+        }
+
+        // Constructor privado
         private FavoritesManager() {}
     }
+
 }

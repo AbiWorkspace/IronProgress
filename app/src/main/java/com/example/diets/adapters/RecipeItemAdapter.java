@@ -34,22 +34,26 @@ public class RecipeItemAdapter extends RecyclerView.Adapter<RecipeItemAdapter.Re
     private static final String TAG = "RecipeItemAdapter";
 
     private final List<FoodItem> items;
-    private final Context context;
+    private final Context context; // ⚠️ Nota: se llama 'context'
     private final DashboardFragment parent;
     private final FoodItemAdapter.OnFoodItemChangedListener listener;
     private final FoodBlock foodBlock;
+    private final String userUid; // ✅ 1. NUEVO ATRIBUTO
+
 
     public RecipeItemAdapter(List<FoodItem> items,
-                             Context context,
+                             Context ctx,
                              DashboardFragment parent,
+                             // 🛑 CORRECCIÓN 1: Usar el tipo correcto de listener
                              FoodItemAdapter.OnFoodItemChangedListener listener,
-                             FoodBlock foodBlock) {
+                             FoodBlock foodBlock,
+                             String userUid) {
         this.items = items;
-        this.context = context;
+        this.context = ctx; // 🛑 CORRECCIÓN 2: Asignar a 'this.context', no 'this.ctx'
         this.parent = parent;
         this.listener = listener;
         this.foodBlock = foodBlock;
-        Log.d(TAG, "Constructor: recetas=" + items.size());
+        this.userUid = userUid;
     }
 
     // ───────────────────────────────── ViewHolder
@@ -110,7 +114,7 @@ public class RecipeItemAdapter extends RecyclerView.Adapter<RecipeItemAdapter.Re
             result.instructions = item.getInstructions();
             result.type         = "receta";
 
-            RecipeDialog dialog = RecipeDialog.newInstance(result);
+            RecipeDialog dialog = RecipeDialog.newInstance(result, userUid);
             dialog.setOnGramsConfirmedListener(updated -> {
                 item.setGrams(updated.grams);
                 notifyItemChanged(holder.getBindingAdapterPosition());
