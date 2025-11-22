@@ -49,10 +49,12 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 
@@ -529,7 +531,7 @@ public class FoodSearchFragment extends Fragment {
                         .append("nutriments.carbohydrates_100g,nutriments.fat_100g,")
                         .append("nutriments.sugars_100g,nutriments.sodium_100g,")
                         .append("nutriments.fiber_100g,")
-                        .append("serving_size"); // 👈 añadimos serving_size
+                        .append("serving_size");
 
                 for (int i = 0; i < quickSelectedPairs.size(); i++) {
                     String[] pr = quickSelectedPairs.get(i);
@@ -553,7 +555,7 @@ public class FoodSearchFragment extends Fragment {
 
                 String qLow = query.toLowerCase(Locale.ROOT);
                 List<FoodResult> tempProducts = new ArrayList<>();
-
+                Set<String> uniqueKeys = new HashSet<>();
                 for (int i = 0; i < products.length(); i++) {
                     JSONObject p = products.getJSONObject(i);
                     String name = p.optString("product_name_es", p.optString("product_name", ""));
@@ -586,18 +588,11 @@ public class FoodSearchFragment extends Fragment {
                     String servingSizeStr = p.optString("serving_size", "");
 
                     FoodResult food = new FoodResult(name, kcal, 0, brand, img, protein, carbs, fat);
-
+                    String key = name.toLowerCase(Locale.ROOT) + "|" + brand.toLowerCase(Locale.ROOT);
                     // Porciones: siempre 100 g + porción OFF si existe
                     food.portions.add(new FoodResult.Portion("100 g", 100));
                     double servingGrams = parseServingSizeToGrams(servingSizeStr);
-                    if (servingGrams > 0) {
-                        String label = "1 porción (" + servingSizeStr + ")";
-                        food.portions.add(new FoodResult.Portion(label, servingGrams));
-                        Log.d(TAG, "Porción OFF (search): " + label + " = " + servingGrams + " g");
-                    } else {
-                        Log.d(TAG, "Sin porción OFF válida (search) para " + name +
-                                " – serving_size='" + servingSizeStr + "'");
-                    }
+
 
                     foodResultsAddWithRanking(tempProducts, food, query);
                 }
@@ -743,17 +738,29 @@ public class FoodSearchFragment extends Fragment {
         }
     }
 
-    // ========= PARSEO DE serving_size → gramos (para porciones OFF) =========
     private double parseServingSizeToGrams(String serving) {
-        if (TextUtils.isEmpty(serving)) return -1;
-        String s = serving.replace(',', '.').toLowerCase(Locale.ROOT);
+        // Definimos el TAG si no está en el ámbito (asumimos que sí lo está)
+        final String TAG = "FoodSearchFragment";
 
-        // Busca el primer número con unidad g / gramos / ml / l
-        java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("(\\d+(?:\\.\\d+)?)\\s*(g|gramos|ml|l)")
-                .matcher(s);
+        if (TextUtils.isEmpty(serving)) {
+            Log.d(TAG, "PARSE_PORTION: Serving size es NULL o vacío.");
+            return -1;
+        }
 
-        if (!m.find()) return -1;
+        // 1. Preprocesamiento: Limpia espacios extra y convierte a minúsculas
+        String s = serving.replace(',', '.').toLowerCase(Locale.ROOT).trim();
+
+        // 2. EXPRESIÓN REGULAR MÁS LAXA Y ROBUSTA:
+        java.util.regex.Pattern p = java.util.regex.Pattern
+                .compile("(\\d+[\\.\\d]*)[^a-z]*(g|ml|l|gramos|kg|mg|litro)");
+
+        java.util.regex.Matcher m = p.matcher(s);
+
+        if (!m.find()) {
+            return -1;
+        }
+
+        // Si la encuentra, logueamos qué capturó la regex
 
         double value;
         try {
@@ -763,14 +770,28 @@ public class FoodSearchFragment extends Fragment {
         }
 
         String unit = m.group(2);
-        if ("ml".equals(unit)) {
-            // Aproximación densidad ≈ agua
-            return value;
-        } else if ("l".equals(unit)) {
-            return value * 1000.0;
+        double finalGrams = -1;
+
+        // 3. Manejo de UNIDADES (Actualizado con kg y mg)
+        if ("ml".equals(unit) || "g".equals(unit) || "gramos".equals(unit)) {
+            // g, gramos, ml (Aproximación 1:1, densidad agua)
+            finalGrams = value;
+        } else if ("kg".equals(unit) || "l".equals(unit) || "litro".equals(unit)) {
+            // Kilogramos o Litros (multiplicar por 1000 para pasar a gramos/mililitros)
+            finalGrams = value * 1000.0;
+        } else if ("mg".equals(unit)) {
+            // Miligramos (dividir por 1000 para pasar a gramos)
+            finalGrams = value / 1000.0;
         }
-        // g / gramos
-        return value;
+
+        // Fallback: Si no se identificó la unidad, pero se extrajo un valor, se asume gramos (value)
+        if (finalGrams < 0) {
+            finalGrams = value;
+            Log.w(TAG, "PARSE_PORTION: Unidad '" + unit + "' no reconocida, se asume gramos (" + finalGrams + ").");
+        }
+
+        Log.d(TAG, "PARSE_PORTION: Conversión final a gramos: " + finalGrams);
+        return finalGrams;
     }
 
     // =================== RESTO DEL CÓDIGO IGUAL (sin tocar nada) ==============

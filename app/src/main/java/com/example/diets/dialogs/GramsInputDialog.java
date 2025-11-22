@@ -1,5 +1,8 @@
 package com.example.diets.dialogs;
 
+import static android.content.ContentValues.TAG;
+import static android.provider.Contacts.SettingsColumns.KEY;
+
 import android.app.Dialog;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -121,8 +124,7 @@ public class GramsInputDialog extends DialogFragment {
         title.setText("¿Cuánto de " + food.name + "?");
         brand.setText("Marca: " + food.brand);
 
-        // --------- Preview inicial con 100g ----------
-        updateDetails(det, food, 100);
+
 
         Glide.with(requireContext())
                 .load(food.imageUrl)
@@ -150,12 +152,47 @@ public class GramsInputDialog extends DialogFragment {
                     return null;
                 }
         });
+        List<String> entries = new ArrayList<>();
 
-        // ---------- Label dinámico kcal/macros encima del EditText ----------
-        // ... (código omitido para brevedad) ...
+// 1. Añadir la entrada manual (SIEMPRE PRIMERO)
+        entries.add("Ingresar gramos manualmente");
 
-        // ---------- Spinner de porciones ----------
-        // ... (código omitido para brevedad) ...
+// 2. Añadir la porción por defecto de 100g (Si la quieres por defecto en este orden)
+// Si esta es la entrada que se duplica, debe ser añadida aquí y luego filtrada en el bucle.
+        entries.add("100 g (100.0 g)");
+
+// CRÍTICO: Este 'for' pobla la lista de porciones que el usuario verá
+        if (food.portions != null && !food.portions.isEmpty()) {
+            Log.d(TAG, "Portions Debug: La lista de porciones contiene " + food.portions.size() + " elementos.");
+            for (FoodSearchFragment.FoodResult.Portion p : food.portions) {
+
+                // FILTRO CLAVE: Omitir la porción si:
+                // a) La etiqueta es la misma que la entrada manual.
+                boolean isManualEntryLabel = p.label.trim().toLowerCase().equals("ingresar gramos manualmente");
+
+                // b) La porción representa exactamente 100 gramos.
+                // Asumimos que la porción de 100g por defecto se llama "100 g" o tiene 100 gramos.
+                boolean isDefault100g = p.grams == 100.0;
+
+                if (isManualEntryLabel || isDefault100g) {
+                    // No hacemos nada, ya la añadimos o es una porción redundante (100g).
+                    Log.v(TAG, "Portions Debug: Porción redundante detectada (Manual o 100g) y omitida.");
+                } else {
+                    // Añadir el resto de porciones
+                    entries.add(p.label + " (" + p.grams + " g)");
+                    // Log para verificar cada ítem que se añade al Spinner
+                    Log.d(TAG, "Portions Debug: Añadiendo porción: " + p.label + " (" + p.grams + " g)");
+                }
+            }
+        } else {
+            Log.w(TAG, "Portions Debug: La lista de porciones está NULL o VACÍA al iniciar el diálogo.");
+        }
+
+        ArrayAdapter<String> spAdapter = new ArrayAdapter<>(
+                requireContext(), android.R.layout.simple_spinner_dropdown_item, entries);
+
+        //  CRÍTICO: Aquí es donde se le dice al Spinner qué datos usar
+        spnPort.setAdapter(spAdapter);
 
         spnPort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
@@ -190,6 +227,8 @@ public class GramsInputDialog extends DialogFragment {
                 double grams = (val == null)
                         ? (selectedPortionGrams == 0 ? 100 : selectedPortionGrams)
                         : (selectedPortionGrams == 0 ? val : val * selectedPortionGrams);
+                Log.d(TAG, "s='" + s + "' val=" + val + " selectedPortionGrams=" + selectedPortionGrams + " grams=" + grams);
+
                 updateDetails(det, food, grams);
                 // Log.d(TAG, "Texto cambiado. Gramos calculados para preview: " + grams);
             }
@@ -371,6 +410,21 @@ public class GramsInputDialog extends DialogFragment {
                 Log.d(TAG, "FavoritesManager - Removido " + name + " de favoritos.");
             } else {
                 Log.w(TAG, "FavoritesManager - Intento de remover favorito no encontrado: " + name);
+            }
+        }
+        /**
+         * Elimina TODOS los favoritos persistidos (borrar la clave KEY).
+         * @param c Contexto de la aplicación.
+         */
+        public static void clearAll(Context c) {
+            try {
+                SharedPreferences prefs = c.getApplicationContext()
+                        .getSharedPreferences(PREF, Context.MODE_PRIVATE);
+                // Removemos solo la clave usada para favoritos (no limpiamos otras claves del mismo archivo por seguridad)
+                prefs.edit().remove(KEY).apply();
+                Log.i(TAG, "FavoritesManager - Todos los favoritos eliminados.");
+            } catch (Exception e) {
+                Log.e(TAG, "FavoritesManager - Error al eliminar favoritos.", e);
             }
         }
         /**
