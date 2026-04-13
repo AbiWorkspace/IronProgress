@@ -1,31 +1,28 @@
 package com.example.diets.model;
-
 public class WeightRecord {
+    private String id;
     private double weight;
+    private double calories;
     private String date;
 
-    public WeightRecord() {
-        // Constructor vacío necesario para Firebase
-    }
+    public WeightRecord() {} // Obligatorio para Firebase
 
-    public WeightRecord(double weight, String date) {
+    public WeightRecord(String id, double weight, double calories, String date) {
+        this.id = id;
         this.weight = weight;
+        this.calories = calories;
         this.date = date;
     }
 
-    public double getWeight() {
-        return weight;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public void setWeight(double weight) {
-        this.weight = weight;
-    }
+    public double getWeight() { return weight; }
+    public void setWeight(double weight) { this.weight = weight; }
 
-    public String getDate() {
-        return date;
-    }
+    public double getCalories() { return calories; }
+    public void setCalories(double calories) { this.calories = calories; }
 
-    public void setDate(String date) {
-        this.date = date;
-    }
+    public String getDate() { return date; }
+    public void setDate(String date) { this.date = date; }
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/values/themes_overlay.xml -->
+<resources>
+
+    <!-- Overlay único para diálogos/overlays Material 3 -->
+    <style name="ThemeOverlay.Diets" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <!-- (opcional) tus overrides aquí -->
+        <!-- <item name="materialAlertDialogBodyTextStyle">@style/TextAppearance.Material3.BodyMedium</item> -->
+        <!-- <item name="materialAlertDialogTitleTextStyle">@style/TextAppearance.Material3.TitleMedium</item> -->
+    </style>
+
+</resources>

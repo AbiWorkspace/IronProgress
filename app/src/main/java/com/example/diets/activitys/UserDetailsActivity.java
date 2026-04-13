@@ -109,7 +109,8 @@ public class UserDetailsActivity extends AppCompatActivity {
                         userDetailsFatToday.setText("Grasas consumidas hoy: " + user.getFatToday() + " g");
                         userDetailsCarbToday.setText("Carbohidratos consumidos hoy: " + user.getCarbToday() + " g");
                         userDetailsCaloriesNeeded.setText("Calorías necesarias: " + String.format("%.2f", caloriesNeeded) + " kcal");
-                        userDetailsIsAdmin.setText("Administrador: " + (user.isAdmin() ? "Sí" : "No"));
+                        // CORRECCIÓN: Comparar String role en lugar de booleano
+                        userDetailsIsAdmin.setText("Administrador: " + ("coach".equals(user.getRole()) ? "Sí" : "No"));
 
                         // Muestra la ubicación
                         userDetailsLocation.setText(String.format("Ubicación: Lat %.6f, Lng %.6f", user.getLatitude(), user.getLongitude()));

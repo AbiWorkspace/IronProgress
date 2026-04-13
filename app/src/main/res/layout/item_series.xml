@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="40dp"
+    android:orientation="horizontal"
+    android:padding="1dp"
+    android:background="@drawable/rounded_outer_corners"
+    android:layout_marginBottom="8dp"
+    android:minHeight="40dp"
+    android:gravity="center_vertical">
+
+    <!-- Número de Serie -->
+    <TextView
+        android:id="@+id/seriesNumber"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:text="1"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:gravity="center_vertical"/>
+
+    <!-- Carga Anterior -->
+    <TextView
+        android:id="@+id/previousLoad"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.2"
+        android:text="N/A"
+        android:textSize="14sp"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/rounded_corners"
+        android:padding="4dp"
+        android:gravity="center"
+        android:layout_marginEnd="8dp"/>
+
+    <!-- Reps -->
+    <EditText
+        android:id="@+id/repsInput"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:hint="Reps"
+        android:textSize="14sp"
+        android:inputType="number"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/rounded_corners"
+        android:padding="4dp"
+        android:gravity="center"
+        android:layout_marginEnd="8dp"/>
+
+    <!-- Peso -->
+    <EditText
+        android:id="@+id/weightInput"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:hint="Peso"
+        android:textSize="14sp"
+        android:inputType="numberDecimal"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/rounded_corners"
+        android:padding="4dp"
+        android:gravity="center"
+        android:layout_marginEnd="8dp"/>
+
+    <!-- RPE -->
+    <EditText
+        android:id="@+id/rpeInput"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:hint="RPE"
+        android:textSize="14sp"
+        android:inputType="numberDecimal"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/rounded_corners"
+        android:padding="4dp"
+        android:gravity="center"
+        android:layout_marginEnd="8dp"/>
+
+    <!-- Check completado -->
+    <CheckBox
+        android:id="@+id/checkSeriesCompleted"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginEnd="8dp"
+        android:buttonTint="#E63946"
+        android:gravity="center" />
+</LinearLayout>

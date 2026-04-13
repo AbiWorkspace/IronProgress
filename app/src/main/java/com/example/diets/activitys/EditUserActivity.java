@@ -185,7 +185,9 @@ public class EditUserActivity extends AppCompatActivity {
                 editUserEmail.setText(user.getEmail());
                 editUserLatitude.setText(String.valueOf(user.getLatitude()));
                 editUserLongitude.setText(String.valueOf(user.getLongitude()));
-                editUserAdminCheckBox.setChecked(user.isAdmin());
+
+                // CORRECCIÓN: Verificar si el rol es "coach" para marcar el checkbox
+                editUserAdminCheckBox.setChecked("coach".equals(user.getRole()));
 
                 setSpinnerSelection(editUserAgeSpinner, String.valueOf(user.getAge()));
                 setSpinnerSelection(editUserWeightSpinner, String.valueOf(user.getWeight()));
@@ -196,14 +198,10 @@ public class EditUserActivity extends AppCompatActivity {
 
                 loadProfileImage(user.getProfilePhoto());
             } else {
-                Toast.makeText(this, "No se pudieron cargar los datos del usuario.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "No se pudieron cargar los datos.", Toast.LENGTH_SHORT).show();
                 finish();
             }
-        }).addOnFailureListener(e -> {
-            Toast.makeText(this, "Error al cargar los datos del usuario.", Toast.LENGTH_SHORT).show();
-            Log.e("EditUserActivity", "Error al cargar los datos: " + e.getMessage());
-            finish();
-        });
+        }).addOnFailureListener(e -> { /* ... */ });
     }
 
     private void setSpinnerSelection(Spinner spinner, String value) {
@@ -264,13 +262,10 @@ public class EditUserActivity extends AppCompatActivity {
                 User currentUser = snapshot.getValue(User.class);
 
                 if (currentUser != null) {
-                    // Mantener la contraseña actual
-                    String password = currentUser.getPassword();
+                    // CORRECCIÓN: Ya no necesitamos obtener ni guardar la contraseña aquí
 
-                    // Si no se cambió la foto, mantener la foto actual
                     String profilePhoto = profilePhotoBase64.isEmpty() ? currentUser.getProfilePhoto() : profilePhotoBase64;
 
-                    // Actualizar solo los campos necesarios
                     String firstName = editUserFirstName.getText().toString().trim();
                     String lastName = editUserLastName.getText().toString().trim();
                     String email = editUserEmail.getText().toString().trim();
@@ -282,31 +277,30 @@ public class EditUserActivity extends AppCompatActivity {
                     String gender = editUserGender.getSelectedItem().toString();
                     String activityLevel = editUserActivityLevel.getSelectedItem().toString();
                     String goal = editUserGoal.getSelectedItem().toString();
+
                     boolean isAdmin = editUserAdminCheckBox.isChecked();
 
-                    // Crear el objeto actualizado
-                    User updatedUser = new User(firstName, lastName, email, password, age, weight, height, gender, activityLevel, goal);
+                    // CORRECCIÓN: Constructor actualizado SIN password
+                    User updatedUser = new User(firstName, lastName, email, age, weight, height, gender, activityLevel, goal);
+
                     updatedUser.setLatitude(latitude);
                     updatedUser.setLongitude(longitude);
                     updatedUser.setProfilePhoto(profilePhoto);
-                    updatedUser.setAdmin(isAdmin);
 
-                    // Guardar cambios en Firebase
+                    // CORRECCIÓN: Mapear checkbox a rol String
+                    updatedUser.setRole(isAdmin ? "coach" : "user");
+
+                    // Guardar cambios
                     userRef.setValue(updatedUser).addOnCompleteListener(task -> {
                         if (task.isSuccessful()) {
-                            Toast.makeText(this, "Usuario actualizado correctamente.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Usuario actualizado.", Toast.LENGTH_SHORT).show();
                             finish();
                         } else {
-                            Toast.makeText(this, "Error al actualizar el usuario.", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(this, "Error al actualizar.", Toast.LENGTH_SHORT).show();
                         }
                     });
-                } else {
-                    Toast.makeText(this, "Usuario no encontrado.", Toast.LENGTH_SHORT).show();
                 }
             }
-        }).addOnFailureListener(e -> {
-            Toast.makeText(this, "Error al acceder a los datos del usuario.", Toast.LENGTH_SHORT).show();
-            Log.e("EditUserActivity", "Error al acceder a los datos del usuario: " + e.getMessage());
         });
     }
 

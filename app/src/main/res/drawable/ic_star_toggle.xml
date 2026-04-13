@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ON (marcado en favoritos) -->
+    <item android:drawable="@drawable/ic_star_filled" android:state_selected="true"/>
+    <!-- OFF (no es favorito) -->
+    <item android:drawable="@drawable/ic_star_outline"/>
+</selector>

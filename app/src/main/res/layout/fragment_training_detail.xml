@@ -1,0 +1,101 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="#1C1C1C">
+
+    <!-- Contenedor del icono de retroceso y título -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp">
+
+        <ImageView
+            android:id="@+id/btnBackToPrevious"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:src="@drawable/ic_back_arrow"
+            android:contentDescription="Regresar"
+            android:padding="4dp"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Detalles del Entrenamiento"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:layout_centerHorizontal="true"/>
+    </RelativeLayout>
+
+    <!-- Cronómetro -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:id="@+id/textTimerLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingEnd="8dp"
+            android:text="Tiempo transcurrido:"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp" />
+
+        <Chronometer
+            android:id="@+id/chronometerTraining"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            android:textColor="#E63946"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Scroll con ejercicios -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewExercises"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="vertical"/>
+    </ScrollView>
+
+    <!-- NUEVO Botón para agregar ejercicio -->
+    <Button
+        android:id="@+id/btnAddExercise"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Añadir Ejercicio"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:padding="12dp"
+        android:backgroundTint="#2F2F2F"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="0dp" />
+
+    <!-- Botón para terminar el entrenamiento -->
+    <Button
+        android:id="@+id/btnFinishWorkout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Terminar Entrenamiento"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:padding="12dp"
+        android:backgroundTint="#E63946"
+        android:textColor="#FFFFFF"
+        android:layout_marginTop="0dp"/>
+</LinearLayout>

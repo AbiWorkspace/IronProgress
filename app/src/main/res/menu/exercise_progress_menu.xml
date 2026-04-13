@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/navigation_exercises"
+        android:icon="@drawable/ic_exercises"
+        android:title="Ejercicios" />
+    <item
+        android:id="@+id/navigation_progress"
+        android:icon="@drawable/ic_create"
+        android:title="Creados" />
+</menu>

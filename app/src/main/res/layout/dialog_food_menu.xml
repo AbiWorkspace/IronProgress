@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/dialog_background"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <!-- Tabla para identificar fragmentos -->
+        <TableLayout
+            android:id="@+id/tableHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:stretchColumns="*"
+            android:background="@android:color/transparent"
+            android:paddingBottom="8dp">
+
+            <TableRow
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center">
+
+                <TextView
+                    android:id="@+id/tabSearch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Buscar"
+                    android:gravity="center"
+                    android:textColor="#E63946"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:padding="8dp" />
+
+                <TextView
+                    android:id="@+id/tabFavorites"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Favoritos"
+                    android:gravity="center"
+                    android:textColor="#E63946"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:padding="8dp" />
+
+            </TableRow>
+
+        </TableLayout>
+
+        <!-- ViewPager debajo de la tabla -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/viewPagerMenu"
+            android:layout_width="match_parent"
+            android:layout_height="800dp" />
+    </LinearLayout>
+
+</FrameLayout>

@@ -12,6 +12,8 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.diets.R;
 import com.example.diets.model.User;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -20,7 +22,6 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.List;
-
 public class UserListActivity extends AppCompatActivity {
 
     private static final String TAG = "UserListActivity";
@@ -45,6 +46,11 @@ public class UserListActivity extends AppCompatActivity {
 
             // Validar que el usuario tiene un ID
             if (selectedUser != null && selectedUser.getId() != null && !selectedUser.getId().isEmpty()) {
+
+                // AUDIT TRAIL: coach entrando al perfil de un cliente (modo coach)
+                Log.i(TAG, "AUDIT_TRAIL: Coach accediendo a perfil de cliente. Target UID: "
+                        + selectedUser.getId() + ". Iniciando Modo Coach.");
+
                 Intent intent = new Intent(UserListActivity.this, UserDetailsActivity.class);
                 intent.putExtra("userId", selectedUser.getId());
                 Log.d(TAG, "Seleccionado User ID: " + selectedUser.getId());
@@ -52,7 +58,9 @@ public class UserListActivity extends AppCompatActivity {
             } else {
                 // Mostrar mensaje de error si el usuario no tiene un ID válido
                 Log.e(TAG, "El usuario seleccionado no tiene un ID válido.");
-                Toast.makeText(UserListActivity.this, "Error: El usuario seleccionado no tiene un ID válido.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(UserListActivity.this,
+                        "Error: El usuario seleccionado no tiene un ID válido.",
+                        Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -62,8 +70,30 @@ public class UserListActivity extends AppCompatActivity {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 userList.clear();
+
+                FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
+                String currentUid = (current != null) ? current.getUid() : null;
+
                 for (DataSnapshot userSnapshot : snapshot.getChildren()) {
                     User user = userSnapshot.getValue(User.class);
+
+                    // UID en DB
+                    String uid = userSnapshot.getKey();
+                    // Rol leído desde DB
+                    String r = userSnapshot.child("role").getValue(String.class);
+                    if (r == null) r = "";
+
+                    boolean isMe    = currentUid != null && currentUid.equals(uid);
+                    boolean isCoach = "coach".equalsIgnoreCase(r);
+                    boolean showInList = !isMe && !isCoach;
+
+                    // AUDIT TRAIL por usuario evaluado
+                    Log.v(TAG, "AUDIT_TRAIL: Evaluando usuario " + uid
+                            + ". ¿Es Coach/Admin?: " + ("coach".equals(r))
+                            + ". ¿Mostrar en lista?: " + showInList);
+
+                    // Solo mostrar clientes (no yo mismo, no coaches)
+                    if (!showInList) continue;
 
                     // Validar que el usuario tiene un ID antes de agregarlo a la lista
                     if (user != null && user.getId() != null && !user.getId().isEmpty()) {

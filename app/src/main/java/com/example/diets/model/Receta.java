@@ -18,7 +18,6 @@ public class Receta {
         this.productos = new ArrayList<>();
     }
 
-    // Método para agregar un producto a la receta
     public void agregarProducto(Producto producto) {
         this.productos.add(producto);
     }

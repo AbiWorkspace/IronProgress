@@ -1,9 +1,21 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- ‑‑‑ Tema base M3 con ActionBar oculta ‑‑‑ -->
     <style name="Base.Theme.Diets" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <!-- Colores que ya tenías -->
+        <item name="colorPrimary">@color/red</item>
+        <item name="colorSecondary">@color/colorAccent</item>
+
+        <!-- Fondo y texto global -->
+        <item name="android:colorBackground">@color/backgroundDark</item>
+        <item name="colorOnBackground">@color/white</item>
+        <item name="colorOnSurface">@color/white</item>
+
+        <!-- Demás atributos globales… -->
     </style>
 
+    <!-- Tema que pones en el manifest -->
     <style name="Theme.Diets" parent="Base.Theme.Diets" />
+
 </resources>

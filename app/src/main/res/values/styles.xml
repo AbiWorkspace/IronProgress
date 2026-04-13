@@ -2,8 +2,8 @@
     <!-- Tema de la aplicación -->
     <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <!-- Personaliza tu tema aquí -->
-        <item name="colorPrimary">@color/colorPrimary</item>
-        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorPrimary">@color/red</item>
+        <item name="colorPrimaryDark">@color/dark_gray</item>
         <item name="colorAccent">@color/colorAccent</item>
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
@@ -12,12 +12,37 @@
     <!-- Estilo para TextInputLayout con caja delineada -->
     <style name="Widget.MaterialComponents.TextInputLayout.OutlinedBox" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense">
         <item name="boxBackgroundMode">outline</item>
-        <item name="boxStrokeColor">@color/colorPrimary</item>
+        <item name="boxStrokeColor">@color/red</item>
         <item name="boxStrokeWidth">2dp</item>
         <item name="boxCornerRadiusTopStart">4dp</item>
         <item name="boxCornerRadiusTopEnd">4dp</item>
         <item name="boxCornerRadiusBottomStart">4dp</item>
         <item name="boxCornerRadiusBottomEnd">4dp</item>
+    </style>
+    <style name="CustomDialogTheme" parent="Theme.MaterialComponents.DayNight.Dialog">
+        <item name="android:windowBackground">@color/black</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowMinWidthMajor">90%</item>
+        <item name="android:windowMinWidthMinor">90%</item>
+    </style>
+    <style name="FullScreenDialogTheme" parent="Theme.AppCompat.Light.Dialog">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowIsFloating">false</item>
+    </style>
+
+
+    <style name="SectionHeader">
+        <item name="android:textColor">#E63946</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:layout_marginTop">16dp</item>
+    </style>
+
+    <style name="SectionBody">
+        <item name="android:textColor">#DDDDDD</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:layout_marginTop">4dp</item>
     </style>
 
     <!-- Estilo para Spinner -->
@@ -37,4 +62,49 @@
         <item name="android:background">#E63946</item>
         <item name="android:textColor">#FFFFFF</item>
     </style>
+    <style name="CustomButtonStyle" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/red</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="AlertDialogTheme" parent="ThemeOverlay.MaterialComponents.MaterialAlertDialog">
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <item name="android:textColorSecondary">#CCCCCC</item>
+        <item name="android:background">?attr/colorSurface</item>
+    </style>
+    <style name="PopupMenuWhiteText" parent="Widget.AppCompat.PopupMenu.Overflow">
+        <item name="android:textColor">#FFFFFF</item>
+    </style>
+    <!-- Tema oscuro para pop-ups: fondo gris y texto blanco -->
+    <!-- Tema oscuro para pop-ups -->
+    <style name="PopupMenu.Dark" parent="ThemeOverlay.AppCompat.Dark">
+        <!-- Fondo -->
+        <item name="android:popupBackground">#2F2F2F</item>
+        <!-- Color del texto de los items -->
+        <item name="android:textColor">#FFFFFF</item>
+        <!-- Si usas íconos en el menú y quieres un tinte blanco (opcional) -->
+        <!-- <item name="android:iconTint">#FFFFFF</item> -->
+    </style>
+
+
+    <style name="CustomAlertDialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <!-- Fondo del diálogo -->
+        <item name="android:background">#1C1C1C</item>
+        <!-- Título -->
+        <item name="android:textColorPrimary">#FFFFFF</item>
+        <!-- Mensaje e inputs -->
+        <item name="android:textColorSecondary">#BBBBBB</item>
+        <!-- Botones -->
+        <item name="colorAccent">#E63946</item>
+        <item name="android:buttonBarPositiveButtonStyle">@style/CustomAlertDialogButton</item>
+        <item name="android:buttonBarNegativeButtonStyle">@style/CustomAlertDialogButton</item>
+    </style>
+
+
+
+    <style name="CustomAlertDialogButton" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:backgroundTint">#E63946</item>
+    </style>
+    <string name="fullscreen_image">Imagen en pantalla completa</string>
 </resources>
+

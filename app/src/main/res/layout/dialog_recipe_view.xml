@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--  XML revisado: todos los nodos tienen layout_width / layout_height           -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_dialog_rounded"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- ═════ título + favorito ═════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/txtRecipeName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Nombre de la receta"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:justificationMode="inter_word"/>
+
+            <ImageButton
+                android:id="@+id/btnFavRecipe"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/fav"
+                android:src="@drawable/ic_star_toggle"/>
+        </LinearLayout>
+
+        <!-- ═════ imagen ═════ -->
+        <ImageView
+            android:id="@+id/imgRecipe"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_marginTop="12dp"
+            android:scaleType="centerCrop"
+            android:background="@drawable/bg_image_rounded" />
+
+        <!-- ═════ nutrición ═════ -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Información nutricional"
+            android:textColor="#E63946"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:id="@+id/txtRecipeKcal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#BBBBBB"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp" />
+        <TextView
+            android:id="@+id/txtRecipeProtein"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#BBBBBB"
+            android:textSize="14sp"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/txtRecipeCarbs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#BBBBBB"
+            android:textSize="14sp"
+            android:layout_marginTop="2dp" />
+
+        <TextView
+            android:id="@+id/txtRecipeFat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#BBBBBB"
+            android:textSize="14sp"
+            android:layout_marginTop="2dp" />
+
+        <EditText
+            android:id="@+id/editGrams"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Gramos consumidos (ej. 150)"            android:inputType="numberDecimal"
+            android:background="@drawable/bg_input_field"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#777777"
+            android:layout_marginTop="6dp" />
+
+        <!-- ═════ ingredientes ═════ -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Ingredientes"
+            android:textColor="#E63946"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"/>
+
+        <TextView
+            android:id="@+id/txtRecipeIngList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#EEEEEE"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"
+            android:lineSpacingExtra="4dp"/>
+
+        <!-- ═════ pasos ═════ -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pasos de preparación"
+            android:textColor="#E63946"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"/>
+
+        <TextView
+            android:id="@+id/txtRecipeInstructions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#DDDDDD"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"
+            android:lineSpacingExtra="6dp"
+            android:justificationMode="inter_word" />
+
+
+        <!-- ═════ botones ═════ -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <Button
+                android:id="@+id/btnCloseRecipe"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:text="Cerrar"
+                android:textColor="#E63946"
+                android:background="@drawable/bg_button_outline_red"/>
+
+            <Button
+                android:id="@+id/btnSaveRecipe"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginStart="12dp"
+                android:text="Guardar"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/bg_button_filled_red"/>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

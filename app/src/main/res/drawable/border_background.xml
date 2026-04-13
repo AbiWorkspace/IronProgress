@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+
+    <!-- Color de fondo con transparencia sutil -->
+    <solid android:color="#F8F8F8"/> <!-- Blanco con tono sutil -->
+
+    <!-- Bordes redondeados más suaves -->
+    <corners android:radius="12dp"/>
+
+    <!-- Borde con un gris más elegante -->
+    <stroke android:width="2dp" android:color="#B0B0B0"/> <!-- Gris suave -->
+
+    <!-- Sombra ligera (opcional, si se necesita más profundidad) -->
+    <padding android:left="12dp" android:top="12dp" android:right="12dp" android:bottom="12dp"/>
+</shape>

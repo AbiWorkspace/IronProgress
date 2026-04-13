@@ -8,4 +8,12 @@
     <string name="menu">Menú</string>
     <string name="add_food_item">Añadir alimento</string>
     <string name="training_icon">Icono de entrenamiento</string>
+    <string name="status_button">Estado del ejercicio</string>
+    <string name="default_notification_channel_id">default_channel</string>
+    <string name="default_web_client_id">tu-cliente-web-id.apps.googleusercontent.com</string>
+    <string name="barcode_search">Buscar por código de barras</string>
+    <string name="fav">Marcar como favorito</string>
+    <string name="nav_open">Abrir menú</string>
+    <string name="nav_close">Cerrar menú</string>
+
 </resources>

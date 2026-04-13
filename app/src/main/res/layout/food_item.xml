@@ -1,54 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/foodItemLayout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
+    android:orientation="horizontal"
+    android:background="@drawable/bg_food_item_rounded"
     android:padding="8dp"
-    android:background="#3F3F3F">
+    android:layout_marginBottom="8dp"
+    android:minHeight="72dp">
 
-    <EditText
-        android:id="@+id/foodItemName"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Nombre del alimento"
-        android:maxLines="1"
-        android:inputType="text"
-        android:maxLength="20"
-        android:textSize="16sp"
-        android:textColor="#FFFFFF"
-        android:background="@null" />
+    <!-- Imagen del alimento -->
+    <ImageView
+        android:id="@+id/foodItemImage"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginEnd="8dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_placeholder"
+        android:contentDescription="Imagen del alimento" />
 
-    <EditText
-        android:id="@+id/foodItemGrams"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Cantidad (g)"
-        android:maxLines="1"
-        android:inputType="number"
-        android:textSize="16sp"
-        android:textColor="#FFFFFF"
-        android:background="@null" />
+    <!-- Contenedor vertical de nombre, gramos y calorías -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center_vertical">
 
-    <EditText
-        android:id="@+id/foodItemCalories"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Calorías"
-        android:maxLines="1"
-        android:inputType="number"
-        android:textSize="16sp"
-        android:textColor="#FFFFFF"
-        android:background="@null" />
+        <!-- Fila: Nombre + Gramos -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingBottom="4dp">
 
-    <EditText
-        android:id="@+id/foodItemBrand"
-        android:layout_width="match_parent"
+            <EditText
+                android:id="@+id/foodItemName"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:hint="Nombre"
+                android:maxLines="1"
+                android:inputType="text"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:background="@null"
+                android:paddingVertical="2dp" />
+
+            <EditText
+                android:id="@+id/foodItemGrams"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:hint="Gramos"
+                android:maxLines="1"
+                android:inputType="numberDecimal"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:gravity="end"
+                android:background="@null"
+                android:paddingVertical="2dp"
+                android:layout_marginStart="6dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="gr"
+                android:textColor="#CCCCCC"
+                android:textSize="13sp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
+        <!-- Fila: Calorías -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end">
+
+            <EditText
+                android:id="@+id/foodItemCalories"
+                android:layout_width="60dp"
+                android:layout_height="wrap_content"
+                android:hint="Kcal/100g"
+                android:maxLines="1"
+                android:inputType="numberDecimal"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:gravity="end"
+                android:background="@null"
+                android:paddingVertical="2dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="kcal"
+                android:textColor="#CCCCCC"
+                android:textSize="13sp"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- CheckBox de selección -->
+    <CheckBox
+        android:id="@+id/foodItemCheck"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:hint="Marca (opcional)"
-        android:maxLines="1"
-        android:inputType="text"
-        android:textSize="16sp"
-        android:textColor="#FFFFFF"
-        android:background="@null" />
+        android:layout_gravity="center_vertical"
+        android:buttonTint="@color/white"
+        android:checked="true"
+        android:focusable="false"
+        android:focusableInTouchMode="false" />
+
 </LinearLayout>

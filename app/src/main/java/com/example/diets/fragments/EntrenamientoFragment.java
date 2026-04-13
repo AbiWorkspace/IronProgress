@@ -17,11 +17,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.example.diets.R;
+import com.example.diets.activitys.ViewPagerActivity;
 
 public class EntrenamientoFragment extends Fragment {
 
     private static final String PREFS_NAME = "MyPrefsFile";
     private static final String FIRST_TIME_KEY = "firstTime";
+    private static final String TAG = "EntrenamientoFragment";
 
     @Nullable
     @Override
@@ -48,15 +50,20 @@ public class EntrenamientoFragment extends Fragment {
 
     private void showWelcomeForm(View view) {
         Log.d(TAG, "showWelcomeForm: Mostrando formulario de bienvenida");
-
         TextView welcomeText = view.findViewById(R.id.welcomeText);
         Spinner daysSpinner = view.findViewById(R.id.daysSpinner);
         Spinner jobTypeSpinner = view.findViewById(R.id.jobTypeSpinner);
+        Spinner goalSpinner2 = view.findViewById(R.id.goalSpinner);
+        Spinner experienceSpinner = view.findViewById(R.id.experienceSpinner);
+        Spinner timeSpinner = view.findViewById(R.id.timeSpinner);
         Button submitButton = view.findViewById(R.id.submitButton);
 
         welcomeText.setVisibility(View.VISIBLE);
         daysSpinner.setVisibility(View.VISIBLE);
         jobTypeSpinner.setVisibility(View.VISIBLE);
+        goalSpinner2.setVisibility(View.VISIBLE);
+        experienceSpinner.setVisibility(View.VISIBLE);
+        timeSpinner.setVisibility(View.VISIBLE);
         submitButton.setVisibility(View.VISIBLE);
 
         Log.d(TAG, "showWelcomeForm: Configurando ArrayAdapter para los Spinners");
@@ -68,39 +75,56 @@ public class EntrenamientoFragment extends Fragment {
                 R.array.job_type_array, android.R.layout.simple_spinner_item);
         jobTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
-        // Verificar si los adaptadores tienen contenido antes de asignarlos a los Spinners
-        if (daysAdapter.getCount() > 0) {
-            daysSpinner.setAdapter(daysAdapter);
-            Log.d(TAG, "showWelcomeForm: Spinner de días lleno con opciones");
-        } else {
-            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de días", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de días");
-        }
+        ArrayAdapter<CharSequence> goalAdapter = ArrayAdapter.createFromResource(getContext(),
+                R.array.goal_options2, android.R.layout.simple_spinner_item);
+        goalAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
-        if (jobTypeAdapter.getCount() > 0) {
-            jobTypeSpinner.setAdapter(jobTypeAdapter);
-            Log.d(TAG, "showWelcomeForm: Spinner de tipo de trabajo lleno con opciones");
-        } else {
-            Toast.makeText(getContext(), "No hay opciones disponibles para el Spinner de tipo de trabajo", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "showWelcomeForm: No hay opciones disponibles para el Spinner de tipo de trabajo");
-        }
+        ArrayAdapter<CharSequence> experienceAdapter = ArrayAdapter.createFromResource(getContext(),
+                R.array.experience_options, android.R.layout.simple_spinner_item);
+        experienceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        ArrayAdapter<CharSequence> timeAdapter = ArrayAdapter.createFromResource(getContext(),
+                R.array.time_availability_options, android.R.layout.simple_spinner_item);
+        timeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        Log.d(TAG, "showWelcomeForm: Configurando ArrayAdapter personalizado para los Spinners con texto blanco");
+
+        daysSpinner.setAdapter(daysAdapter);
+        jobTypeSpinner.setAdapter(jobTypeAdapter);
+        goalSpinner2.setAdapter(goalAdapter);
+        experienceSpinner.setAdapter(experienceAdapter);
+        timeSpinner.setAdapter(timeAdapter);
 
         submitButton.setOnClickListener(v -> {
             Log.d(TAG, "submitButton: Botón de enviar clicado");
 
-            // Guardar datos del formulario y actualizar preferencias
-            SharedPreferences settings = getActivity().getSharedPreferences(PREFS_NAME, 0);
-            SharedPreferences.Editor editor = settings.edit();
-            editor.putBoolean(FIRST_TIME_KEY, false);
-            editor.apply();
-            Log.d(TAG, "submitButton: Preferencias actualizadas, firstTime establecido a false");
+            // Recopilar datos seleccionados en los Spinners
+            String goal = goalSpinner2.getSelectedItem().toString();
+            String daysText = daysSpinner.getSelectedItem().toString();
+            String jobType = jobTypeSpinner.getSelectedItem().toString();
+            String experience = experienceSpinner.getSelectedItem().toString();
+            String timeText = timeSpinner.getSelectedItem().toString();
 
-            // Ocultar formulario y mostrar contenido normal
-            welcomeText.setVisibility(View.GONE);
-            daysSpinner.setVisibility(View.GONE);
-            jobTypeSpinner.setVisibility(View.GONE);
-            submitButton.setVisibility(View.GONE);
-            Log.d(TAG, "submitButton: Formulario de bienvenida oculto, mostrando contenido normal");
+            // Procesar valores numéricos
+            int days = Integer.parseInt(daysText.replaceAll("\\D+", ""));
+            int time = Integer.parseInt(timeText.replaceAll("\\D+", ""));
+
+            // 🔎 AUDITORÍA: datos efímeros capturados antes de crear el Bundle
+            Log.i(TAG, "AUDIT_TRAIL: Capturando parámetros de filtrado (Efímeros) -> Días: " + days + ", Exp: " + experience + ". Pasando a siguiente vista sin persistir en BD.");
+
+            // Crear un Bundle con los datos
+            Bundle data = new Bundle();
+            data.putString("goal", goal);
+            data.putString("jobType", jobType);
+            data.putString("experience", experience);
+            data.putInt("days", days);
+            data.putInt("time", time);
+
+            // Llamar al método para cambiar al nuevo fragmento
+            if (getActivity() instanceof ViewPagerActivity) {
+                ((ViewPagerActivity) getActivity()).switchToExerciseDistributionFragment(data);
+            }
         });
     }
+
 }

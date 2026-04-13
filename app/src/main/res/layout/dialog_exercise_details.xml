@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#1C1C1C">
+
+    <!-- Contenido desplazable -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="80dp"
+        android:fillViewport="true"
+        android:padding="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Imagen del Ejercicio -->
+            <androidx.viewpager2.widget.ViewPager2
+                android:id="@+id/imageCarousel"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/rounded_corners"
+                android:elevation="8dp" />
+
+
+            <!-- Nombre del Ejercicio -->
+            <TextView
+                android:id="@+id/textExerciseName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Nombre del Ejercicio"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:paddingTop="16dp"
+                android:paddingBottom="8dp" />
+
+            <!-- Descripción del Ejercicio -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="6dp"
+                app:cardBackgroundColor="#2F2F2F"
+                android:layout_marginBottom="12dp">
+
+                <TextView
+                    android:id="@+id/textDescription"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Descripción del ejercicio"
+                    android:textColor="#BBBBBB"
+                    android:textSize="16sp"
+                    android:padding="16dp" />
+            </androidx.cardview.widget.CardView>
+
+            <!-- Músculos trabajados y sinérgicos -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="6dp"
+                app:cardBackgroundColor="#2F2F2F"
+                android:layout_marginBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/textMusclesWorked"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Músculos trabajados: ..."
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:paddingBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/textSynergistMuscles"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Músculos sinérgicos: ..."
+                        android:textColor="#BBBBBB"
+                        android:textSize="16sp" />
+
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Estadísticas -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="6dp"
+                app:cardBackgroundColor="#2F2F2F"
+                android:layout_marginBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/textRM"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="RM Estimado: 80 kg"
+                        android:textColor="#BBBBBB"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:paddingBottom="6dp" />
+
+                    <TextView
+                        android:id="@+id/textPersonalRecord"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Personal Record: 100 kg"
+                        android:textColor="#BBBBBB"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:paddingBottom="6dp" />
+
+                    <TextView
+                        android:id="@+id/textVolume"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Volumen: 0"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/textBestSeries"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Mejor Serie: --"
+                        android:textColor="#FFFFFF"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Información adicional -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/cardExtraData"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="6dp"
+                app:cardBackgroundColor="#2F2F2F"
+                android:layout_marginBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/textMovementType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Tipo de Movimiento: Desconocido"
+                        android:textColor="#BBBBBB"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:paddingBottom="6dp" />
+
+                    <TextView
+                        android:id="@+id/textEquipmentType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Equipamiento: Desconocido"
+                        android:textColor="#BBBBBB"
+                        android:textSize="16sp"
+                        android:paddingBottom="6dp" />
+
+                    <TextView
+                        android:id="@+id/textExerciseType"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Tipo de Ejercicio: Desconocido"
+                        android:textColor="#BBBBBB"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:paddingBottom="6dp" />
+
+                    <TextView
+                        android:id="@+id/textPatternName"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Patrón de Movimiento: Desconocido"
+                        android:textColor="#BBBBBB"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+            <!-- Gráfica -->
+            <com.github.mikephil.charting.charts.LineChart
+                android:id="@+id/chartExerciseProgress"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/rounded_corners" />
+
+            <!-- Spinner RPE -->
+            <Spinner
+                android:id="@+id/spinnerRpeFilter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:entries="@array/rpe_array"
+                android:spinnerMode="dropdown"
+                android:backgroundTint="#2F2F2F"
+                android:textColor="#FFFFFF"
+                android:layout_marginBottom="16dp" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Botón siempre visible al fondo -->
+    <Button
+        android:id="@+id/btnClose"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="CERRAR"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#FFFFFF"
+        android:backgroundTint="#E63946"
+        android:padding="12dp"
+        android:elevation="6dp"
+        android:layout_gravity="bottom"
+        android:layout_margin="16dp" />
+</FrameLayout>

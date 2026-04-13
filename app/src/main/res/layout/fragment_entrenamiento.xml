@@ -1,93 +1,175 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp"
     android:background="#1C1C1C"
-    android:gravity="center_horizontal">
+    android:padding="16dp">
 
-    <ImageView
-        android:layout_width="100dp"
-        android:layout_height="100dp"
-        android:layout_gravity="center"
-        android:layout_marginBottom="16dp"
-        android:src="@drawable/strength_svgrepo_com"
-        android:contentDescription="@string/training_icon"
-        android:tint="#E63946" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginBottom="16dp"
-        android:text="Bienvenido al Entrenamiento"
-        android:textColor="#FFFFFF"
-        android:textSize="24sp"
-        android:fontFamily="sans-serif-medium"
-        android:id="@+id/welcomeText" />
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginBottom="8dp"
-        android:text="Selecciona tus días de entrenamiento"
-        android:textColor="#BBBBBB"
-        android:textSize="16sp"
-        android:fontFamily="sans-serif" />
-
-    <Spinner
-        android:id="@+id/daysSpinner"
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:background="#2F2F2F"
-        android:padding="10dp"
-        android:textColor="#FFFFFF"
-        android:popupBackground="#2F2F2F" />
+        android:layout_height="match_parent"
+        android:layout_above="@id/submitButton"
+        android:layout_marginBottom="8dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginBottom="8dp"
-        android:text="¿Qué tipo de trabajo tienes?"
-        android:textColor="#BBBBBB"
-        android:textSize="16sp"
-        android:fontFamily="sans-serif" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:layout_marginBottom="8dp"
-        android:text="Por favor selecciona si tu trabajo implica desgaste físico o no."
-        android:textColor="#BBBBBB"
-        android:textSize="14sp"
-        android:fontFamily="sans-serif" />
+            <ImageView
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:layout_gravity="center"
+                android:layout_marginBottom="16dp"
+                android:src="@drawable/strength_svgrepo_com"
+                android:contentDescription="@string/training_icon"
+                app:tint="#E63946" />
 
-    <Spinner
-        android:id="@+id/jobTypeSpinner"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:background="#2F2F2F"
-        android:padding="10dp"
-        android:textColor="#FFFFFF"
-        android:popupBackground="#2F2F2F" />
+            <TextView
+                android:id="@+id/welcomeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="16dp"
+                android:text="Bienvenido al Entrenamiento"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#444444"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="8dp"
+                android:text="Selecciona tus días de entrenamiento"
+                android:textColor="#BBBBBB"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif" />
+
+            <Spinner
+                android:id="@+id/daysSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="#2F2F2F"
+                android:padding="10dp"
+                android:popupBackground="#2F2F2F" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="8dp"
+                android:text="¿Qué tipo de trabajo tienes?"
+                android:textColor="#BBBBBB"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="8dp"
+                android:text="Por favor selecciona si tu trabajo implica desgaste físico o no."
+                android:textColor="#BBBBBB"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif" />
+
+            <Spinner
+                android:id="@+id/jobTypeSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="#2F2F2F"
+                android:padding="10dp"
+                android:popupBackground="#2F2F2F" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="8dp"
+                android:text="¿Buscas aumentar la masa muscular, mejorar la fuerza, o ambos?"
+                android:textColor="#BBBBBB"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif" />
+
+            <Spinner
+                android:id="@+id/goalSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="#2F2F2F"
+                android:padding="10dp"
+                android:popupBackground="#2F2F2F" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="8dp"
+                android:text="¿Tienes experiencia previa en entrenamiento de fuerza?"
+                android:textColor="#BBBBBB"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif" />
+
+            <Spinner
+                android:id="@+id/experienceSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="#2F2F2F"
+                android:padding="10dp"
+                android:popupBackground="#2F2F2F" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="8dp"
+                android:text="¿Cuál es tu disponibilidad de tiempo para entrenar?"
+                android:textColor="#BBBBBB"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif" />
+
+            <Spinner
+                android:id="@+id/timeSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="#2F2F2F"
+                android:padding="10dp"
+                android:popupBackground="#2F2F2F" />
+
+        </LinearLayout>
+    </ScrollView>
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/submitButton"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="8dp"
+        android:layout_marginTop="8dp"
         android:text="Enviar"
         android:textColor="#FFFFFF"
         android:backgroundTint="#E63946"
-        android:layout_gravity="center"
         android:padding="16dp"
         android:textSize="18sp"
-        android:layout_marginBottom="16dp"
-        android:fontFamily="sans-serif-medium" />
+        android:fontFamily="sans-serif-medium"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentEnd="true"
+      />
 
-</LinearLayout>
+</RelativeLayout>
