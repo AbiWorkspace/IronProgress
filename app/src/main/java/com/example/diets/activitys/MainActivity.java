@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 //LISTO AUDITORIA??
-
+//Hasta que vea esto
 public class MainActivity extends AppCompatActivity {
 //ultima actualizacion del codigo
     private static final String TAG = "MainActivity";
