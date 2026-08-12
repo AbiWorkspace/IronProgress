@@ -47,10 +47,6 @@ public class UserListActivity extends AppCompatActivity {
             // Validar que el usuario tiene un ID
             if (selectedUser != null && selectedUser.getId() != null && !selectedUser.getId().isEmpty()) {
 
-                // AUDIT TRAIL: coach entrando al perfil de un cliente (modo coach)
-                Log.i(TAG, "AUDIT_TRAIL: Coach accediendo a perfil de cliente. Target UID: "
-                        + selectedUser.getId() + ". Iniciando Modo Coach.");
-
                 Intent intent = new Intent(UserListActivity.this, UserDetailsActivity.class);
                 intent.putExtra("userId", selectedUser.getId());
                 Log.d(TAG, "Seleccionado User ID: " + selectedUser.getId());
@@ -86,11 +82,6 @@ public class UserListActivity extends AppCompatActivity {
                     boolean isMe    = currentUid != null && currentUid.equals(uid);
                     boolean isCoach = "coach".equalsIgnoreCase(r);
                     boolean showInList = !isMe && !isCoach;
-
-                    // AUDIT TRAIL por usuario evaluado
-                    Log.v(TAG, "AUDIT_TRAIL: Evaluando usuario " + uid
-                            + ". ¿Es Coach/Admin?: " + ("coach".equals(r))
-                            + ". ¿Mostrar en lista?: " + showInList);
 
                     // Solo mostrar clientes (no yo mismo, no coaches)
                     if (!showInList) continue;

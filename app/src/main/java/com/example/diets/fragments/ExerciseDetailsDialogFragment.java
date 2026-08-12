@@ -67,7 +67,7 @@ public class ExerciseDetailsDialogFragment extends DialogFragment {
     private static final String ARG_UID            = "effectiveUid";
     private static final String ARG_EXERCISE_OBJ   = "exercise";         // Serializable Exercise
 
-    /* ====== Parámetros de auditoría 6.4 ====== */
+    /* ====== Parámetros de compresión de imágenes ====== */
     private static final int  IMAGE_MAX_DIM          = 1920;               // ≈1080p
     private static final int  BASE64_THRESHOLD_BYTES = 1_500_000;          // 1.5 MB
     private static final int  LRU_CACHE_MAX_BYTES    = 12 * 1024 * 1024;   // ~12 MB

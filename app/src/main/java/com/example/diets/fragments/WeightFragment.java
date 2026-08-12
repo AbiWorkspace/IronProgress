@@ -72,7 +72,7 @@ public class WeightFragment extends Fragment {
     /* -------------------------------------------------- */
     /* ------------------- CONSTANTES ------------------- */
     /* -------------------------------------------------- */
-    private static final String TAG = "WeightFragment";   //  para AUDIT_TRAIL
+    private static final String TAG = "WeightFragment";
     private static final String KEY_WAITING_PROGRESS = "waiting_progress";
     private static final String KEY_WAITING_DATE     = "waiting_date"; // epochDay del último ajuste
     private static final int WAIT_DAYS_AFTER_ADJUST  = 7;
@@ -385,9 +385,6 @@ public class WeightFragment extends Fragment {
         }
 
         double weight = Double.parseDouble(wStr);
-
-        // 🧾 AUDIT TRAIL
-        Log.i(TAG, "AUDIT_TRAIL: Guardando peso: " + weight + "kg para fecha: " + selectedDate + ". Validando unicidad y rango.");
 
         if(weight <= 40 || weight > 150) {
             Toast.makeText(getContext(), "Peso fuera de rango", Toast.LENGTH_SHORT).show();
@@ -721,9 +718,6 @@ public class WeightFragment extends Fragment {
             }
 
             if (upd != curr) {
-                //  AUDIT TRAIL
-                Log.w(TAG, "AUDIT_TRAIL: Ajuste Inteligente activado. Modificando Kcal diarias para cumplir meta.");
-
                 kcalRef.setValue(upd);
                 Log.d(LOG_PREFIX, String.format(Locale.getDefault(),
                         "[ajustarCalorias] kcal %,.0f → %,.0f", curr, upd));

@@ -174,10 +174,6 @@ public class ExerciseDetailsLoadFragment extends DialogFragment {
 
         Log.d(TAG, "saveExerciseDetails:  Datos asignados a userExercise: " + userExercise.getName());
 
-        //  AUDITORÍA: antes de enviar a Firebase, dejamos huella de la carga inicial
-        Log.i(TAG, "AUDIT_TRAIL: Guardando carga inicial para ejercicio: " + userExercise.getName()
-                + " | Carga: " + currentLoad + " | Reps: " + maxReps);
-
         if (userId == null || mDatabase == null) {
             Log.e(TAG, "saveExerciseDetails:  UID o referencia Firebase no disponible");
             return;

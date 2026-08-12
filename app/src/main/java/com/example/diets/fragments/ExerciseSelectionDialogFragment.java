@@ -137,9 +137,6 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
                     }
                 }
 
-                // 🔎 AUDITORÍA: resultado del filtrado inteligente por patrón del día
-                Log.d(TAG, "AUDIT_TRAIL: Filtrado de catálogo aplicado. Ejercicios coincidentes con el patrón del día: " + filtered.size());
-
                 /* Refrescar UI */
                 requireActivity().runOnUiThread(() -> {
                     exercises.clear();
@@ -191,8 +188,6 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
     }
 
     private void showExerciseDetails(Exercise ex) {
-        // AUDITORÍA: navegación a detalle preservando selección actual en memoria
-        Log.i(TAG, "AUDIT_TRAIL: Navegando a Detalle de Ejercicio. Preservando estado de selección actual.");
 
         ExerciseDetailsFragment d = ExerciseDetailsFragment.newInstance(ex);
         getParentFragmentManager().beginTransaction()
@@ -223,10 +218,6 @@ public class ExerciseSelectionDialogFragment extends DialogFragment
         ex.setMusclesWorked(worked instanceof String ? (String) worked : "");
 
         ex.setSynergistMuscles(extractSynergistNames(m.get("synergistMuscles")));
-
-        // AUDITORÍA: mapeo desde Firebase + presencia de imagen
-        Log.v(TAG, "AUDIT_TRAIL: Mapeando ejercicio desde Firebase -> " + ex.getName()
-                + " | Imagen presente: " + (!ex.getImage().isEmpty()));
 
         return ex;
     }

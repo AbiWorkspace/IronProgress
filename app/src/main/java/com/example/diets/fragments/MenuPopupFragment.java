@@ -50,9 +50,6 @@ public class MenuPopupFragment extends DialogFragment {
         }
 
         navigationView.setOnItemSelectedListener(item -> {
-            // 🔎 AUDITORÍA: cambio de fuente de datos (Firebase vs Local JSON)
-            Log.i(TAG, "AUDIT_TRAIL: Cambiando fuente de datos -> " +
-                    (item.getItemId() == R.id.navigation_exercises ? "CATÁLOGO (Firebase)" : "LOCAL (JSON)"));
 
             Fragment selectedFragment = null;
 

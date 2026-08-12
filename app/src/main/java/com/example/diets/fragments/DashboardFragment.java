@@ -52,7 +52,7 @@ import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-//VERSION AUDITORIA 4:13
+
 public class DashboardFragment extends Fragment {
 
     private static final String TAG = "DashboardFragment";
@@ -115,7 +115,6 @@ public class DashboardFragment extends Fragment {
                 String pfx = effectiveUid + "_";
                 if (key.equals(pfx + K_KCAL) || key.equals(pfx + K_PROT) ||
                         key.equals(pfx + K_CARB) || key.equals(pfx + K_FAT)) {
-                    Log.d(TAG, "Listener de Metas activado por cambio en clave: " + key); // LOG AÑADIDO
                     if (loadGoalsFromPrefs()) {
                         updateMacrosUI();
                         recalculateDayTotals();
@@ -133,7 +132,6 @@ public class DashboardFragment extends Fragment {
     @Override
     public void onAttach(@NonNull Context ctx) {
         super.onAttach(ctx);
-        Log.d(TAG, "[onAttach] fragment attached to Context: " + ctx.getClass().getSimpleName()); // LOG AÑADIDO
         if (ctx instanceof OnNavigationItemSelectedListener) {
             mListener = (OnNavigationItemSelectedListener) ctx;
         } else {
@@ -144,7 +142,6 @@ public class DashboardFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.d(TAG, "[onDestroy] Limpiando listener de SharedPreferences"); // LOG AÑADIDO
         if (goalPrefs != null) {
             goalPrefs.unregisterOnSharedPreferenceChangeListener(goalListener);
         }
@@ -190,7 +187,6 @@ public class DashboardFragment extends Fragment {
 
         if (goalPrefs == null && getContext() != null) {
             try {
-                Log.d(TAG, "[onCreateView] Registrando SharedPreferences de metas"); // LOG AÑADIDO
                 goalPrefs = requireContext().getSharedPreferences(PREF_GOALS, Context.MODE_PRIVATE);
                 goalPrefs.registerOnSharedPreferenceChangeListener(goalListener);
             } catch (IllegalStateException e) {
@@ -219,7 +215,6 @@ public class DashboardFragment extends Fragment {
         bindUI(v);
 
         if (effectiveUid != null) {
-            Log.d(TAG, "[onViewCreated] effectiveUid válido. Cargando metas, bloques del día y datos de usuario..."); // LOG AÑADIDO
             loadGoalsFromPrefs();
             updateMacrosUI();
             loadFoodBlocksForDate(currentDate);
@@ -313,11 +308,9 @@ public class DashboardFragment extends Fragment {
     private void updateMacrosUI() {
         if (!isAdded() || barCalories == null || labelCalories == null || goalsKcal < 0) {
             if (labelCalories != null) labelCalories.setText("Calorías: Cargando...");
-            Log.v(TAG, "updateMacrosUI: UI no lista o metas no válidas."); // LOG AÑADIDO
             return;
         }
 
-        Log.v(TAG, "Actualizando UI de Macros. Meta Kcal: " + goalsKcal); // LOG AÑADIDO
 
         barCalories.setMax((int) Math.max(1, goalsKcal));
         barProtein .setMax((int) Math.max(1, goalsP));
@@ -344,7 +337,6 @@ public class DashboardFragment extends Fragment {
     /* ==================== UI wiring ==================== */
 
     private void bindUI(View v) {
-        Log.d(TAG, "bindUI: Vinculando vistas y listeners."); // LOG AÑADIDO
         labelCalories = v.findViewById(R.id.labelCalories);
         labelProtein  = v.findViewById(R.id.labelProtein);
         labelCarbs    = v.findViewById(R.id.labelCarbs);
@@ -373,7 +365,6 @@ public class DashboardFragment extends Fragment {
         recyclerViewFoodBlocks.setAdapter(foodBlockAdapter);
 
         v.findViewById(R.id.addFoodButton).setOnClickListener(view -> {
-            Log.d(TAG, "Click en AddFoodButton"); // LOG AÑADIDO
             if (foodBlockList.size() >= MAX_FOOD_BLOCKS) {
                 Toast.makeText(getContext(), "Máximo de bloques de comida alcanzado.", Toast.LENGTH_SHORT).show();
                 return;
@@ -389,7 +380,6 @@ public class DashboardFragment extends Fragment {
 
         txtCurrentDate.setOnClickListener(v1 -> {
             if (getContext() == null) return;
-            Log.d(TAG, "Abriendo DatePickerDialog"); // LOG AÑADIDO
 
             LocalDate date = currentDate;
             DatePickerDialog dpd = new DatePickerDialog(
@@ -397,7 +387,6 @@ public class DashboardFragment extends Fragment {
                     (view, year, month, dayOfMonth) -> {
                         LocalDate pickedDate = LocalDate.of(year, month + 1, dayOfMonth);
                         if (!pickedDate.equals(currentDate)) {
-                            Log.i(TAG, "Fecha seleccionada por usuario: " + pickedDate); // LOG AÑADIDO
                             switchDate(pickedDate);
                         }
                     },
@@ -413,17 +402,14 @@ public class DashboardFragment extends Fragment {
 
     private void setupDateNavigation() {
         btnPrevDay.setOnClickListener(v -> {
-            Log.d(TAG, "Click en Día Anterior"); // LOG AÑADIDO
             switchDate(currentDate.minusDays(1));
         });
 
         btnNextDay.setOnClickListener(v -> {
-            Log.d(TAG, "Click en Día Siguiente"); // LOG AÑADIDO
             LocalDate tomorrow = currentDate.plusDays(1);
             if (ChronoUnit.DAYS.between(LocalDate.now(), tomorrow) <= MAX_DAYS_IN_FUTURE) {
                 switchDate(tomorrow);
             } else {
-                Log.w(TAG, "Intento de navegación a fecha demasiado futura."); // LOG AÑADIDO
                 Toast.makeText(getContext(), "No puedes planificar comidas tan a futuro.", Toast.LENGTH_SHORT).show();
             }
         });
@@ -507,10 +493,6 @@ public class DashboardFragment extends Fragment {
                                 kcalRef.setValue(kcalTodayValue);
                             }
 
-                            // ---------------------------------------------------------
-                            // 3. LÓGICA DE PERSISTENCIA LOCAL vs FIREBASE (AUDITORÍA)
-                            // ---------------------------------------------------------
-
                             // Intentamos cargar lo que hay guardado localmente
                             boolean prefsExistentes = loadGoalsFromPrefs();
                             Log.d(TAG, "Prefs locales existentes: " + prefsExistentes + " | Meta actual en RAM: " + goalsKcal);
@@ -518,7 +500,6 @@ public class DashboardFragment extends Fragment {
                             // REGLA: Solo sobrescribimos con datos de Firebase si NO hay datos locales
                             // o si los datos locales están vacíos/corruptos (goalsKcal <= 0).
                             if (!prefsExistentes || goalsKcal <= 0) {
-                                Log.i(TAG, "AUDIT_TRAIL: Primer inicio o datos locales vacíos. Inicializando con datos de Firebase.");
 
                                 goalsKcal = kcalTodayValue;
                                 goalsP    = user.calculateProtein();
@@ -539,7 +520,6 @@ public class DashboardFragment extends Fragment {
                                 saveGoalsToPrefs();
                             } else {
                                 // Si ya existen preferencias, NO hacemos nada. Respetamos la edición manual del usuario.
-                                Log.i(TAG, "AUDIT_TRAIL: Se respetan las metas manuales locales (" + goalsKcal + " kcal). Ignorando recalculo automático.");
                             }
 
                             // 4. Actualizar UI final
@@ -569,7 +549,6 @@ public class DashboardFragment extends Fragment {
     /* ==================== Cambiar de fecha ==================== */
 
     private void switchDate(LocalDate newDate) {
-        Log.i(TAG, "switchDate: Cambiando fecha de " + currentDate + " -> " + newDate); // LOG AÑADIDO
         if (effectiveUid != null) {
             guardarComidasDelDia(currentDate);
         }
@@ -582,7 +561,6 @@ public class DashboardFragment extends Fragment {
         if (effectiveUid != null) {
             loadFoodBlocksForDate(currentDate);
         } else {
-            Log.w(TAG, "switchDate: effectiveUid es null, limpiando UI."); // LOG AÑADIDO
             foodBlockList.clear();
             if (foodBlockAdapter != null) foodBlockAdapter.notifyDataSetChanged();
             recalculateDayTotals();
@@ -595,7 +573,6 @@ public class DashboardFragment extends Fragment {
         if (!isAdded() || getContext() == null) return;
         if (foodBlockList == null) return;
 
-        Log.d(TAG, "guardarComidasDelDia: Procesando guardado para " + date + ". Bloques: " + foodBlockList.size()); // LOG AÑADIDO
 
         SharedPreferences.Editor ed;
         try {
@@ -607,7 +584,6 @@ public class DashboardFragment extends Fragment {
 
         String json = GSON.toJson(foodBlockList);
         ed.putString(keyFood(date), json);
-        Log.v(TAG, "JSON generado (length=" + json.length() + ")"); // LOG AÑADIDO
 
         Totales t = calcularTotalesActuales();
         ed.putFloat(keyTotK(date), (float) t.kcal);
@@ -616,7 +592,6 @@ public class DashboardFragment extends Fragment {
         ed.putFloat(keyTotC(date), (float) t.carb);
 
         ed.apply();
-        Log.d(TAG, "Guardado completado en SharedPreferences."); // LOG AÑADIDO
     }
 
     private boolean loadGoalsFromPrefs() {
@@ -638,7 +613,6 @@ public class DashboardFragment extends Fragment {
 
         String prefix = effectiveUid + "_";
         if (!p.contains(prefix + K_KCAL)) {
-            Log.d(TAG, "loadGoalsFromPrefs: No se encontraron metas para prefix: " + prefix); // LOG AÑADIDO
             goalsKcal = 0; goalsP = 0; goalsF = 0; goalsC = 0;
             return false;
         }
@@ -647,14 +621,12 @@ public class DashboardFragment extends Fragment {
         goalsP    = p.getFloat(prefix + K_PROT, 0f);
         goalsF    = p.getFloat(prefix + K_FAT , 0f);
         goalsC    = p.getFloat(prefix + K_CARB, 0f);
-        Log.d(TAG, "loadGoalsFromPrefs: Metas cargadas. Kcal: " + goalsKcal); // LOG AÑADIDO
 
         return true;
     }
 
     private void loadFoodBlocksForDate(LocalDate date) {
         if (!isAdded() || getContext() == null) return;
-        Log.d(TAG, "loadFoodBlocksForDate: Cargando para " + date); // LOG AÑADIDO
 
         dataLoaded = false;
 
@@ -675,7 +647,6 @@ public class DashboardFragment extends Fragment {
         boolean debeGuardarCambios = false;
 
         if (json == null || json.isEmpty() || json.equals("[]")) {
-            Log.i(TAG, "No hay datos previos o JSON vacío para esta fecha. Creando bloques por defecto."); // LOG AÑADIDO
             for (String defaultName : DEFAULT_FOOD_NAMES) {
                 foodBlockList.add(new FoodBlock(defaultName));
             }
@@ -686,7 +657,6 @@ public class DashboardFragment extends Fragment {
                 List<FoodBlock> loadedBlocks = GSON.fromJson(json, listType);
 
                 if (loadedBlocks != null && !loadedBlocks.isEmpty()) {
-                    Log.d(TAG, "Bloques cargados desde JSON: " + loadedBlocks.size()); // LOG AÑADIDO
                     foodBlockList.addAll(loadedBlocks);
 
                     for (FoodBlock block : foodBlockList) {
@@ -705,7 +675,6 @@ public class DashboardFragment extends Fragment {
                     }
 
                     if (foodBlockList.size() < DEFAULT_FOOD_NAMES.length) {
-                        Log.d(TAG, "Rellenando bloques faltantes para llegar al mínimo."); // LOG AÑADIDO
                         Set<String> currentTitles = new HashSet<>();
                         for (FoodBlock block : foodBlockList) {
                             if (block.getTitle() != null)
@@ -720,7 +689,6 @@ public class DashboardFragment extends Fragment {
                     }
 
                 } else {
-                    Log.w(TAG, "JSON parseado pero lista vacía. Usando defaults."); // LOG AÑADIDO
                     for (String defaultName : DEFAULT_FOOD_NAMES) foodBlockList.add(new FoodBlock(defaultName));
                     debeGuardarCambios = true;
                 }
@@ -734,7 +702,6 @@ public class DashboardFragment extends Fragment {
         }
 
         if (debeGuardarCambios) {
-            Log.d(TAG, "Se detectaron cambios estructurales/defaults, guardando inmediatamente."); // LOG AÑADIDO
             guardarComidasDelDia(date);
         }
 
@@ -748,7 +715,6 @@ public class DashboardFragment extends Fragment {
 
     private void cleanupOldEntries() {
         if (effectiveUid == null || !isAdded() || getContext() == null) return;
-        Log.d(TAG, "cleanupOldEntries: Iniciando limpieza de entradas antiguas."); // LOG AÑADIDO
 
         SharedPreferences prefs;
         try {
@@ -794,17 +760,14 @@ public class DashboardFragment extends Fragment {
         }
 
         if (removedAny) {
-            Log.w(TAG, "AUDIT_TRAIL: Mantenimiento automático: Eliminados " + count + " registros locales antiguos (>365 días).");
             editor.apply();
         } else {
-            Log.d(TAG, "cleanupOldEntries: No se encontraron registros para eliminar."); // LOG AÑADIDO
         }
     }
 
     /** MIGRACIÓN: Marca como receta items antiguos que tengan ingredientes. */
     private void migrateAllSavedDays() {
         if (!isAdded() || getContext() == null) return;
-        Log.d(TAG, "migrateAllSavedDays: Verificando migraciones de recetas."); // LOG AÑADIDO
 
         SharedPreferences p;
         try {
@@ -847,7 +810,6 @@ public class DashboardFragment extends Fragment {
                 }
 
                 if (changedInThisKey) {
-                    Log.i(TAG, "Migrando entrada antigua con clave: " + key); // LOG AÑADIDO
                     String updatedJson = GSON.toJson(blocks);
                     editor.putString(key, updatedJson);
                     madeChanges = true;
@@ -860,7 +822,6 @@ public class DashboardFragment extends Fragment {
 
         if (madeChanges) {
             editor.apply();
-            Log.i(TAG, "Migración completada y guardada."); // LOG AÑADIDO
         }
     }
 
@@ -868,7 +829,6 @@ public class DashboardFragment extends Fragment {
 
     private void showEditMacrosDialog() {
         if (getContext() == null) return;
-        Log.d(TAG, "Abriendo diálogo de edición de macros."); // LOG AÑADIDO
 
         ContextThemeWrapper themedContext = new ContextThemeWrapper(
                 requireContext(), R.style.ThemeOverlay_Diets_Material3Bridge);
@@ -944,7 +904,6 @@ public class DashboardFragment extends Fragment {
             // Este booleano AHORA SÍ funciona bien
             boolean onlyKcalChanged = kcalChanged && !protChanged && !carbChanged && !fatChanged;
 
-            Log.d(TAG, "Dialogo Macros: KcalChanged=" + kcalChanged + ", OnlyKcal=" + onlyKcalChanged); // LOG AÑADIDO
 
             // --- 3. Aplicar tu lógica ---
             if (onlyKcalChanged) {
@@ -955,7 +914,6 @@ public class DashboardFragment extends Fragment {
                 if (newKcal > maxAllowedKcal && goalsKcal > 0) {
                     // 🛑 ¡AQUÍ ESTÁ TU TOAST! 🛑
                     // Se pasó del 10% de AUMENTO
-                    Log.w(TAG, "Intento de aumento excesivo de calorías. New: " + newKcal + ", Max: " + maxAllowedKcal); // LOG AÑADIDO
                     Toast.makeText(getContext(),
                             "El aumento excede el 10%. No se guardó.",
                             Toast.LENGTH_LONG).show();
@@ -979,7 +937,6 @@ public class DashboardFragment extends Fragment {
                 // ESCENARIO 2: El usuario cambió macros (o no cambió nada)
 
                 if (!kcalChanged && !protChanged && !carbChanged && !fatChanged) {
-                    Log.d(TAG, "Sin cambios en macros, cerrando diálogo."); // LOG AÑADIDO
                     dialog.dismiss(); // No cambió nada en absoluto
                     return;
                 }
@@ -1019,9 +976,6 @@ public class DashboardFragment extends Fragment {
                                      @Nullable Double fixedCarbGr,
                                      @Nullable Double fixedFatGr) {
 
-        Log.d(TAG, "autoRebalanceMacros: TargetKcal=" + targetKcal +
-                " P_fijo=" + fixedProtGr + " C_fijo=" + fixedCarbGr + " F_fijo=" + fixedFatGr); // LOG AÑADIDO
-
         // Caso 0: Solo cambió Kcal -> escalar distribuciones actuales
         if (fixedProtGr == null && fixedCarbGr == null && fixedFatGr == null) {
             double currentTotalKcal = goalsKcal;
@@ -1049,9 +1003,6 @@ public class DashboardFragment extends Fragment {
                 goalsF = Math.round(goalsF * scaleFactor);
             }
 
-            // 🔎 AUDITORÍA: rebalanceo automático de macros (solo Kcal cambiadas)
-            Log.d(TAG, "AUDIT_TRAIL: Rebalanceo inteligente de macros ejecutado. Nueva meta Kcal: " + goalsKcal);
-
             saveGoalsToPrefs();
             updateMacrosUI();
             recalculateDayTotals();
@@ -1067,7 +1018,6 @@ public class DashboardFragment extends Fragment {
         if (fixedFatGr != null) kcalFromFixedMacros += fixedFatGr * 9;
 
         double remainingKcal = targetKcal - kcalFromFixedMacros;
-        Log.v(TAG, "Kcal fijas: " + kcalFromFixedMacros + ", Restantes: " + remainingKcal); // LOG AÑADIDO
 
         if (fixedProtGr != null && fixedCarbGr != null && fixedFatGr != null) {
             finalP = fixedProtGr; finalC = fixedCarbGr; finalF = fixedFatGr;
@@ -1142,9 +1092,6 @@ public class DashboardFragment extends Fragment {
         goalsC = Math.round(finalC);
         goalsF = Math.round(finalF);
 
-        // 🔎 AUDITORÍA: rebalanceo inteligente con macros fijos/parciales
-        Log.d(TAG, "AUDIT_TRAIL: Rebalanceo inteligente de macros ejecutado. Nueva meta Kcal: " + goalsKcal);
-
         saveGoalsToPrefs();
         updateMacrosUI();
         recalculateDayTotals();
@@ -1199,7 +1146,6 @@ public class DashboardFragment extends Fragment {
                 .setPositiveButton("Eliminar", (dialog, which) -> {
                     try {
                         if (position >= 0 && position < foodBlockList.size()) {
-                            Log.d(TAG, "Eliminando bloque en posición: " + position); // LOG AÑADIDO
                             foodBlockList.remove(position);
                             if (foodBlockAdapter != null) {
                                 foodBlockAdapter.notifyItemRemoved(position);
@@ -1208,11 +1154,9 @@ public class DashboardFragment extends Fragment {
                             recalculateDayTotals();
                             guardarComidasDelDia(currentDate);
                         } else {
-                            Log.e(TAG, "Intento de eliminar bloque con posición inválida: " + position); // LOG AÑADIDO
                             Toast.makeText(getContext(), "Posición inválida.", Toast.LENGTH_SHORT).show();
                         }
                     } catch (IndexOutOfBoundsException e) {
-                        Log.e(TAG, "Excepción al eliminar bloque", e); // LOG AÑADIDO
                         Toast.makeText(getContext(), "Error al eliminar.", Toast.LENGTH_SHORT).show();
                     }
                 })
@@ -1248,7 +1192,6 @@ public class DashboardFragment extends Fragment {
         Totales t = calcularTotalesActuales();
 
         // Log Verbose para ver el cálculo exacto si lo necesitas
-        Log.v(TAG, "Recalculando totales: Kcal=" + t.kcal + "/" + goalsKcal + " P=" + t.prot + " C=" + t.carb + " F=" + t.fat); // LOG AÑADIDO
 
         labelCalories.setText(String.format(Locale.getDefault(), "Calorías: %.0f / %.0f kcal", t.kcal, goalsKcal));
         labelProtein.setText(String.format(Locale.getDefault(),  "Proteínas: %.0f / %.0f g",  t.prot, goalsP));
@@ -1274,7 +1217,6 @@ public class DashboardFragment extends Fragment {
 
     public void showRecipeDialog(FoodSearchFragment.FoodResult recipeResult) {
         if (!isAdded() || getParentFragmentManager() == null) return;
-        Log.d(TAG, "Mostrando RecipeDialog para: " + recipeResult.name); // LOG AÑADIDO
 
         RecipeDialog dialog = RecipeDialog.newInstance(recipeResult, effectiveUid); // ✅ Pasar effectiveUid
 
@@ -1306,15 +1248,10 @@ public class DashboardFragment extends Fragment {
                     foodBlockAdapter.notifyItemChanged(0);
                 }
 
-                //  AUDIT TRAIL requerido
-                Log.i(TAG, "AUDIT_TRAIL: Receta añadida al bloque de comida (" + confirmedResult.name + "). " +
-                        "Guardando en historial local (SharedPreferences).");
-
                 guardarComidasDelDia(currentDate);
                 recalculateDayTotals();
 
             } else {
-                Log.e(TAG, "Error: Intento de añadir receta pero foodBlockList está vacía."); // LOG AÑADIDO
                 Toast.makeText(getContext(), "No hay bloques de comida disponibles.", Toast.LENGTH_SHORT).show();
             }
         });

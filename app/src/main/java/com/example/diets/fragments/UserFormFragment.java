@@ -151,10 +151,6 @@ public class UserFormFragment extends Fragment {
             return;
         }
 
-        // 🔎 AUDITORÍA: persistencia de perfil biométrico (sin cálculos de macros aquí)
-        Log.i(TAG, "AUDIT_TRAIL: Guardando perfil biométrico. Peso: " + weight
-                + " | Meta: " + goal + ". (Cálculo de macros delegado al Dashboard).");
-
         Map<String, Object> userData = new HashMap<>();
         userData.put("weight", Double.parseDouble(weight));
         userData.put("height", Double.parseDouble(height));

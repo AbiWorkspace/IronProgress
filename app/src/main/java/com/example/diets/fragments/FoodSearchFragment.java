@@ -180,9 +180,7 @@ public class FoodSearchFragment extends Fragment {
             pm.getMenu().add(0, i, i, (sel ? "✓ " : "") + n);
         }
         pm.setOnMenuItemClickListener(mi -> {
-            toggleQuickFilter(quickFilterNames.get(mi.getItemId()), mi);
-            Log.i(TAG, "AUDIT_TRAIL: Usuario modificó filtros de búsqueda. Recargando parámetros.");
-            return true;
+            toggleQuickFilter(quickFilterNames.get(mi.getItemId()), mi);            return true;
         });
         pm.show();
     }
@@ -207,9 +205,7 @@ public class FoodSearchFragment extends Fragment {
             String n = macroFilterNames.get(mi.getItemId());
             if (macroSelectedNames.contains(n)) macroSelectedNames.remove(n);
             else macroSelectedNames.add(n);
-            mi.setTitle((macroSelectedNames.contains(n) ? "✓ " : "") + n);
-            Log.i(TAG, "AUDIT_TRAIL: Usuario modificó filtros de búsqueda. Recargando parámetros.");
-            return true;
+            mi.setTitle((macroSelectedNames.contains(n) ? "✓ " : "") + n);            return true;
         });
         pm.show();
     }
@@ -380,7 +376,6 @@ public class FoodSearchFragment extends Fragment {
 
     private void searchFood(String query) {
         Log.d(TAG, "searchFood: " + query);
-        Log.i(TAG, "AUDIT_TRAIL: Iniciando búsqueda híbrida para: '" + query + "'. Disparando hilos OFF y Spoonacular.");
         resultObjects.clear(); adapter.notifyDataSetChanged();
         productResults.clear(); recipeResults.clear();
         fetchProductsFromOpenFoodFacts(query);
@@ -409,15 +404,10 @@ public class FoodSearchFragment extends Fragment {
                 for (String n : quickSelectedNames)  url.append(getSpoonacularQuickQuery(n));
                 for (String n : macroSelectedNames) url.append(getSpoonacularMacroQuery(n));
 
-                Log.d(TAG, "AUDIT_TRAIL: Spoonacular filtros server-side aplicados. query=" + query +
-                        " quickFilters=" + quickSelectedNames +
-                        " macroFilters=" + macroSelectedNames);
-
 
                 OkHttpClient cli = OkHttpSingleton.get();
                 Response rsp = cli.newCall(new Request.Builder().url(url.toString()).build()).execute();
 
-                // --- CORRECCIÓN AUDITORÍA: MANEJO ESPECÍFICO DE ERRORES (Doc: SPOON-03) ---
                 if (!rsp.isSuccessful()) {
                     // Caso Cuota Excedida (Documentado en Integración Técnica)
                     if (rsp.code() == 402) {
@@ -438,8 +428,6 @@ public class FoodSearchFragment extends Fragment {
 
                 JSONArray arr = new JSONObject(rsp.body().string()).optJSONArray("results");
                 if (arr == null) return;
-
-                Log.i(TAG, "AUDIT_TRAIL: Spoonacular retornó " + arr.length() + " recetas.");
 
                 for (int i = 0; i < arr.length(); i++) {
                     JSONObject r = arr.getJSONObject(i);
@@ -595,11 +583,8 @@ public class FoodSearchFragment extends Fragment {
                     if (kcal <= 0) continue;
 
                     if (!passesMacroFilters(kcal, protein, carbs, fat, sugar, sodium, fiber)) {
-                        Log.d(TAG, "AUDIT_TRAIL: OFF Producto descartado por filtros de Macros: " + name);
                         continue;
                     }
-
-                    Log.v(TAG, "AUDIT_TRAIL: OFF Producto aceptado: " + name);
 
                     String brand = p.optString("brands", "Sin marca");
                     String img   = p.optString("image_front_url", "");

@@ -72,9 +72,6 @@ public class ExerciseDistributionFragment extends Fragment {
                 data.putSerializable("trainingDays", (Serializable) trainingDays);
                 data.putString("userId", userId);
 
-                // AUDITORÍA: confirmando selección antes de navegar
-                Log.i(TAG, "AUDIT_TRAIL: Confirmando distribución. Pasando datos a siguiente paso (En memoria).");
-
                 ((ViewPagerActivity) getActivity()).switchToSelectExercisesFragment(data);
             } else {
                 Log.d(TAG, "No se ha seleccionado ninguna distribución");
@@ -139,9 +136,6 @@ public class ExerciseDistributionFragment extends Fragment {
                     if (!hasNotRecommended) {
                         displayNoDistributionsMessage(notRecommendedContainer);
                     }
-
-                    // AUDITORÍA: resumen de filtrado Recomendado / No recomendado
-                    Log.i(TAG, "AUDIT_TRAIL: Distribuciones cargadas. Recomendadas: " + hasRecommended + " | No Recomendadas: " + hasNotRecommended);
                 }
             }
 
@@ -298,9 +292,6 @@ public class ExerciseDistributionFragment extends Fragment {
                 for (RadioButton rb : radioButtons) {
                     if (rb != buttonView) rb.setChecked(false);
                 }
-
-                // AUDITORÍA: selección explícita de distribución
-                Log.i(TAG, "AUDIT_TRAIL: Usuario seleccionó distribución: " + distribution.getTitle());
             }
         });
 
