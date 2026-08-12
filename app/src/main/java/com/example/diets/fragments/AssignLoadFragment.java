@@ -108,9 +108,6 @@ public class AssignLoadFragment extends Fragment {
         saveButton.setOnClickListener(v -> {
             Log.d(TAG, "AssignLoadFragment - onViewCreated: Botón de guardar clicado");
 
-            //  AUDITORÍA: intento global de cierre del formulario de cargas
-            Log.i(TAG, "AUDIT_TRAIL: Intento de finalizar asignación de cargas. Validando " + userExercises.size() + " ejercicios.");
-
             saveAssignedLoads();
             // Mostrar mensaje al usuario
 

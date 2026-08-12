@@ -97,11 +97,6 @@ public class RecipeDialog extends DialogFragment {
             Log.e(TAG, "ERROR CRÍTICO: RecipeDialog iniciado sin UID.");
         }
 
-        // === AUDIT_TRAIL: apertura de detalle de receta ===
-        boolean tieneInstrucciones = recipe.instructions != null && !recipe.instructions.isEmpty();
-        Log.i(TAG, "AUDIT_TRAIL: Abriendo detalle de receta. ID: " + recipe.idMeal
-                + " | Tiene instrucciones: " + tieneInstrucciones);
-
         Log.d(TAG, "onCreateView: receta recibida – idMeal=" + recipe.idMeal +
                 " | name=" + recipe.name +
                 " | instrLen=" + (recipe.instructions == null ? "null" : recipe.instructions.length()));
@@ -240,11 +235,6 @@ public class RecipeDialog extends DialogFragment {
                 return;
             }
 
-            // AUDIT_TRAIL al confirmar receta y recalcular macros
-            Log.d(TAG, "AUDIT_TRAIL: Confirmando receta. Gramos: " + grams +
-                    ". Recalculando macros (Kcal: " + recipe.kcalPer100g + ").");
-
-            // Solo esto:
             recipe.grams = grams;
 
             Log.d(TAG, "btnSave: gramos seleccionados → " + grams);
