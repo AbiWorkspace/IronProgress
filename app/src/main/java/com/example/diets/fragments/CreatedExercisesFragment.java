@@ -160,10 +160,6 @@ public class CreatedExercisesFragment extends Fragment implements
     private void deleteSelectedExercises() {
         Log.d(TAG, "deleteSelectedExercises: Eliminando " + selectedExercises.size() + " ejercicios seleccionados.");
 
-        // ⚠️ AUDIT_TRAIL: regla de independencia entre JSON local y planes en Firebase
-        Log.w(TAG, "AUDIT_TRAIL: Eliminando " + selectedExercises.size()
-                + " ítems del catálogo local. Los planes en Firebase NO se ven afectados (Regla de Independencia).");
-
         exercises.removeAll(selectedExercises);
         selectedExercises.clear();
         selectedExerciseIds.clear(); // mantener en sync con el adapter
@@ -176,10 +172,6 @@ public class CreatedExercisesFragment extends Fragment implements
         if (!ready()) return;
         String u = uid();
         if (u == null) { Log.w(TAG, "save: uid null"); return; }
-
-        // 📁 AUDIT_TRAIL: énfasis en el archivo JSON local por usuario
-        Log.i(TAG, "AUDIT_TRAIL: Escribiendo " + exercises.size()
-                + " ejercicios en archivo local privado: " + file().getName());
 
         try (FileWriter writer = new FileWriter(file())) {
             new Gson().toJson(exercises, writer);
@@ -208,9 +200,6 @@ public class CreatedExercisesFragment extends Fragment implements
     private void loadExercisesFromInternalStorage(@Nullable List<MovementPattern> movementPatterns) {
         Log.d(TAG, "loadExercisesFromInternalStorage: Iniciando carga desde almacenamiento interno.");
 
-        // 📖 AUDIT_TRAIL: lectura explícita del catálogo offline
-        Log.d(TAG, "AUDIT_TRAIL: Leyendo catálogo local. Origen: Almacenamiento Interno (Offline).");
-
         if (!ready()) return;
         String u = uid();
         if (u == null) { Log.w(TAG, "load: uid null"); return; }
@@ -229,9 +218,6 @@ public class CreatedExercisesFragment extends Fragment implements
 
             exercises.clear();
             if (loadedExercises != null) {
-                // (Se mantiene este AUDIT_TRAIL si quieres detalle de conteo)
-                Log.i(TAG, "AUDIT_TRAIL: Cargando ejercicios personalizados desde JSON local. Total: " + loadedExercises.size());
-
                 exercises.addAll(loadedExercises); // por ahora sin filtro
                 Log.d(TAG, "loadExercisesFromInternalStorage: Cargados " + exercises.size()
                         + " ejercicios desde " + f.getName());

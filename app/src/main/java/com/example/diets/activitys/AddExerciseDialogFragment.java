@@ -157,9 +157,6 @@ public class AddExerciseDialogFragment extends DialogFragment {
             return;
         }
 
-        // AUDITORÍA: intento de creación con conteo de imágenes
-        Log.i(TAG, "AUDIT_TRAIL: Intentando crear ejercicio: " + exerciseName + " | Imágenes: " + imagesBase64.size());
-
         Exercise newExercise = new Exercise();
 
         // 🔍 Establecer como ejercicio de almacenamiento interno
@@ -280,9 +277,6 @@ public class AddExerciseDialogFragment extends DialogFragment {
             // Guardar lista en formato JSON
             File f = file();
 
-            Log.d(TAG, "AUDIT_TRAIL: Persistiendo " + exercises.size()
-                    + " ejercicios en archivo aislado por UID: " + f.getName());
-
             try (FileWriter writer = new FileWriter(f)) {
                 Gson gson = new Gson();
                 String json = gson.toJson(exercises);
@@ -299,8 +293,6 @@ public class AddExerciseDialogFragment extends DialogFragment {
 
     private void loadMusclesFromDatabase() {
         Log.d("AddExerciseDialogFragment", "loadMusclesFromDatabase: Cargando músculos desde la base de datos");
-        // AUDITORÍA: sincronización de catálogos para validar formularios
-        Log.d(TAG, "AUDIT_TRAIL: Sincronizando catálogos desde Firebase para validación de formularios.");
 
         DatabaseReference exercisesRef = FirebaseDatabase.getInstance().getReference().child("exercises");
         exercisesRef.addListenerForSingleValueEvent(new ValueEventListener() {

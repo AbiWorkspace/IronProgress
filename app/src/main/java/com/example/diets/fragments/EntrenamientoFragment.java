@@ -109,9 +109,6 @@ public class EntrenamientoFragment extends Fragment {
             int days = Integer.parseInt(daysText.replaceAll("\\D+", ""));
             int time = Integer.parseInt(timeText.replaceAll("\\D+", ""));
 
-            // 🔎 AUDITORÍA: datos efímeros capturados antes de crear el Bundle
-            Log.i(TAG, "AUDIT_TRAIL: Capturando parámetros de filtrado (Efímeros) -> Días: " + days + ", Exp: " + experience + ". Pasando a siguiente vista sin persistir en BD.");
-
             // Crear un Bundle con los datos
             Bundle data = new Bundle();
             data.putString("goal", goal);

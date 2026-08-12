@@ -70,14 +70,8 @@ public class CoachPendingActivity extends AppCompatActivity {
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 String role = snapshot.getValue(String.class);
 
-                // AUDIT TRAIL: monitoreo en tiempo real del rol
-                Log.i(TAG, "AUDIT_TRAIL: Monitoreando estado de rol. Valor actual en DB: " + role);
-
                 Log.d(TAG, "role actual: " + role);
                 if ("coach".equalsIgnoreCase(role)) {
-
-                    // AUDIT TRAIL: transición a rol coach detectada
-                    Log.w(TAG, "AUDIT_TRAIL: Rol 'Coach' detectado. Aprobación concedida. Navegando a Panel.");
 
                     // Ya eres coach → ir a la lista de usuarios (pantallas del coach)
                     Intent i = new Intent(CoachPendingActivity.this, UsersListActivity.class);
