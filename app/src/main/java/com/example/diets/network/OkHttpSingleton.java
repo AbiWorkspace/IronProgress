@@ -15,7 +15,6 @@ import okhttp3.Response;
  * - Timeouts: 15s / 45s / 50s
  * - User-Agent global
  * - Reintentos con backoff exponencial (1s, 2s, 4s) + log de intento
- * - Métricas: MetricsInterceptor (NET_URL, NET_METRICS, SPN_METRICS)
  */
 public final class OkHttpSingleton {
 
@@ -44,8 +43,6 @@ public final class OkHttpSingleton {
                                         .build();
                                 return chain.proceed(request);
                             })
-                            // 3) Métricas y URL segura
-                            .addInterceptor(new MetricsInterceptor())
                             .retryOnConnectionFailure(true)
                             .build();
                 }
@@ -71,13 +68,8 @@ public final class OkHttpSingleton {
             IOException last = null;
 
             while (attempt <= maxRetries) {
-                // Marcar intento para que lo lea MetricsInterceptor
-                Request attemptReq = original.newBuilder()
-                        .header("X-Retry-Count", String.valueOf(attempt))
-                        .build();
-
                 try {
-                    return chain.proceed(attemptReq);
+                    return chain.proceed(original);
                 } catch (IOException e) {
                     last = e;
                     if (attempt >= maxRetries) break;
